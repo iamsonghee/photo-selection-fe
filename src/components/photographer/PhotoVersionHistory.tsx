@@ -58,7 +58,7 @@ export function PhotoVersionHistory({
         </div>
         <div className={styles.comment}>
           <h3>{commentHeading}</h3>
-          <p>{comment?.trim() || "남긴 요청이 없습니다."}</p>
+          <p>{comment?.trim() || "남긴 내용이 없습니다."}</p>
         </div>
       </section>
       {canCompare && comparisonTarget ? <button type="button" aria-pressed={compareEnabled} onClick={() => onCompareChange(!compareEnabled)} className={styles.compare}>

@@ -671,7 +671,7 @@ export default function ProjectAssetsPageClient({
         ) : (
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <strong>선택 {selectedPhotos.length.toLocaleString()}장</strong>
-            <span className="hidden text-muted-foreground md:inline">· 고객 메모 {commentCount.toLocaleString()}장</span>
+            <span className="hidden text-muted-foreground md:inline">· 작가 전달 메모 {commentCount.toLocaleString()}장</span>
           </div>
         )}
         actions={(
@@ -931,6 +931,7 @@ export default function ProjectAssetsPageClient({
         activeTab === "original" ? (
           <OriginalPhotoViewer
             photos={viewerFilmstripPhotos}
+            mobileDetailLayout
             activeIndex={viewerFilmstripIndex ?? 0}
             onActiveIndexChange={(index) => {
               if (inGroupReview) setGroupReviewIndex(index);
@@ -996,7 +997,7 @@ export default function ProjectAssetsPageClient({
               const count = group ? (membersByGroup.get(group.id)?.length ?? group.photoCount) : 0;
               const representative = inGroupReview && groupReviewGroup?.representativePhotoId === photo.id;
               return <>
-                {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[#111315]/80 px-1.5 text-xs font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
+                {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[color-mix(in_srgb,var(--darkroom-stage)_80%,transparent)] px-1.5 text-xs font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
                 {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-xs font-bold text-accent-foreground">대표</span> : null}
               </>;
             }}

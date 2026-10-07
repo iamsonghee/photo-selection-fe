@@ -5,6 +5,13 @@
 :root {
   /* 라이트 화면 공통 캔버스(작가 운영 화면·셀프 고객) — html/body overscroll에서도 쓰여 :root에 둔다. 전역 기본 토큰은 Dark Photo Workspace 그대로. */
   --acut-canvas: #f5f8f8;
+  /* 암실(상세 뷰어·비교) — 라이트 화면 테마 안에 떠도 같은 값을 쓰도록 이름을 따로 둔다(DESIGN.md darkroom-*). */
+  --darkroom-stage: #0a0b0d;
+  --darkroom-surface: #15161a;
+  --darkroom-raised: #1d1e23;
+  --darkroom-text: #f2f2f4;
+  --darkroom-muted: #b8b8c0;
+  --darkroom-border: #3a3a42;
   --background: #0a0b0d;
   --foreground: #f2f2f4;
   --muted-foreground: #b8b8c0;

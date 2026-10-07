@@ -376,7 +376,7 @@ export function OriginalPhotoViewer({
           </div>
           {!focused ? <PrevNextButton direction="next" size="xl" align="edge" className={`${styles.nav} ${styles.navNext}`} style={{ zIndex: 2 }} onClick={(event) => { event.stopPropagation(); next(); }} /> : null}
           <p className={styles.gestureHint} data-used={hasCompared} onClick={(event) => event.stopPropagation()}>
-            {canHoldPreview && !showMissingRetouched ? "사진을 꾹 누르면 원본을 볼 수 있어요." : `${mobileEnabled ? "한 번 탭" : "사진 클릭"}하면 사진만 크게 볼 수 있어요.`}
+            {canHoldPreview && !showMissingRetouched ? "사진을 꾹 누르면 원본을 볼 수 있어요." : "사진을 누르면 사진만 크게 볼 수 있어요."}
           </p>
         </div>
         {inspector ? <aside className={styles.inspector} aria-label="사진 상세 정보" onClick={(event) => event.stopPropagation()}>{inspector}</aside> : null}

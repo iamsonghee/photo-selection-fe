@@ -22,6 +22,7 @@ colors:
   darkroom-surface: "#15161a"
   darkroom-raised: "#1d1e23"
   darkroom-text: "#f2f2f4"
+  darkroom-muted: "#b8b8c0"
   darkroom-border: "#3a3a42"
 typography:
   page-title:
@@ -150,7 +151,7 @@ A컷은 한 화면을 라이트/다크로 토글하는 제품이 아니라 두 �
 - **Paper White** (`paper-white`): 카드·패널·표(레벨 1).
 - **Raised Mist** (`raised-mist`): 보조 버튼, hover, 표 헤더(레벨 2).
 - **Hairlines**: 남색 9% / 16% / 28%를 흰색에 섞은 구분선. 기본은 subtle.
-- **Darkroom** (`darkroom-*`): 상세 뷰어·비교 화면의 무대, 면, 글자, 경계.
+- **Darkroom** (`darkroom-*`): 상세 뷰어·비교 화면의 무대, 면, 띄운 면, 글자, 보조 글자, 경계. `globals.css`의 `--darkroom-*` 변수로 쓴다.
 
 ### Semantic
 - **Critical Red** (`critical-red`): 해당 단계의 기한 초과, 오류, 파괴적 행동에만.

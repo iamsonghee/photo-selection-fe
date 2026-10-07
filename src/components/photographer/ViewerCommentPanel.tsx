@@ -44,7 +44,7 @@ export function ViewerCommentPanel({
           ))}
         </div>
       ) : (
-        <p className={styles.empty}>내용이 없습니다.</p>
+        <p className={styles.empty}>남긴 메모가 없습니다.</p>
       )}
     </section>
   );

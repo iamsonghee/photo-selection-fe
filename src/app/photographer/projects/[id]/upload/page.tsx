@@ -4380,6 +4380,7 @@ export default function ProjectDetailPage() {
       {isPhotoViewerOpen && activePhoto && viewerFilmstripIndex !== null ? (
         <OriginalPhotoViewer
           photos={viewerFilmstripPhotos}
+          mobileDetailLayout
           headerControls={photoUploadAllowed ? (
             <button type="button" disabled={recommendationSaving} aria-pressed={recommendedPhotoIds.has(activePhoto.id)}
               className="inline-flex min-h-11 items-center gap-2 rounded px-3 text-sm text-white disabled:opacity-50"
@@ -4416,7 +4417,7 @@ export default function ProjectDetailPage() {
                 <div className="flex min-w-0 items-center gap-2">
                   <ImagePlus size={16} aria-hidden className="shrink-0 text-white/70" />
                   <span className="whitespace-nowrap text-[12px] font-semibold">고객 진입 대표</span>
-                  <span className="truncate text-[11px] text-white/50">현재 사진을 첫 화면에 사용</span>
+                  <span className="truncate text-xs text-white/60">현재 사진을 첫 화면에 사용</span>
                 </div>
                 <button
                   type="button"
@@ -4478,9 +4479,9 @@ export default function ProjectDetailPage() {
             const representative = inGroupReview && groupReviewGroup?.representativePhotoId === photo.id;
             const entryCover = project.coverPhotoId === photo.id;
             return <>
-              {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[#111315]/80 px-1.5 text-[10px] font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
-              {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-[8px] font-bold text-accent-foreground">대표</span> : null}
-              {entryCover ? <span className="absolute left-0.5 top-0.5 z-[2] rounded-[3px] bg-white/90 px-1 py-px text-[8px] font-bold text-[#191918]">진입 대표</span> : null}
+              {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[color-mix(in_srgb,var(--darkroom-stage)_80%,transparent)] px-1.5 text-xs font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
+              {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-xs font-bold text-accent-foreground">대표</span> : null}
+              {entryCover ? <span className="absolute left-0.5 top-0.5 z-[2] rounded-[3px] bg-white/90 px-1 py-px text-xs font-bold text-[var(--darkroom-stage)]">진입 대표</span> : null}
             </>;
           }}
         />

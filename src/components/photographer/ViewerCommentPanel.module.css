@@ -6,7 +6,7 @@
   min-height: 0;
   flex-direction: column;
   padding: 24px 20px;
-  color: #fff;
+  color: var(--darkroom-text);
 }
 
 .heading {
@@ -14,7 +14,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  color: #65cfd0;
+  color: var(--customer-foreground, #75cdcb);
 }
 
 .heading h2 {
@@ -32,7 +32,7 @@
   overscroll-behavior: contain;
   padding-right: 4px;
   padding-left: 16px;
-  border-left: 2px solid rgb(101 207 208 / 70%);
+  border-left: 2px solid color-mix(in srgb, var(--customer-foreground, #75cdcb) 70%, transparent);
   scrollbar-color: rgb(255 255 255 / 22%) transparent;
 }
 
@@ -42,8 +42,8 @@
 
 .source {
   margin: 0 0 3px;
-  color: #65cfd0;
-  font-size: 11px;
+  color: var(--customer-foreground, #75cdcb);
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
 }
@@ -51,7 +51,7 @@
 .text {
   margin: 0;
   overflow-wrap: anywhere;
-  color: rgb(255 255 255 / 88%);
+  color: var(--darkroom-text);
   font-size: 14px;
   line-height: 24px;
   white-space: pre-wrap;
@@ -59,7 +59,7 @@
 
 .empty {
   margin: 16px 0 0;
-  color: rgb(255 255 255 / 38%);
+  color: var(--darkroom-muted);
   font-size: 13px;
   line-height: 20px;
 }
