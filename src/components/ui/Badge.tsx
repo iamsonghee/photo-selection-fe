@@ -32,7 +32,7 @@ const toneClasses: Record<BadgeTone, string> = {
 };
 
 const lightToneClasses: Partial<Record<BadgeTone, string>> = {
-  time: "bg-white text-[rgba(2, 56, 82, 0.68)] border-[#d7dfe3]",
+  time: "bg-white text-[rgba(2,56,82,0.68)] border-[#d7dfe3]",
 };
 
 export function Badge({ tone, icon, theme = "workspace", className = "", children, ...props }: BadgeProps) {

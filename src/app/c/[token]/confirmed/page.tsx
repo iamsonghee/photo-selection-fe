@@ -57,7 +57,7 @@ export default function ConfirmedPage() {
 
   if (loading) return <CustomerPageSkeleton variant="page" />;
   if (!project) {
-    return <main className="flex min-h-dvh items-center justify-center bg-white text-sm text-[rgba(2, 56, 82, 0.52)]">존재하지 않는 초대 링크입니다.</main>;
+    return <main className="flex min-h-dvh items-center justify-center bg-white text-sm text-[rgba(2,56,82,0.52)]">존재하지 않는 초대 링크입니다.</main>;
   }
   if (["selecting", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status)) {
     return <CustomerPageSkeleton variant="page" />;
