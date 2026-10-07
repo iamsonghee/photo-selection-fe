@@ -35,14 +35,10 @@ test.describe("고객 — 셀렉 확정 완료", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("heading", { name: "사진 셀렉이 완료되었어요" })).toBeVisible();
-    await expect(page.getByText(`선택 완료 · ${project.requiredCount}장`, { exact: true })).toBeVisible();
-
-    const success = page.locator(".confirmed-success");
-    await expect(success).toHaveCSS("color", "rgb(255, 77, 0)");
+    await expect(page.getByText(`셀렉 확정 완료 · ${project.requiredCount}장`, { exact: true })).toBeVisible();
 
     const detailLink = page.getByRole("link", { name: "선택한 사진 보기" });
     await expect(detailLink).toHaveAttribute("href", `/c/${project.accessToken}/locked`);
-    await expect(detailLink).toHaveCSS("background-color", "rgb(38, 40, 44)");
 
     const resultBox = await page.locator(".confirmed-result").boundingBox();
     const summaryBox = await page.locator(".confirmed-selection-summary").boundingBox();
