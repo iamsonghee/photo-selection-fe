@@ -7,7 +7,8 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await loginAsPhotographer(page);
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/customer-select/new");
+    // /new는 유형 선택(촬영본 고르기·하객 사진 모으기), 촬영본 생성 폼은 /new/photos다(2026-10-06).
+    await page.goto("/customer-select/new/photos");
     await expect(page.getByRole("heading", { name: "어떤 사진을 골라볼까요?" })).toBeVisible();
     // 셀프 고객은 장면 구성이 다른 촬영 종류를 나눠 고른다(웨딩 본식/웨딩 촬영 등).
     await expect(page.getByRole("button", { name: "웨딩 본식" })).toBeVisible();
