@@ -493,7 +493,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 ### 7.15.1 Project Detail Work Panel
 
 - 우측 Work Panel은 다음 행동을 안내하는 보조 영역이며, 페이지 본문이나 Expanded Stepper보다 큰 상태 배너처럼 보이지 않아야 한다.
-- outer padding 24px, eyebrow 14/20px, title 24/32px, description 14/22px을 사용한다. Desktop panel 높이는 430px 이하를 기준으로 한다.
+- outer padding 28px(PC 상세), eyebrow 13/20px, title 26px/1.4(PC 상세, 모바일 20/28px), description 14/22px을 사용한다. Desktop panel 높이는 430px 이하를 기준으로 한다.
 - meta는 배경 상자 없이 흰 면 위 subtle divider 줄로만 나눈다(2026-10-07, 카드 안 회색 상자 제거). label 13/20px, value 14/20px이다.
 - Photographer Primary CTA만 Orange filled를 사용한다. Customer/Completed action은 Neutral Secondary를 유지한다. 행위자는 eyebrow 한 줄 `● 현재 진행 · 고객 차례`(8px 점 + 13px 글자)로만 말하고, 아이콘 타일·`고객 진행 중` badge·카드 윗줄 색은 쓰지 않는다(2026-10-07 — 같은 상태를 세 번 말했다).
 - CTA는 48px 높이와 14/20px Bold를 사용한다. 카드 테두리는 항상 Neutral이며 semantic border(윗줄 포함)로 CTA와 경쟁하지 않는다. 우측 정보 카드 제목은 PC·모바일 모두 `프로젝트 정보`다.
@@ -503,7 +503,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 - Project Information은 하나의 white Level-1 container 안에서 divider와 spacing으로 `기본 정보 → 고객 갤러리 설정 → 고객 링크`를 구분한다. 하위 정보마다 독립 raised card를 반복하지 않는다.
 - container header는 x 24px/y 16px, title 18/24px이다. section body는 24px, section title은 15/20px이고 numbered marker는 20px을 유지한다.
 - 촬영 일자처럼 독립적으로 읽어야 하는 핵심 정보만 border 없는 `surface-raised` block을 사용한다. 고객 identity와 보조 metadata는 white surface 위에서 typography와 divider로 구분한다.
-- 갤러리 설정 값은 네 개의 개별 card가 아니라 하나의 `surface-raised` summary strip으로 묶는다. item min-height 56px, label 12/20px Medium, value 14/20px Semibold이며 item 사이는 subtle divider만 사용한다.
+- 갤러리 설정 값은 네 개의 개별 card나 회색 strip 없이, 흰 면 위 `고객 갤러리 설정` 소제목 아래 label–value 줄로 나열한다. label은 muted, value는 오른쪽 정렬 Semibold다.
 - summary strip은 desktop 4열, medium 2열, mobile 1열로 재배치되며 각 값의 의미와 순서는 바꾸지 않는다.
 
 ### 7.15.3 Customer Link Tool

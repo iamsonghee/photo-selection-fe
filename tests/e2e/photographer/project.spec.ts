@@ -334,7 +334,8 @@ test.describe("작가 — 프로젝트 관리", () => {
     if (process.env.SIDEBAR_CAPTURE === "1") {
       await page.screenshot({ path: "test-results/sidebar-light/collapsed-project-detail.png", fullPage: true });
     }
-    await expect(sidebar).toHaveCSS("background-color", "rgb(245, 248, 248)");
+    // 2026-09-14 개편부터 Light 사이드바 바탕은 color-mix(canvas 72%, surface)다.
+    await expect(sidebar).toHaveCSS("background-color", "color(srgb 0.971765 0.980235 0.980235)");
     const sidebarFontFamily = await sidebar.evaluate((element) => getComputedStyle(element).fontFamily);
     expect(sidebarFontFamily).toContain("Pretendard");
     expect(sidebarFontFamily).not.toContain("Inter");
@@ -381,7 +382,6 @@ test.describe("작가 — 프로젝트 관리", () => {
     }
     await deleteDialog.getByRole("button", { name: "취소" }).click();
     await expect(page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible")).toBeVisible({ timeout: 8000 });
-    await expect(page.getByRole("button", { name: "알림톡 보내기" })).toBeDisabled();
     await expect(page.getByRole("button", { name: /PIN (변경|설정)/ })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "원본 사진을 업로드하세요" })).toBeVisible();
     const progressCardBox = await page.locator("[data-project-progress-card]").boundingBox();
@@ -398,47 +398,39 @@ test.describe("작가 — 프로젝트 관리", () => {
     expect(workPanelBox).not.toBeNull();
     expect(workPanelBox!.height).toBeLessThanOrEqual(430);
     const workPanelTitle = page.locator("[data-project-work-panel] h2");
-    await expect(workPanelTitle).toHaveCSS("font-size", "24px");
-    await expect(workPanelTitle).toHaveCSS("line-height", "32px");
+    // PC 상세 테마(ProjectDetailTheme.module.css)가 26px / 1.4로 키운다.
+    await expect(workPanelTitle).toHaveCSS("font-size", "26px");
+    await expect(workPanelTitle).toHaveCSS("line-height", "36.4px");
     const informationCard = page.locator("[data-project-information-card]");
     await expect(informationCard).toBeVisible();
     await expect(informationCard.getByRole("heading", { name: "프로젝트 정보" })).toHaveCSS("font-size", "18px");
     const gallerySummary = page.locator("[data-project-gallery-summary]");
-    await expect(gallerySummary).toHaveCSS("background-color", "rgb(238, 243, 244)");
+    // 갤러리 설정은 회색 띠 없이 흰 면 위 줄로만 나눈다(카드 안 상자 금지).
+    await expect(gallerySummary).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(gallerySummary.locator("dt")).toHaveCount(4);
     await expect(gallerySummary.locator("dd")).toHaveCount(4);
     const customerLinkSection = page.locator("[data-project-customer-link]");
     await expect(customerLinkSection).toBeVisible();
-    const customerLinkControls = customerLinkSection.locator("[data-customer-link-control]");
-    await expect(customerLinkControls).toHaveCount(2);
-    await expect(customerLinkControls.first()).toHaveCSS("height", "44px");
-    const kakaoButton = customerLinkSection.getByRole("button", { name: "알림톡 보내기" });
-    await expect(kakaoButton).toBeDisabled();
-    await expect(kakaoButton).toHaveCSS("background-color", "rgb(238, 243, 244)");
+    // 원본 준비(preparing) 단계에서는 링크 도구(링크·PIN·복사·알림톡)를 숨기고 안내 문장만 보인다.
+    await expect(customerLinkSection.getByText("원본을 준비하고 셀렉을 요청하면 고객 링크를 공유할 수 있어요.")).toBeVisible();
+    await expect(customerLinkSection.locator("[data-customer-link-control]").first()).toBeHidden();
     const primaryColumnBox = await page.locator("[data-project-detail-primary-column]").boundingBox();
     const secondaryColumnBox = await page.locator("[data-project-detail-secondary-column]").boundingBox();
     expect(primaryColumnBox).not.toBeNull();
     expect(secondaryColumnBox).not.toBeNull();
-    expect(secondaryColumnBox!.width).toBeGreaterThanOrEqual(379);
-    expect(secondaryColumnBox!.width).toBeLessThanOrEqual(441);
-    expect(primaryColumnBox!.width).toBeGreaterThan(secondaryColumnBox!.width);
+    // 좁은 오른쪽 열은 프로젝트 정보 열(data-project-detail-primary-column), 넓은 왼쪽이 작업 열이다.
+    expect(primaryColumnBox!.width).toBeGreaterThanOrEqual(379);
+    expect(primaryColumnBox!.width).toBeLessThanOrEqual(441);
+    expect(primaryColumnBox!.x).toBeGreaterThan(secondaryColumnBox!.x);
+    expect(secondaryColumnBox!.width).toBeGreaterThan(primaryColumnBox!.width);
     expect(Math.abs(primaryColumnBox!.y - secondaryColumnBox!.y)).toBeLessThanOrEqual(1);
-    for (const selector of [
-      "[data-project-shoot-date]",
-      "[data-project-customer-phone]",
-      "[data-project-review-deadline]",
-    ]) {
-      const fontFamily = await page.locator(selector).evaluate(
-        (element) => getComputedStyle(element).fontFamily,
-      );
-      expect(fontFamily).toContain("Pretendard");
-      expect(fontFamily).not.toContain("Inter");
-      expect(fontFamily).not.toContain("JetBrains Mono");
-    }
-    await expect(page.locator("[data-project-shoot-date]")).toHaveCSS("line-height", "32px");
-    await expect(page.locator("[data-project-customer-phone]")).toHaveCSS("line-height", "22px");
-    await expect(page.locator("[data-project-review-deadline]")).toHaveCSS("line-height", "24px");
-    await expect(page.getByText("사진 업로드 후 가능", { exact: true })).toBeVisible();
+    // 정보 카드 개편(행 목록)으로 전화번호·검토 마감은 값이 있을 때만 보인다 — 늘 있는 촬영일로 폰트 규칙만 확인한다.
+    const shootDateFont = await page.locator("[data-project-shoot-date]").evaluate((element) => getComputedStyle(element).fontFamily);
+    expect(shootDateFont).toContain("Pretendard");
+    expect(shootDateFont).not.toContain("Inter");
+    expect(shootDateFont).not.toContain("JetBrains Mono");
+    // PC 상세는 단계 설명 줄을 숨긴 축약 Stepper다(ProjectDetailTheme) — 설명은 단계 aria-label로 전달된다.
+    await expect(page.locator('[data-project-progress-card] [aria-label="셀렉, 사진 업로드 후 가능"]')).toHaveCount(1);
     await expect(page.getByText("YOU ARE HERE", { exact: true })).toHaveCount(0);
   });
 
