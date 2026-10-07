@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T10:30:10.616299+09:00",
+  "title": "Design System: A컷 (ACUT)",
+  "extensions": {
+    "colorMeta": {
+      "brand-orange": {
+        "role": "primary",
+        "displayName": "Brand Orange",
+        "tonalRamp": [
+          "#4a1600",
+          "#7a2400",
+          "#b03300",
+          "#e04400",
+          "#ff4d00",
+          "#ff7a40",
+          "#ffb08c",
+          "#ffe3d6"
+        ]
+      },
+      "customer-teal": {
+        "role": "secondary",
+        "displayName": "Customer Teal",
+        "tonalRamp": [
+          "#023030",
+          "#044f50",
+          "#057071",
+          "#079fa0",
+          "#3db6b7",
+          "#7ccecf",
+          "#b6e5e5",
+          "#e6f6f6"
+        ]
+      },
+      "deep-navy": {
+        "role": "neutral",
+        "displayName": "Deep Navy",
+        "tonalRamp": [
+          "#011a26",
+          "#023852",
+          "#35607a",
+          "#5c7f93",
+          "#8aa3b1",
+          "#b8c7cf",
+          "#d7dfe3",
+          "#e8edef"
+        ]
+      },
+      "studio-canvas": {
+        "role": "neutral",
+        "displayName": "Studio Canvas"
+      },
+      "paper-white": {
+        "role": "neutral",
+        "displayName": "Paper White"
+      },
+      "raised-mist": {
+        "role": "neutral",
+        "displayName": "Raised Mist"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "color-mix(in srgb, #023852 16%, #ffffff)"
+      },
+      "hairline-subtle": {
+        "role": "neutral",
+        "displayName": "Hairline Subtle",
+        "canonical": "color-mix(in srgb, #023852 9%, #ffffff)"
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "color-mix(in srgb, #023852 28%, #ffffff)"
+      },
+      "critical-red": {
+        "role": "semantic",
+        "displayName": "Critical Red"
+      },
+      "warning-yellow": {
+        "role": "semantic",
+        "displayName": "Warning Yellow"
+      },
+      "darkroom-stage": {
+        "role": "neutral",
+        "displayName": "Darkroom Stage"
+      }
+    },
+    "typographyMeta": {
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "페이지당 하나의 제목."
+      },
+      "section-title": {
+        "displayName": "Section Title",
+        "purpose": "패널·섹션 머리."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "설명 문장."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "행위자 라벨, 현재 행동, 메타데이터."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Primary/Danger 700, Secondary 400; 같은 크기."
+      },
+      "mono-id": {
+        "displayName": "Mono ID",
+        "purpose": "프로젝트 ID, D+N, 카운터에만."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-lift",
+        "value": "0 10px 24px -22px rgba(2,56,82,0.72)",
+        "purpose": "테두리 없는 반복 Work Card."
+      },
+      {
+        "name": "hairline-lift",
+        "value": "0 2px 6px rgba(2,56,82,0.03)",
+        "purpose": "조용한 컨트롤."
+      },
+      {
+        "name": "overlay",
+        "value": "0 12px 32px rgba(2,56,82,0.18)",
+        "purpose": "팝오버·시트."
+      },
+      {
+        "name": "focus-halo-photographer",
+        "value": "0 0 0 4px rgba(255,77,0,0.22)",
+        "purpose": "작가 단계 현재 노드."
+      }
+    ],
+    "motion": [
+      {
+        "name": "header-collapse",
+        "value": "200ms",
+        "purpose": "모바일 헤더 56→44px 축소, reduced-motion 예외."
+      },
+      {
+        "name": "press",
+        "value": "scale(0.98)",
+        "purpose": "버튼 누름."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "현재 맥락의 다음 행동 하나.",
+      "html": "<button class=\"ds-btn-primary\">보정 시작</button>",
+      "css": ".ds-btn-primary{background:#ff4d00;color:#fff;border:1px solid #ff4d00;border-radius:8px;padding:10px 20px;font:700 13px/18px 'Pretendard Variable',Pretendard,sans-serif;letter-spacing:-0.28px;cursor:pointer;transition:background .15s,transform .1s}.ds-btn-primary:hover{background:rgba(255,77,0,.9)}.ds-btn-primary:active{transform:scale(.98)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(255,77,0,.4)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "같은 영역의 보조·열람 행동.",
+      "html": "<button class=\"ds-btn-secondary\">프로젝트 보기</button>",
+      "css": ".ds-btn-secondary{background:#eef3f4;color:#023852;border:1px solid color-mix(in srgb,#023852 9%,#fff);border-radius:8px;padding:10px 20px;font:400 13px/18px 'Pretendard Variable',Pretendard,sans-serif;letter-spacing:-0.28px;cursor:pointer;transition:background .15s}.ds-btn-secondary:hover{background:color-mix(in srgb,#023852 9%,#fff)}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px color-mix(in srgb,#023852 28%,#fff)}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "파괴적 확인에만.",
+      "html": "<button class=\"ds-btn-danger\">삭제</button>",
+      "css": ".ds-btn-danger{background:#dc2e2f;color:#fff;border:none;border-radius:8px;padding:10px 20px;font:700 13px/18px 'Pretendard Variable',Pretendard,sans-serif;cursor:pointer}.ds-btn-danger:hover{background:rgba(220,46,47,.9)}.ds-btn-danger:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(220,46,47,.35)}"
+    },
+    {
+      "name": "Dense Input",
+      "kind": "input",
+      "refersTo": "input-dense",
+      "description": "검색·필터 컨트롤.",
+      "html": "<input class=\"ds-input\" placeholder=\"프로젝트·고객 검색\" />",
+      "css": ".ds-input{height:48px;padding:0 16px;background:#fff;color:#023852;border:1px solid color-mix(in srgb,#023852 16%,#fff);border-radius:8px;font:600 14px/24px 'Pretendard Variable',Pretendard,sans-serif;letter-spacing:-0.45px}.ds-input::placeholder{color:rgba(2,56,82,.46)}.ds-input:hover{border-color:color-mix(in srgb,#023852 28%,#fff)}.ds-input:focus-visible{outline:none;border-color:#ff4d00;box-shadow:0 0 0 3px rgba(255,77,0,.18)}"
+    },
+    {
+      "name": "Actor Chip",
+      "kind": "chip",
+      "description": "색 점 + 텍스트로 행위자 표시.",
+      "html": "<span class=\"ds-actor\"><i class=\"ds-dot ds-dot-p\"></i>작가</span> <span class=\"ds-actor\"><i class=\"ds-dot ds-dot-c\"></i>고객</span>",
+      "css": ".ds-actor{display:inline-flex;align-items:center;gap:6px;font:600 11px/16.5px 'Pretendard Variable',Pretendard,sans-serif;color:rgba(2,56,82,.68)}.ds-dot{width:8px;height:8px;border-radius:9999px;display:inline-block}.ds-dot-p{background:#ff4d00}.ds-dot-c{background:#079fa0;box-shadow:0 0 0 4px color-mix(in srgb,#9fd8c5 24%,#fff)}"
+    },
+    {
+      "name": "Work Card",
+      "kind": "card",
+      "refersTo": "work-card",
+      "description": "카드 전체가 상세 이동. 테두리 없이 card lift.",
+      "html": "<a class=\"ds-work\" href=\"#\"><div class=\"ds-thumb\"></div><div class=\"ds-work-body\"><span class=\"ds-id\">AC-0142</span><strong>김민지 돌스냅</strong><span class=\"ds-actor\"><i class=\"ds-dot ds-dot-c\"></i>고객 셀렉 중</span></div></a>",
+      "css": ".ds-work{display:block;width:240px;background:#fff;border-radius:14px;box-shadow:0 10px 24px -22px rgba(2,56,82,.72);text-decoration:none;color:#023852;transition:background .15s}.ds-work:hover{background:#eef3f4}.ds-work:focus-visible{outline:2px solid #ff4d00;outline-offset:2px}.ds-thumb{margin:10px 12px 0;aspect-ratio:3/2;border-radius:8px;background:#eef3f4}.ds-work-body{display:flex;flex-direction:column;gap:4px;padding:12px 12px 16px;font:700 14px/20px 'Pretendard Variable',Pretendard,sans-serif}.ds-id{font:600 11px/16.5px 'JetBrains Mono',monospace;color:rgba(2,56,82,.52)}"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "description": "현재 항목: 흰 면 + 왼쪽 3px 주황, 아이콘만 주황.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item is-active\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\"/></svg><span>대시보드</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 7h18M3 12h18M3 17h18\"/></svg><span>프로젝트</span></a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:4px;width:220px;padding:8px;background:#f5f8f8}.ds-nav-item{position:relative;display:flex;align-items:center;gap:12px;height:50px;padding:0 12px;border-radius:8px;color:#023852;text-decoration:none;font:600 16px/24px 'Pretendard Variable',Pretendard,sans-serif;letter-spacing:-0.35px}.ds-nav-item svg{color:rgba(2,56,82,.52)}.ds-nav-item:hover{background:#eef3f4}.ds-nav-item.is-active{background:#fff}.ds-nav-item.is-active::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:3px;background:#ff4d00}.ds-nav-item.is-active svg{color:#ff4d00}.ds-nav-item:focus-visible{outline:2px solid #ff4d00;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "밝은 작업실과 암실 (The Studio and the Darkroom)",
+    "overview": "A컷은 한 화면을 라이트/다크로 토글하는 제품이 아니라 두 공간이 공존하는 제품이다. 작업실은 밝고 정돈된 운영 공간이다. 작가가 프로젝트 상태를 파악하고, 업로드하고, 다음 할 일을 처리한다. 흰 종이 같은 면 위에 깊은 남색 글자, 그리고 지금 해야 할 단 하나의 행동에만 주황이 켜진다. 갤러리(사진 목록에서 고르기)도 밝은 작업실에 속한다. 암실은 사진 한 장을 눌러 크게 보는 순간이다. 상세 뷰어·비교 화면은 어두운 무대가 되어 사진만 남기고, UI는 어둠 속으로 물러난다.\n\n컴포넌트는 단정하고 절제되어 있다. 얇은 테두리, 아주 작은 그림자, 낮은 대비의 구분선으로 층을 만들고, 장식은 없다. 밀도는 중간보다 약간 높다. 작가는 수백 장과 여러 프로젝트를 한 화면에서 훑어야 하기 때문이다.",
+    "keyCharacteristics": [
+      "목록·갤러리·운영은 라이트(작업실), 사진 한 장을 크게 보는 상세 뷰어·비교는 다크(암실). 두 규칙을 서로 옮기지 않는다.",
+      "주황은 행동색이지 면 색이 아니다.",
+      "행위자(작가/고객)는 색 점과 텍스트를 함께 써서 구분한다.",
+      "깊이는 캔버스 → 흰 면 → 한 단계 띄운 면 순서의 톤으로 만든다.",
+      "한글 UI는 Pretendard 한 가족, 숫자·ID만 JetBrains Mono."
+    ],
+    "rules": [
+      {
+        "name": "The One Orange Rule",
+        "body": "한 시야에 주황 채움 버튼은 하나다. 반복 카드마다 주황 CTA를 두지 않는다. 카드 자체가 행동이면 내부 CTA를 추가하지 않는다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Actor Signal Rule",
+        "body": "작가 = 주황 점, 고객 = 청록 점, 완료 = 남색 52%. 색만으로 전달하지 않고 `작가/고객/완료` 같은 텍스트를 함께 둔다. 완료는 새 행동색을 얻지 않으며 CTA를 없앤다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-for-Numbers Rule",
+        "body": "JetBrains Mono는 ID·D+·카운터에만 쓴다. 한 컴포넌트의 본문 전체를 mono로 바꾸지 않는다.",
+        "section": "typography"
+      },
+      {
+        "name": "The 16px Input Rule",
+        "body": "모바일 입력칸은 16px. iOS 자동 확대를 막는다.",
+        "section": "typography"
+      },
+      {
+        "name": "The Border-or-Shadow Rule",
+        "body": "한 면에 테두리와 진한 그림자를 같이 반복하지 않는다. 카드 안에 카드 박스를 다시 만들지 않는다. 목록·활동은 간격과 구분선으로 나눈다.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** 운영 화면과 갤러리 그리드는 작업실(라이트), 사진을 눌러 여는 상세 뷰어·비교 화면은 암실(다크)에 둔다.",
+      "**Do** 한 시야의 주황 채움은 다음 행동 하나에만 쓴다.",
+      "**Do** 행위자는 색 점 + 텍스트 라벨로 함께 표시한다.",
+      "**Do** 깊이는 canvas → white → raised 톤으로 만들고, 반복 카드는 테두리 대신 card lift를 쓴다.",
+      "**Do** 버튼은 `PhotographerLightButton`의 variant/size를 쓰고 새 버튼 스타일을 만들지 않는다.",
+      "**Do** 3을 넘는 모든 모션에 `prefers-reduced-motion` 예외를 둔다."
+    ],
+    "donts": [
+      "**Don't** 주황·청록으로 카드나 섹션 전체 면을 칠하지 않는다.",
+      "**Don't** 라이트 규칙을 상세 뷰어에 강제하거나, 다크 대비 값을 운영 화면에 옮기지 않는다.",
+      "**Don't** 프라이머리 색, 폰트, 버튼 스타일을 바꾸지 않는다. 레이아웃은 새로 짜도 이 셋은 유지한다(2026-10-01 결정).",
+      "**Don't** 빨강을 일반 마감일이나 장식에 쓰지 않는다. 해당 단계의 기한 초과·오류·파괴에만 쓴다.",
+      "**Don't** 카드 안에 카드를 만들거나 테두리와 진한 그림자를 한 면에 겹치지 않는다."
+    ]
+  }
+}
