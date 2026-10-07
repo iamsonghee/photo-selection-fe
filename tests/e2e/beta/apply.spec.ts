@@ -5,7 +5,7 @@ test.describe("클로즈드 베타 신청", () => {
   test("비로그인 사용자는 로그인 안내를 보고 제출 API는 401을 반환한다", async ({ page }) => {
     await page.goto("/beta/apply");
 
-    await expect(page.getByRole("heading", { name: "A-CUT 클로즈드 베타 신청" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "클로즈드 베타 신청" })).toBeVisible();
     await expect(page.getByRole("button", { name: "로그인하고 신청하기" })).toBeVisible();
 
     const response = await page.request.post("/api/beta/applications", { data: {} });
@@ -18,7 +18,7 @@ test.describe("클로즈드 베타 신청", () => {
     await page.goto("/beta/apply");
 
     await page.getByRole("button", { name: "베타 신청하기" }).click();
-    await expect(page.getByText("이름을 입력해주세요.")).toBeVisible();
+    await expect(page.getByText("이름을 입력해 주세요.")).toBeVisible();
 
     await page.getByLabel("이름 *").fill("베타 테스트");
     await page.getByLabel("휴대폰번호 *").fill("010-123-4567");
@@ -52,7 +52,7 @@ test.describe("클로즈드 베타 신청", () => {
 
     const genreGroup = page.getByRole("group", { name: "주 촬영 분야 * (복수선택 가능)" });
     await genreGroup.getByRole("button", { name: "기타" }).click();
-    await genreGroup.getByPlaceholder("기타 내용을 입력해주세요").fill("숨겨지면 안 되는 값");
+    await genreGroup.getByPlaceholder("기타 내용을 입력해 주세요").fill("숨겨지면 안 되는 값");
     await genreGroup.getByRole("button", { name: "기타" }).click();
     await genreGroup.getByRole("button", { name: "웨딩 본식" }).click();
 
@@ -64,7 +64,7 @@ test.describe("클로즈드 베타 신청", () => {
     await page.getByRole("group", { name: "베타에서 사용해보고 싶은 기능은? * (복수선택 가능)" })
       .getByRole("button", { name: "고객 셀렉 갤러리" })
       .click();
-    await page.getByLabel("개인정보 수집·이용에 동의합니다 (필수)").check();
+    await page.getByLabel("개인정보처리방침에 동의합니다 (필수)").check();
     await page.getByLabel("베타 운영 관련 연락에 동의합니다 (필수)").check();
     await page.getByRole("button", { name: "베타 신청하기" }).click();
 
@@ -103,7 +103,7 @@ test.describe("클로즈드 베타 신청", () => {
     await page.getByRole("group", { name: "베타에서 사용해보고 싶은 기능은? * (복수선택 가능)" })
       .getByRole("button", { name: "고객 셀렉 갤러리" })
       .click();
-    await page.getByLabel("개인정보 수집·이용에 동의합니다 (필수)").check();
+    await page.getByLabel("개인정보처리방침에 동의합니다 (필수)").check();
     await page.getByLabel("베타 운영 관련 연락에 동의합니다 (필수)").check();
 
     await page.getByRole("button", { name: "베타 신청하기" }).dblclick();
