@@ -5,10 +5,12 @@ const PROJECT_ID = "scene-timeline";
 const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 const pad = (n: number) => String(n).padStart(2, "0");
 
-// 촬영 시각 공백으로 장면 3개가 나오는 사진(오전 11:00 30장, 11:40 30장, 오후 12:30 30장).
-function project(blocks: number[][] = [[11, 0], [11, 40], [12, 30]]) {
-  const photos = blocks.flatMap(([hour, minute], block) => Array.from({ length: 30 }, (_, i) => {
-    const n = block * 30 + i;
+// 촬영 시각 공백으로 나뉘는 사진(오전 11:00 30장, 11:40 30장, 오후 12:30 30장, 2시 10장).
+// 장면 나누기는 사진 100장 이상일 때만 한다(MIN_PHOTOS_FOR_SCENES, 2026-10-05) — 마지막 10장으로 100장을 채우고, 앞 90장(p0~p89)의 장면 구성은 그대로 둔다.
+function project(blocks: number[][] = [[11, 0], [11, 40], [12, 30], [14, 0, 10]]) {
+  const starts = blocks.map((_, block) => blocks.slice(0, block).reduce((sum, [, , count = 30]) => sum + count, 0));
+  const photos = blocks.flatMap(([hour, minute, count = 30], block) => Array.from({ length: count }, (_, i) => {
+    const n = starts[block] + i;
     const seconds = hour * 3600 + minute * 60 + i * 20;
     return {
       id: `p${n}`, projectId: PROJECT_ID, orderIndex: n, url: PIXEL, previewUrl: PIXEL, originalFilename: `S_${n}.jpg`,
@@ -68,6 +70,11 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
     if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
     await page.getByRole("button", { name: /^예식/ }).filter({ visible: true }).first().click();
+    await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("축가·축하 무대");
+    // 100장 데이터의 마지막(네 번째) 장면.
+    if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
+    await page.getByRole("button", { name: /^축가·축하 무대/ }).filter({ visible: true }).first().click();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
     await expect(page.getByText("마지막 장면", { exact: false }).filter({ visible: true })).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -643,7 +650,7 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
   const page = await context.newPage();
   await loginAsPhotographer(page);
   const data = project() as ReturnType<typeof project> & { aiScenes?: unknown };
-  // 서버 장면 2개(p0~p29 입장, p30~p59 예식) — p60~p89는 정리 뒤 새로 올린 사진이라 어느 장면에도 없다.
+  // 서버 장면 2개(p0~p29 입장, p30~p59 예식) — p60~p99(40장)는 정리 뒤 새로 올린 사진이라 어느 장면에도 없다.
   data.aiScenes = [
     { name: "입장", start: data.photos[0].takenAt, end: data.photos[29].takenAt, photoIds: data.photos.slice(0, 30).map((photo) => photo.id) },
     { name: "예식", start: data.photos[30].takenAt, end: data.photos[59].takenAt, photoIds: data.photos.slice(30, 60).map((photo) => photo.id) },
@@ -665,7 +672,7 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
 
   await page.getByRole("button", { name: "보기 옵션" }).click();
   const retidy = page.getByRole("button", { name: /AI 다시 정리/ });
-  await expect(retidy).toContainText("새로 올린 30장");
+  await expect(retidy).toContainText("새로 올린 40장");
   await retidy.click();
   await page.getByRole("button", { name: "정리 시작" }).click();
   await expect.poll(() => started.length).toBeGreaterThan(0);
