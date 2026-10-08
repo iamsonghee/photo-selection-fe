@@ -75,6 +75,8 @@
   padding: 14px 36px 12px 14px;
   color: var(--foreground);
   box-shadow: 0 12px 32px rgba(2, 56, 82, 0.2);
+  /* 안내가 첫 줄 사진을 덮어도 사진 누르기·길게 누르기를 가로채지 않는다 — 닫기 버튼만 누를 수 있다. */
+  pointer-events: none;
 }
 
 .guide::before {
@@ -101,6 +103,7 @@
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .guide > strong { display: block; font-size: 13px; line-height: 20px; }

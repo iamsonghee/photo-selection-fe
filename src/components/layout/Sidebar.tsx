@@ -131,7 +131,7 @@ export function Sidebar({
     }
 
     return (
-      <Link key={key} href={href} className={itemClass} title={tip} aria-label={collapsed ? label : undefined}>
+      <Link key={key} href={href} className={itemClass} title={tip} aria-label={collapsed ? label : undefined} aria-current={isActive ? "page" : undefined}>
         {inner}
       </Link>
     );

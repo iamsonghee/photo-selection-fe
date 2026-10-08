@@ -63,11 +63,20 @@ export function ProjectInformationCard({
             <MoreHorizontal size={16} />
           </summary>
           <div role="menu" className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-border-subtle bg-surface p-1 shadow-lg">
+            {/* 모바일은 페이지 머리의 '정보 수정' 버튼이 없어 여기서 수정한다 — 빠지면 모바일에서 정보를 고칠 방법이 없다. */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onEdit(); }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-surface-raised"
+            >
+              <PenLine size={13} /> 수정하기
+            </button>
             <button
               type="button"
               role="menuitem"
               onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-danger"
             >
               <Trash2 size={13} /> 삭제하기
             </button>
@@ -91,7 +100,7 @@ export function ProjectInformationCard({
               type="button"
               role="menuitem"
               onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onEdit(); }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-foreground transition-colors hover:bg-surface-raised"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-surface-raised"
             >
               <PenLine size={13} /> 수정하기
             </button>
@@ -99,7 +108,7 @@ export function ProjectInformationCard({
               type="button"
               role="menuitem"
               onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger transition-colors hover:bg-danger/8"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-danger transition-colors hover:bg-danger/8"
             >
               <Trash2 size={13} /> 삭제하기
             </button>
