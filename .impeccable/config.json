@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "space grotesk",
+        "createdAt": "2026-10-08T00:42:53.286Z",
+        "reason": "docs/agent-guidelines.md 폰트 규칙: Space 계열은 로고·랜딩 브랜드 표현에만 허용(기존 globals.css import, 이번 작업과 무관)"
+      }
+    ]
+  }
+}
