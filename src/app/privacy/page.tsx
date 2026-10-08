@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/legal/LegalDocument";
+import { OG_MAIN_IMAGE, SITE_NAME } from "@/lib/site-metadata";
+
+const title = "개인정보처리방침 | A-CUT";
+const description = "A-CUT 개인정보처리방침";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 | A-CUT",
-  description: "A-CUT 개인정보처리방침",
+  title,
+  description,
   alternates: { canonical: "/privacy" },
+  openGraph: { title, description, url: "/privacy", siteName: SITE_NAME, images: [OG_MAIN_IMAGE], type: "website", locale: "ko_KR" },
 };
 
 export default function PrivacyPage() {

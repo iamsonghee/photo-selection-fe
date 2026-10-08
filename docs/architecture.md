@@ -107,7 +107,7 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 ## 검색 노출·색인 정책 (2026-10-07)
 
 - 대표 주소는 `https://www.acut.kr`(`SITE_URL`, `src/lib/site-metadata.ts`)이다. apex `acut.kr`은 Vercel이 www로 308 리다이렉트하고, `acut.vercel.app`은 `src/middleware.ts`가 www로 바로 308 리다이렉트한다.
-- 색인 대상은 `src/app/sitemap.ts`의 `/`, `/beta/apply`, `/terms`, `/privacy`다. 네 페이지 모두 `alternates.canonical`을 갖고, `/`와 `/beta/apply`는 공유 미리보기 이미지 `OG_MAIN_IMAGE`(`/og/main.jpg?v=2`)를 쓴다. 정확한 수정일을 알 수 없어 `lastModified`는 넣지 않는다.
+- 색인 대상은 `src/app/sitemap.ts`의 `/`, `/beta/apply`, `/terms`, `/privacy`다. 네 페이지 모두 `alternates.canonical`과 Open Graph(제목·설명·url, 공유 미리보기 이미지 `OG_MAIN_IMAGE` = `/og/main.jpg?v=2`)를 갖는다(`/terms`·`/privacy` OG는 2026-10-08 추가). 로그인하지 않은 `/beta/apply`는 로그인 창(`AuthModal`)이 처음부터 열려 창 제목 h1("3초면 시작할 수 있어요")이 페이지 h1과 함께 있다 — 화면 크기(`beta.css`의 `.beta-signin h1` 28px)를 유지하려고 그대로 둔다(2026-10-08 결정). 정확한 수정일을 알 수 없어 `lastModified`는 넣지 않는다.
 - 고객·작가·관리자 화면과 API(`/c`, `/g`, `/photographer`, `/customer-select`, `/admin`, `/auth`, `/api` 하위, `/beta/apply/complete`)는 `next.config.ts`의 `NOINDEX_SOURCES`로 `X-Robots-Tag: noindex, nofollow` 헤더를 받는다. `src/app/robots.ts`는 크롤러가 이 헤더를 읽을 수 있도록 해당 경로를 막지 않고 `/api/`, `/auth/`만 `Disallow`하며 sitemap 주소를 알린다.
 - `/landing`은 `/`와 같은 화면을 그리던 중복 주소라 `next.config.ts` `redirects()`에서 `/`로 308 리다이렉트한다. 개발 전용 `/landing/demo-capture`·`/landing/support-capture`는 영향이 없다.
 - `/`는 JSON-LD(Organization·WebSite·FAQPage)를 렌더링한다. FAQ 문장은 `src/app/landing/faq.ts`의 `LANDING_FAQ`를 화면(`LandingStory`)과 함께 쓴다. 실제 후기·평점이 없으므로 리뷰·평점 스키마는 넣지 않는다(`PRODUCT.md` Evidence on Hand).
