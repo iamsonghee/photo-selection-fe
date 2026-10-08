@@ -25,6 +25,14 @@ type Props = {
  * 상태와 관계없이 동일하게 노출되는 프로젝트 설정의 단일 표시 컴포넌트.
  * 편집 모달에서 수정할 수 있는 모든 프로젝트 설정을 이 카드에서도 확인할 수 있다.
  */
+/** 메뉴 항목을 누르면 메뉴를 닫고 초점을 ⋯ 버튼으로 옮긴다 — 이어서 뜬 확인 창·수정 화면을 닫으면
+ *  초점이 닫힌 메뉴 안(갈 곳 없음)이 아니라 ⋯ 버튼으로 돌아온다. */
+function closeMenuToTrigger(item: HTMLElement) {
+  const menu = item.closest("details");
+  menu?.removeAttribute("open");
+  menu?.querySelector("summary")?.focus();
+}
+
 export function ProjectInformationCard({
   project,
   shootDisplay,
@@ -67,7 +75,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onEdit(); }}
+              onClick={(event) => { closeMenuToTrigger(event.currentTarget); onEdit(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-surface-raised"
             >
               <PenLine size={13} /> 수정하기
@@ -75,7 +83,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
+              onClick={(event) => { closeMenuToTrigger(event.currentTarget); onDelete(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-danger"
             >
               <Trash2 size={13} /> 삭제하기
@@ -99,7 +107,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onEdit(); }}
+              onClick={(event) => { closeMenuToTrigger(event.currentTarget); onEdit(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-surface-raised"
             >
               <PenLine size={13} /> 수정하기
@@ -107,7 +115,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
+              onClick={(event) => { closeMenuToTrigger(event.currentTarget); onDelete(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-danger transition-colors hover:bg-danger/8"
             >
               <Trash2 size={13} /> 삭제하기
