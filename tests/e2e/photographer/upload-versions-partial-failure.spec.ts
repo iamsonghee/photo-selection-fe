@@ -50,16 +50,8 @@ test.describe("작가 — 보정본 업로드 부분 실패 처리 (BUG-05 회�
     const fileInput = uploadDialog.locator('input[type="file"][multiple]');
     await fileInput.setInputFiles(emptyFilePath);
 
-    const uploadBtn = uploadDialog.getByRole("button", { name: /^업로드$/i });
-    await expect(uploadBtn).toBeEnabled({ timeout: 8000 });
-    await uploadBtn.click();
-
-    // 서버가 0바이트 파일을 스킵해 uploaded 수가 제출 수보다 적으면,
-    // 패널이 조용히 닫히지 않고 명시적인 실패 메시지가 표시되어야 한다.
-    await expect(
-      page.getByText(/업로드되지 않았습니다|처리된 파일이 없습니다/)
-    ).toBeVisible({ timeout: 20000 });
-    // 실패했으므로 패널이 닫히지 않고 업로드 버튼도 그대로 남아있어야 한다.
-    await expect(uploadBtn).toBeVisible();
+    // 빈 파일은 고르는 순간 이유를 밝히고 제외한다 — 조용히 성공 처리되거나 업로드 대상에 섞이지 않는다.
+    await expect(uploadDialog.getByText("내용이 없는 파일 1개를 제외했습니다.")).toBeVisible();
+    await expect(uploadDialog.getByRole("button", { name: /^업로드$/i })).toBeDisabled();
   });
 });

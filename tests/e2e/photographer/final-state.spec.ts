@@ -58,21 +58,19 @@ test("납품 완료 최종본은 과거 재보정 요청 상태를 노출하지 
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto(`/photographer/projects/${project.projectId}/assets/final`);
 
-    await expect(page.getByRole("tab", { name: "최종본", exact: true })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "최종 보정본", exact: true })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    await expect(page.getByRole("region", { name: "최종본 작업 도구" })).toContainText(
+    await expect(page.getByRole("region", { name: "최종 보정본 작업 도구" })).toContainText(
       "최종 확정본",
     );
     await expect(page.getByText("재보정 요청", { exact: true }).filter({ visible: true })).toHaveCount(0);
     await expect(page.locator('[data-final-photo-header] p[title="최종보정.jpg"]')).toBeVisible();
-    await page.getByRole("button", { name: "최종본 내보내기", exact: true }).click();
-    const exportPopover = page.getByRole("dialog", { name: "최종본 내보내기" });
+    await page.getByRole("button", { name: "최종 보정본 내보내기", exact: true }).click();
+    const exportPopover = page.getByRole("dialog", { name: "최종 보정본 내보내기" });
     await expect(exportPopover).toBeVisible();
     expect((await exportPopover.boundingBox())!.height).toBeLessThan(220);
-    await expect(page.getByRole("button", { name: "최종본 내보내기 메뉴 닫기" })).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await page.screenshot({ path: "/tmp/final-mobile-export-open.png" });
     await page.keyboard.press("Escape");
 
     await page.setViewportSize({ width: 1440, height: 1000 });

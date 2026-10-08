@@ -34,42 +34,23 @@ test.describe("작가 — 대시보드", () => {
     await expect(page.getByText("불러오는 중")).toHaveCount(0);
   });
 
-  test("D2: '진행중' 카드 클릭 → 필터 활성화", async ({ page }) => {
-    const card = page.getByText("진행중").first();
-    if (!(await card.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "요약 카드 없음"); return;
-    }
-    await card.click();
-    await page.waitForTimeout(300);
-    // 필터 활성화 후 페이지 정상 상태 유지
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
+  // 2026-09 개편으로 대시보드 안에서 목록을 거르던 요약 카드(진행중/완료/전체)는 없어졌다.
+  // 지금 구성: 업무 현황 → 이어서 확인할 프로젝트·최근 변경 → 보조 정보(사용량·최근 활동).
+  test("D2: 업무 현황과 이어서 확인할 프로젝트를 보여준다", async ({ page }) => {
+    await expect(page.getByRole("region", { name: "업무 현황" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("complementary", { name: "대시보드 보조 정보" })).toBeVisible();
   });
 
-  test("D3: '완료' 카드 클릭 → 완료 프로젝트 필터", async ({ page }) => {
-    const card = page.getByText("완료").first();
-    if (!(await card.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "요약 카드 없음"); return;
-    }
-    await card.click();
-    await page.waitForTimeout(300);
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
+  test("D3: '전체 프로젝트' 링크 → 프로젝트 목록", async ({ page }) => {
+    const allProjects = page.getByRole("link", { name: "전체 프로젝트" }).first();
+    await expect(allProjects).toBeVisible({ timeout: 10_000 });
+    await allProjects.click();
+    await expect(page).toHaveURL(/\/photographer\/projects$/);
   });
 
-  test("D4: '전체 프로젝트' 카드 클릭 → 전체 복원", async ({ page }) => {
-    // 먼저 진행중 필터
-    const activeCard = page.getByText("진행중").first();
-    if (await activeCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await activeCard.click();
-      await page.waitForTimeout(200);
-    }
-    // 전체로 복원
-    const allCard = page.getByText("전체 프로젝트").first();
-    if (!(await allCard.isVisible({ timeout: 3000 }).catch(() => false))) {
-      test.skip(true, "요약 카드 없음"); return;
-    }
-    await allCard.click();
-    await page.waitForTimeout(300);
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
+  test("D4: 프로젝트 사용량을 숫자와 함께 보여준다", async ({ page }) => {
+    const usage = page.getByRole("region", { name: "프로젝트 사용량" }).or(page.getByLabel(/프로젝트 사용량, \d+개 사용/));
+    await expect(usage.first()).toBeVisible({ timeout: 10_000 });
   });
 
   test("D5: 모바일에서는 대시보드 대신 프로젝트 목록으로 진입", async ({ page }) => {

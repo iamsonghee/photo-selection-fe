@@ -39,7 +39,7 @@ test("고객관리 — 실제 저장·프로젝트 연결·PC·모바일", async
       const detail = page.getByRole("article", { name: "고객 상세" });
       await expect(detail.getByRole("heading", { name: unique, exact: true })).toBeVisible();
       await expect(detail.getByRole("link", { name: "프로젝트 보기", exact: true })).toHaveAttribute("href", `/photographer/projects/${seed.data!.id}`);
-      await expect(detail.getByRole("link", { name: "납품 사진", exact: true })).toHaveAttribute("href", `/photographer/projects/${seed.data!.id}/assets/final`);
+      await expect(detail.getByRole("link", { name: "최종 보정본 보기", exact: true })).toHaveAttribute("href", `/photographer/projects/${seed.data!.id}/assets/final`);
       await detail.getByRole("region", { name: "고객 메모" }).getByRole("button").click();
       await page.getByRole("textbox", { name: "다음 촬영에 참고할 내용" }).fill(`저장 검증 ${width}`);
       await page.getByRole("dialog").getByRole("button", { name: "저장", exact: true }).click();

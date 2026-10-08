@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
-import { setupTestProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import { createTestProject, setupTestProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 import path from "path";
 import fs from "fs";
 
@@ -123,7 +123,9 @@ test.describe("작가 — 파일 업로드", () => {
       });
     });
 
-    await page.goto(project.uploadUrl);
+    // 앞 테스트가 같은 sample.jpg를 이미 올린 공유 프로젝트에서는 중복 파일로 건너뛰어 요청 자체가 없다 — 빈 프로젝트를 따로 쓴다.
+    const freshProject = await createTestProject(page);
+    await page.goto(freshProject.uploadUrl);
     await page.waitForLoadState("networkidle");
     await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, "sample.jpg"));
 
@@ -142,5 +144,6 @@ test.describe("작가 — 파일 업로드", () => {
     // 응답 유실로 같은 multipart 요청을 재시도해도 서버가 동일 논리 사진으로 판별할 수 있어야 한다.
     expect(clientUploadIds).toHaveLength(3);
     expect(new Set(clientUploadIds).size).toBe(1);
+    await deleteTestProject(page, freshProject.projectId);
   });
 });

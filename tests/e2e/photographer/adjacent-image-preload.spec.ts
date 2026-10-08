@@ -52,11 +52,13 @@ async function trackProgrammaticImagePreloads(page: Page) {
   });
 }
 
+// 개발 서버는 React StrictMode로 화면을 한 번 더 붙였다 떼어 같은 주소가 반복 기록될 수 있다 —
+// 정책(어떤 이웃 사진을 미리 받는가)은 겹치지 않는 주소 수로 확인한다.
 async function openFirstUploadLightbox(page: Page) {
   await loginAsPhotographer(page);
   await page.goto(project.uploadUrl);
   await page.waitForLoadState("networkidle");
-  await page.locator(".prj-data-cell").first().click();
+  await page.locator("[data-original-photo-media]").first().locator("> button").first().click();
   await expect(page.getByRole("button", { name: "다음 사진" })).toBeVisible();
 }
 
@@ -64,12 +66,12 @@ test("PC 업로드 라이트박스는 현재·이전 1장·다음 2장만 선로
   await trackProgrammaticImagePreloads(page);
   await openFirstUploadLightbox(page);
 
-  await expect.poll(() => page.evaluate(() => window.__adjacentPreloadUrls?.length ?? 0)).toBe(4);
+  await expect.poll(() => page.evaluate(() => new Set(window.__adjacentPreloadUrls ?? []).size)).toBe(4);
   const initialUrls = await page.evaluate(() => window.__adjacentPreloadUrls ?? []);
   expect(initialUrls.every((url) => url.includes("/1200/900"))).toBeTruthy();
 
   await page.getByRole("button", { name: "다음 사진" }).click();
-  await expect.poll(() => page.evaluate(() => window.__adjacentPreloadUrls?.length ?? 0)).toBe(5);
+  await expect.poll(() => page.evaluate(() => new Set(window.__adjacentPreloadUrls ?? []).size)).toBe(5);
 });
 
 test("모바일 업로드 라이트박스는 현재와 양옆 1장만 선로딩한다", async ({ page }) => {
@@ -77,5 +79,5 @@ test("모바일 업로드 라이트박스는 현재와 양옆 1장만 선로딩�
   await trackProgrammaticImagePreloads(page);
   await openFirstUploadLightbox(page);
 
-  await expect.poll(() => page.evaluate(() => window.__adjacentPreloadUrls?.length ?? 0)).toBe(3);
+  await expect.poll(() => page.evaluate(() => new Set(window.__adjacentPreloadUrls ?? []).size)).toBe(3);
 });
