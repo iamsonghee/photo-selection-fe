@@ -72,8 +72,8 @@ test("선택한 사진을 같은 작업 바에서 추천으로 지정하고 제�
   expect((await addResponse).ok()).toBe(true);
   await expect(card.getByLabel("작가 추천")).toBeVisible();
   await expect(page.getByText("1장을 고객에게 추천했습니다.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
-  const requestDialog = page.getByRole("dialog", { name: "고객에게 셀렉 요청하기" });
+  await page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
+  const requestDialog = page.getByRole("dialog", { name: "고객 셀렉 시작하기" });
   await expect(requestDialog.getByText("작가 추천 사진 · 1장", { exact: true })).toBeVisible();
   await expect(requestDialog.locator("[data-recommendation-preview] img")).toHaveCount(1);
   const deadlineInputRow = requestDialog.locator("[data-selection-deadline-input-row]");
@@ -156,9 +156,9 @@ test("추천이 없는 셀렉 요청에서는 사진 추천 진입점을 보여�
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(project.uploadUrl);
   await page.getByRole("button", { name: "작가 추천 안내 닫기" }).click();
-  await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
+  await page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
 
-  const requestDialog = page.getByRole("dialog", { name: "셀렉 요청" });
+  const requestDialog = page.getByRole("dialog", { name: "고객 셀렉 시작하기" });
   await expect(requestDialog.getByText("작가 추천 사진 · 없음", { exact: true })).toBeVisible();
   await expect(requestDialog.locator("[data-recommendation-preview]")).toHaveCount(0);
   await requestDialog.getByRole("button", { name: "추천 사진 추가" }).click();
@@ -177,14 +177,14 @@ test("좁은 화면에서는 추천 사진 세 장과 나머지 개수만 보여
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(project.uploadUrl);
-  await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
+  await page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
 
-  const requestDialog = page.getByRole("dialog", { name: "셀렉 요청" });
+  const requestDialog = page.getByRole("dialog", { name: "고객 셀렉 시작하기" });
   await expect(requestDialog.getByText("작가 추천 사진 · 5장", { exact: true })).toBeVisible();
   await expect(requestDialog.getByRole("button", { name: "3일 후", exact: true })).toBeHidden();
   await expect(requestDialog.locator("[data-recommendation-preview] img:visible")).toHaveCount(3);
   await expect(requestDialog.getByText("+2", { exact: true })).toBeVisible();
-  await expect(requestDialog.getByText(`셀렉 요청 수보다 ${5 - project.requiredCount!}장 많아요.`, { exact: true })).toBeVisible();
+  await expect(requestDialog.getByText(`셀렉 목표 장수보다 ${5 - project.requiredCount!}장 많아요.`, { exact: true })).toBeVisible();
 });
 
 test("원본 탭에서 저장된 작가 추천을 표시하고 필터링한다", async ({ page }) => {
@@ -286,8 +286,8 @@ for (const width of [1440, 390]) {
     await expect(tray.getByRole("button", { name: "작가 추천 펼치기" })).toBeVisible();
     await expect.poll(() => writes).toBe(2);
     await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `acut:recommendation-draft:${project.projectId}`)).toBeNull();
-    await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
-    const requestDialog = page.getByRole("dialog", { name: /셀렉 요청/ });
+    await page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
+    const requestDialog = page.getByRole("dialog", { name: "고객 셀렉 시작하기" });
     const recommendationSummary = requestDialog.locator("[data-recommendation-delivery-summary]");
     await expect(recommendationSummary.getByText("작가 추천 사진 · 1장", { exact: true })).toBeVisible();
     await requestDialog.getByRole("button", { name: "닫기" }).click();

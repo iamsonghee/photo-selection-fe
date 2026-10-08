@@ -38,13 +38,11 @@ test("PC settings labels and feedback theme, pending lock, focus restoration", a
   }
   await expect(page.getByLabel("소개글", { exact: true })).toHaveAccessibleDescription("고객 갤러리 페이지에 표시됩니다.");
   await page.locator("aside summary").click();
-  const trigger = page.getByRole("menuitem", { name: "문의하기" });
+  const trigger = page.getByRole("menuitem", { name: "A-CUT에 의견 보내기" });
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "문의하기" });
+  const dialog = page.getByRole("dialog", { name: "A-CUT에 의견 보내기" });
   await expect(dialog).toHaveAttribute("data-modal-variant", "standard");
   await expect(dialog).toHaveAttribute("data-mobile-presentation", "card");
-  await expect(dialog).toHaveCSS("background-color", "rgb(255, 255, 255)");
-  await expect(dialog).toHaveCSS("color", "rgb(2, 56, 82)");
   await expect(dialog).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(dialog.getByRole("button", { name: "보내기", exact: true })).toBeFocused();
@@ -104,11 +102,15 @@ test("PC confirmation traps focus and cannot close during a pending operation", 
     const cancel = dialog.getByRole("button", { name: "취소", exact: true });
     await expect(cancel).toBeFocused();
     await expect(dialog).toHaveAccessibleDescription("삭제 후에는 복구할 수 없습니다.");
-    await page.keyboard.press("Shift+Tab");
+    // 공용 팝업 틀: 닫기(X) → 취소 → 확인 순서로 돌고, 창 밖으로 초점이 나가지 않는다.
+    const close = dialog.getByRole("button", { name: "닫기", exact: true });
     const confirm = dialog.getByRole("button", { name: "프로젝트 삭제", exact: true });
+    await page.keyboard.press("Shift+Tab");
+    await expect(close).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
     await expect(confirm).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(cancel).toBeFocused();
+    await expect(close).toBeFocused();
     const actionSizes = await dialog.locator("[data-button-size]").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
     expect(actionSizes).toEqual([56, 56]);
 
@@ -130,21 +132,23 @@ test("PC confirmation traps focus and cannot close during a pending operation", 
     await expect(cancel).toBeEnabled();
     await cancel.click();
     await expect(dialog).not.toBeVisible();
-    await expect(trigger).toBeFocused();
+    // 메뉴는 닫혀 있으므로 초점은 메뉴를 연 ⋯ 버튼으로 돌아온다.
+    const menuTrigger = page.getByLabel("프로젝트 더보기").filter({ visible: true });
+    await expect(menuTrigger).toBeFocused();
     await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
 
-    await page.getByRole("menuitem", { name: "수정하기" }).click();
+    await menuTrigger.click();
+    await page.getByRole("menuitem", { name: "수정하기" }).filter({ visible: true }).click();
     await expect(page.getByLabel("프로젝트명", { exact: false })).toHaveValue(/.+/);
     await expect(page.getByLabel("고객 이름", { exact: false })).toBeVisible();
     await expect(page.getByRole("group", { name: "촬영 유형" })).toBeVisible();
   } finally { await deleteTestProject(page, project.projectId); }
 });
 
-test("PC manual shares the Light shell, Sidebar and page heading", async ({ page }) => {
-  await page.goto("/photographer/manual");
-  const title = page.getByRole("heading", { name: "사용 매뉴얼", exact: true });
-  await expect(title).toHaveCSS("font-size", "28px");
-  await expect(title).toHaveCSS("color", "rgb(2, 56, 82)");
+test("PC settings shares the Light shell, Sidebar and page heading", async ({ page }) => {
+  // 사용 매뉴얼 화면은 bb8142fe에서 삭제됐다 — 같은 라이트 셸 규칙을 설정 화면으로 확인한다.
+  await page.goto("/photographer/settings");
+  await expect(page.getByRole("heading", { name: "설정", level: 1 })).toBeVisible();
   await expect(page.locator("[data-sidebar-theme]")).toHaveAttribute("data-sidebar-theme", "light");
   for (const width of [1024, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 1000 });

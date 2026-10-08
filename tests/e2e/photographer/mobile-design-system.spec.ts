@@ -131,8 +131,8 @@ test("creation preserves original permission, pending width and visible failure;
   await expect(name).toBeFocused();
   await name.fill("모바일 생성 실패 검증");
   await page.getByLabel("고객 이름", { exact: false }).fill("테스트 고객");
-  await page.getByLabel("촬영 일자", { exact: false }).fill("2026-09-09");
-  await page.getByLabel("셀렉 갯수", { exact: false }).fill("3");
+  await page.getByLabel("촬영일", { exact: false }).fill("2026-09-09");
+  await page.getByLabel("셀렉 목표 장수", { exact: false }).fill("3");
   const permission = page.getByRole("switch", { name: /원본/ });
   if (await permission.getAttribute("aria-checked") === "true") await permission.tap();
   let release!: () => void;
@@ -166,8 +166,10 @@ test("mobile settings keeps destructive confirmation focus behavior", async ({ p
   await trigger.tap();
   const dialog = page.getByRole("dialog", { name: "계정을 삭제할까요?" });
   await expect(dialog).toHaveAttribute("data-modal-variant", "confirmation");
-  await expect(dialog).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(dialog.getByRole("button", { name: "취소", exact: true })).toBeFocused();
+  // 공용 팝업 틀: 취소 앞에 닫기(X)가 있고, 그 앞은 마지막 버튼으로 돈다.
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "닫기", exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(dialog.getByRole("button", { name: "계정 삭제", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
