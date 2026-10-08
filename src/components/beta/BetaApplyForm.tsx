@@ -61,8 +61,8 @@ function OptionChip({
       onClick={onClick}
       className={`h-10 px-4 rounded-lg border text-sm font-medium transition-colors ${
         selected
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-border bg-surface-raised text-foreground hover:bg-border-strong"
+          ? "border-foreground bg-surface font-semibold text-foreground ring-1 ring-inset ring-foreground"
+          : "border-border-subtle bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground"
       }`}
       aria-pressed={selected}
     >
@@ -329,7 +329,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
       />
 
       <Textarea
-        label="A-CUT에 기대하는 점을 알려주세요"
+        label="A-CUT에 기대하는 점을 알려 주세요"
         value={expectation}
         onChange={(e) => setExpectation(e.target.value)}
         rows={3}
