@@ -143,21 +143,6 @@ body {
   animation: scale-in 0.4s ease-out;
 }
 
-@keyframes pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-pop {
-  animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
 /* PhotoSelect 로고 텍스트용 */
 .logo-text {
   font-weight: 700;
