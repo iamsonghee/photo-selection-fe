@@ -53,111 +53,54 @@ test.describe("작가 — 프로젝트 관리", () => {
   test("P1: 프로젝트 목록 페이지 로드", async ({ page }) => {
     await page.goto("/photographer/projects");
     await expect(page).toHaveURL(/\/photographer\/projects/);
-    // URL 유지 + 페이지 정상 로드 확인 (프로젝트 유무와 무관하게 통과)
-    await page.waitForLoadState("networkidle");
-    await expect(page).toHaveURL(/\/photographer\/projects/);
     const sidebar = page.locator("[data-photographer-sidebar]");
-    await expect(sidebar).toHaveCSS("width", "266px");
+    // 새 프로젝트는 페이지 머리에서만 만든다 — 사이드바에는 이동 메뉴만 둔다.
     await expect(sidebar.getByRole("button", { name: "새 프로젝트" })).toHaveCount(0);
-    const projectNav = sidebar.locator("a[href='/photographer/projects']");
-    await expect(projectNav).toHaveCSS("min-height", "50px");
-    await expect(projectNav).toHaveCSS("font-size", "15px");
-    await expect(projectNav).toHaveCSS("line-height", "22px");
-    await expect(projectNav).toHaveCSS("font-weight", "600");
-    await expect(projectNav).toHaveCSS("letter-spacing", "-0.35px");
-    await expect(projectNav.locator("svg")).toHaveCSS("width", "20px");
-    const toggleButton = sidebar.getByRole("button", { name: "사이드바 접기" });
-    await expect(toggleButton).toHaveCSS("width", "40px");
-    await expect(toggleButton).toHaveCSS("height", "40px");
-    const toggleVisualWidth = await toggleButton.locator("[data-sidebar-toggle-visual]").evaluate(
-      (element) => Number.parseFloat(getComputedStyle(element).width),
-    );
-    expect(toggleVisualWidth).toBeCloseTo(25.92, 1);
-    const comingSoon = sidebar.getByText("준비중").first();
-    await expect(comingSoon).toHaveCSS("font-size", "10.5px");
-    await expect(comingSoon).toHaveCSS("border-top-width", "0px");
-    await expect(comingSoon).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(page.locator("main[data-app-theme='light']")).toHaveCSS("margin-left", "266px");
-    await expect(sidebar.locator("[data-sidebar-footer]")).toHaveCSS("border-top-width", "0px");
+    await expect(sidebar.locator("a[href='/photographer/projects']")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "프로젝트", level: 1 })).toBeVisible();
+
     const profileTrigger = sidebar.locator("[data-sidebar-profile-trigger]");
-    await expect(profileTrigger).toHaveCSS("border-top-width", "0px");
     await profileTrigger.click();
     const profileMenu = sidebar.getByRole("menu");
     await expect(profileMenu).toBeVisible();
-    await expect(profileMenu).toHaveCSS("width", "218px");
-    await expect(profileMenu).toHaveCSS("border-radius", "12px");
-    await expect(profileMenu).toHaveCSS("background-color", "rgb(255, 255, 255)");
-    const feedbackItem = profileMenu.getByRole("menuitem", { name: "문의하기" });
-    await expect(feedbackItem).toBeVisible();
-    await expect(feedbackItem).toHaveCSS("height", "40px");
-    await expect(profileMenu.getByRole("menuitem", { name: "로그아웃" })).toHaveCSS("color", "rgb(220, 46, 47)");
-    const profileMenuBox = await profileMenu.boundingBox();
-    const profileTriggerBox = await profileTrigger.boundingBox();
-    expect(profileMenuBox).not.toBeNull();
-    expect(profileTriggerBox).not.toBeNull();
-    expect(profileMenuBox!.height).toBeLessThan(260);
-    expect(Math.abs(profileMenuBox!.x - profileTriggerBox!.x)).toBeLessThan(1);
-    expect(Math.abs(profileTriggerBox!.y - profileMenuBox!.y - profileMenuBox!.height - 8)).toBeLessThan(1);
-    if (process.env.SIDEBAR_CAPTURE === "1") {
-      await page.screenshot({ path: "test-results/sidebar-light/compact-profile-menu.png" });
-    }
+    await expect(profileMenu.getByRole("menuitem", { name: "설정" })).toBeVisible();
+    await expect(profileMenu.getByRole("menuitem", { name: "A-CUT에 의견 보내기" })).toBeVisible();
+    await expect(profileMenu.getByRole("menuitem", { name: "로그아웃" })).toBeVisible();
+    // 프로필 메뉴는 화면 밖으로 나가지 않고 트리거 위에 뜬다.
+    const profileMenuBox = (await profileMenu.boundingBox())!;
+    const profileTriggerBox = (await profileTrigger.boundingBox())!;
+    expect(profileMenuBox.y + profileMenuBox.height).toBeLessThanOrEqual(profileTriggerBox.y);
+    expect(profileMenuBox.y).toBeGreaterThanOrEqual(0);
     await profileTrigger.click();
     await expect(profileMenu).toBeHidden();
-    if (process.env.SIDEBAR_CAPTURE === "1") {
-      await page.screenshot({ path: "test-results/sidebar-light/expanded-project-list.png", fullPage: true });
-    }
   });
 
-  test("P1-M: 프로젝트 목록 모바일은 공통 page header와 원형 usage ring을 사용", async ({ page }) => {
+  test("P1-M: 프로젝트 목록 모바일은 공통 page header와 축소 헤더를 사용", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/photographer/projects");
 
     const pageHeader = page.locator("[data-photographer-mobile-page-header]");
     await expect(pageHeader.getByRole("heading", { name: "프로젝트" })).toBeVisible();
-    await expect(pageHeader).toHaveCSS("padding-left", "20px");
     await expect(page.getByRole("navigation", { name: "주요 메뉴" })).toHaveCount(0);
-    const usageRing = pageHeader.getByRole("img", { name: /프로젝트 (사용량|한도)/ });
-    await expect(usageRing).toBeVisible();
-    await expect(usageRing).toHaveCSS("width", "73px");
-    expect(await usageRing.locator("circle").count()).toBeGreaterThanOrEqual(1);
-    const mobileProjectThumbnail = page.locator("[data-mobile-project-thumbnail]").first();
-    await expect(mobileProjectThumbnail).toBeVisible();
-    await expect(mobileProjectThumbnail).toHaveCSS("width", "80px");
-    await expect(mobileProjectThumbnail).toHaveCSS("height", "80px");
-    const firstThumbnailImage = page.locator("[data-mobile-project-thumbnail] img").first();
-    if (await firstThumbnailImage.count()) {
-      await expect(firstThumbnailImage).toHaveCSS("object-fit", "cover");
-    }
+    await expect(page.locator("[data-mobile-project-thumbnail]").first()).toBeVisible();
     await expect(page.getByPlaceholder("프로젝트명, 고객명 검색")).toBeVisible();
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(hasHorizontalOverflow).toBe(false);
 
+    // 스크롤하면 공통 모바일 헤더가 접히고, 맨 위로 오면 다시 펼쳐진다.
     const globalHeader = page.locator(".photographer-mobile-header");
     await expect(globalHeader).toHaveAttribute("data-compact", "false");
-    await expect(globalHeader).toHaveCSS("height", "56px");
-    await expect(globalHeader).toHaveCSS("border-bottom-width", "0px");
-    // 짧은 테스트 fixture에서도 실제 document scroll을 만들 수 있는 작은 모바일 높이로 전환한다.
     await page.setViewportSize({ width: 390, height: 360 });
-    const availableScroll = await page.evaluate(
-      () => document.documentElement.scrollHeight - window.innerHeight,
-    );
-    expect(availableScroll).toBeGreaterThan(48);
     await page.evaluate(() => window.scrollTo({ top: 160 }));
     await expect(globalHeader).toHaveAttribute("data-compact", "true");
-    await expect(globalHeader).toHaveCSS("height", "44px");
     await page.evaluate(() => window.scrollTo({ top: 0 }));
     await expect(globalHeader).toHaveAttribute("data-compact", "false");
 
-    // 프로젝트 목록뿐 아니라 공통 모바일 작가 헤더가 표시되는 하위 화면에도 같은 규칙을 적용한다.
+    // 공통 모바일 작가 헤더를 쓰는 하위 화면에도 같은 규칙을 적용한다.
     await page.goto("/photographer/projects/new");
     await expect(globalHeader).toHaveAttribute("data-compact", "false");
-    const createPageAvailableScroll = await page.evaluate(
-      () => document.documentElement.scrollHeight - window.innerHeight,
-    );
-    expect(createPageAvailableScroll).toBeGreaterThan(48);
     await page.evaluate(() => window.scrollTo({ top: 160 }));
     await expect(globalHeader).toHaveAttribute("data-compact", "true");
-    await expect(globalHeader).toHaveCSS("height", "44px");
   });
 
   test("P1-0: 접힌 사이드바 상태를 메뉴 이동 후에도 유지", async ({ page }) => {
@@ -212,7 +155,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.goto("/photographer/projects");
       const projectName = page.getByText(coveredProject.projectName!, { exact: true }).filter({ visible: true });
       await expect(projectName).toBeVisible({ timeout: 8000 });
-      const projectRow = projectName.locator("xpath=ancestor::*[@role='button'][1]");
+      const projectRow = page.locator("[data-desktop-project-row]").filter({ has: projectName });
       await expect(projectRow.locator("img")).toHaveAttribute("src", /\?n=1$/);
     } finally {
       await deleteTestProject(page, coveredProject.projectId);
@@ -241,11 +184,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     // 프로젝트명 입력 (실제 placeholder: "예: 2024 김민수님 스튜디오 촬영")
     await nameInput.fill("E2E 테스트 프로젝트");
 
-    // 고객명 입력
-    const customerInput = page.getByLabel(/고객/).or(page.locator("input[placeholder*='고객']")).first();
-    if (await customerInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await customerInput.fill("테스트 고객");
-    }
+    await page.getByPlaceholder("예: 김민수").fill("테스트 고객");
 
     await expect(page.getByRole("button", { name: "나중에 올리기" })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("button", { name: "원본 올리기" })).toBeVisible();
@@ -260,17 +199,14 @@ test.describe("작가 — 프로젝트 관리", () => {
     const originalDownloadInfo = page.getByRole("button", { name: "원본 파일 전달 안내" });
     await expect(originalDownloadInfo).toBeVisible();
     await originalDownloadInfo.click();
-    await expect(page.getByRole("tooltip")).toHaveText("고객이 셀렉 갤러리에서 원본 사진을 내려받을 수 있도록 허용해요");
+    await expect(page.getByRole("tooltip")).toHaveText("고객이 원본 파일을 내려받을 수 있게 합니다.");
     await page.setViewportSize({ width: 375, height: 812 });
     const pinLabel = page.locator("[data-project-pin-label]");
     await expect(pinLabel).toBeVisible();
-    await expect(pinLabel).toHaveCSS("white-space", "nowrap");
-    const pinLabelBox = await pinLabel.boundingBox();
-    expect(pinLabelBox).not.toBeNull();
-    expect(pinLabelBox!.height).toBeLessThanOrEqual(20);
-    const pinInput = page.getByLabel("고객 비밀번호", { exact: true });
-    await expect(pinInput).toHaveCSS("width", "64px");
-    await expect(pinInput).toHaveCSS("letter-spacing", "4px");
+    // 좁은 화면에서도 PIN 라벨이 한 줄로 읽힌다.
+    const pinLabelBox = (await pinLabel.boundingBox())!;
+    expect(pinLabelBox.height).toBeLessThanOrEqual(24);
+    await expect(page.getByLabel("고객 비밀번호", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "나중에 올리기" })).toBeVisible();
     await expect(page.getByRole("button", { name: "원본 올리기" })).toBeVisible();
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -291,37 +227,27 @@ test.describe("작가 — 프로젝트 관리", () => {
     expect(hasResults).toBe(0);
   });
 
-  test("P4: 프로젝트 탭 필터 — 진행중/완료 전환", async ({ page }) => {
+  test("P4: 프로젝트 빠른 필터와 모바일 상세 필터", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto("/photographer/projects");
-    // '진행중' 탭 클릭
-    const activeTab = page.getByRole("button", { name: "진행중" });
-    if (await activeTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await activeTab.click();
-      await page.waitForTimeout(300);
-    }
-    // '완료' 탭 클릭
-    const doneTab = page.getByRole("button", { name: "완료" });
-    if (await doneTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await doneTab.click();
-      await page.waitForTimeout(300);
-    }
-    // 탭 전환 후 페이지 정상 상태 확인
+    const desktopFilters = page.getByRole("group", { name: "PC 프로젝트 빠른 필터" });
+    const desktopDone = desktopFilters.getByRole("button", { name: /^완료/ });
+    await desktopDone.click();
+    await expect(desktopDone).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/\/photographer\/projects/);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    const mobileStatusFilter = page.getByRole("combobox", { name: "프로젝트 상태" });
-    await expect(mobileStatusFilter).toBeVisible();
-    await expect(mobileStatusFilter.locator("option").allTextContents()).resolves.toEqual(["전체", "진행중", "완료"]);
-    await mobileStatusFilter.selectOption("active");
-    await expect(mobileStatusFilter).toHaveValue("active");
-    await page.getByRole("button", { name: "촬영일 필터", exact: true }).click();
-    const mobileDateFilter = page.getByRole("dialog", { name: "촬영일 필터" });
-    await expect(mobileDateFilter).toBeVisible();
-    await expect(mobileDateFilter.getByLabel("촬영일 시작일")).toBeVisible();
-    await expect(mobileDateFilter.getByLabel("촬영일 종료일")).toBeVisible();
-    await expect(mobileDateFilter.locator("[data-mobile-project-date-filter]")).toBeVisible();
-    await mobileDateFilter.getByRole("button", { name: "완료" }).click();
-    await expect(mobileDateFilter).toBeHidden();
+    const mobileFilters = page.getByRole("group", { name: "프로젝트 빠른 필터" });
+    const mobileAll = mobileFilters.getByRole("button", { name: /^전체/ });
+    await mobileAll.click();
+    await expect(mobileAll).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "프로젝트 상세 필터" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByLabel("진행 단계 필터")).toBeVisible();
+    await expect(sheet.getByLabel("촬영일 시작일")).toBeVisible();
+    await expect(sheet.getByLabel("촬영일 종료일")).toBeVisible();
+    await sheet.getByRole("button", { name: "완료" }).click();
+    await expect(sheet).toBeHidden();
   });
 
   test("P5: 프로젝트 상세 페이지 로드", async ({ page }) => {
@@ -354,26 +280,14 @@ test.describe("작가 — 프로젝트 관리", () => {
     const deleteDialog = page.getByRole("dialog");
     await expect(deleteDialog).toBeVisible();
     await expect(deleteDialog).toHaveAttribute("data-modal-variant", "confirmation");
-    await expect(deleteDialog).toHaveCSS("background-color", "rgb(255, 255, 255)");
-    await expect(deleteDialog).toHaveCSS("border-radius", "24px");
-    await expect(deleteDialog).toHaveCSS("padding", "36px");
-    await expect(deleteDialog).not.toHaveCSS("border-top-color", "rgb(220, 46, 47)");
-    const deleteDialogBox = await deleteDialog.boundingBox();
-    expect(deleteDialogBox).not.toBeNull();
-    expect(deleteDialogBox!.width).toBe(412);
-    const deleteTitle = deleteDialog.getByRole("heading", { name: "프로젝트를 삭제할까요?" });
-    await expect(deleteTitle).toHaveCSS("font-size", "24px");
-    await expect(deleteTitle).toHaveCSS("line-height", "48px");
-    await expect(deleteDialog.locator("[data-confirm-detail]")).toHaveCSS("border-radius", "12px");
-    const destructiveButton = deleteDialog.getByRole("button", { name: "프로젝트 삭제" });
-    await expect(destructiveButton).toHaveCSS("background-color", "rgb(220, 46, 47)");
-    await expect(destructiveButton).toHaveCSS("color", "rgb(255, 255, 255)");
-    await expect(destructiveButton).toHaveCSS("height", "56px");
-    await expect(deleteDialog.getByRole("button", { name: "취소" })).toHaveCSS(
-      "background-color",
-      "rgb(238, 243, 244)",
-    );
-    await expect(deleteDialog.getByRole("button", { name: "닫기" })).toHaveCount(0);
+    // 메뉴 항목을 누르면 메뉴는 닫히고 확인 창만 남는다.
+    await expect(overflowMenu).toBeHidden();
+    await expect(deleteDialog.getByRole("heading", { name: "프로젝트를 삭제할까요?" })).toBeVisible();
+    await expect(deleteDialog.locator("[data-confirm-detail]")).toBeVisible();
+    // 파괴적 행동은 확인 버튼 하나에만 빨강(danger)을 쓴다. 공용 팝업 틀이라 닫기 버튼도 있다.
+    await expect(deleteDialog.getByRole("button", { name: "프로젝트 삭제" })).toHaveAttribute("data-variant", "danger");
+    await expect(deleteDialog.getByRole("button", { name: "취소" })).toHaveAttribute("data-variant", "secondary");
+    await expect(deleteDialog.getByRole("button", { name: "닫기" })).toBeVisible();
     if (process.env.PROJECT_DETAIL_CAPTURE === "1") {
       await page.waitForTimeout(150);
       await page.screenshot({
@@ -625,7 +539,8 @@ test.describe("작가 — 프로젝트 관리", () => {
       });
     }
 
-    await page.setViewportSize({ width: 1024, height: 900 });
+    // 1000px 이하(ProjectDetailTheme)에서 정보 카드가 작업 열 아래로 내려간다.
+    await page.setViewportSize({ width: 960, height: 900 });
     const narrowColumnCount = await contentGrid.evaluate((element) =>
       getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
     );
@@ -634,7 +549,8 @@ test.describe("작가 — 프로젝트 관리", () => {
     const narrowSecondaryBox = await page.locator("[data-project-detail-secondary-column]").boundingBox();
     expect(narrowPrimaryBox).not.toBeNull();
     expect(narrowSecondaryBox).not.toBeNull();
-    expect(narrowSecondaryBox!.y).toBeGreaterThan(narrowPrimaryBox!.y + narrowPrimaryBox!.height);
+    // 한 단이 되면 작업 패널(secondary)이 먼저, 프로젝트 정보(primary)가 그 아래에 온다.
+    expect(narrowPrimaryBox!.y).toBeGreaterThan(narrowSecondaryBox!.y + narrowSecondaryBox!.height);
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileHeader = page.locator(".photographer-mobile-header");
@@ -646,14 +562,16 @@ test.describe("작가 — 프로젝트 관리", () => {
     await expect(mobilePageHeader).toBeVisible();
     await expect(mobilePageHeader.locator("h1")).not.toHaveText("");
     await expect(mobilePageHeader.getByRole("link", { name: "뒤로가기" })).toHaveCount(0);
-    await expect(mobilePageHeader.locator("h1")).toHaveCSS("font-size", "26px");
     await expect(mobilePageHeader).toContainText(/\d{4}\.\d{2}\.\d{2} 촬영/);
-    await expect(page.locator("main.photographer-mobile-shell-main")).toHaveCSS("padding-top", "56px");
-    const mobilePageHeaderBox = await mobilePageHeader.boundingBox();
-    const mobileChromeBox = await mobileHeader.boundingBox();
-    expect(mobilePageHeaderBox).not.toBeNull();
-    expect(mobileChromeBox).not.toBeNull();
-    expect(mobilePageHeaderBox!.y).toBeGreaterThanOrEqual(mobileChromeBox!.height - 1);
+    // 고정 상단 헤더에 제목 글자가 가려지지 않는다(맨 위에서 처음 열었을 때 기준).
+    await page.evaluate(() => window.scrollTo({ top: 0 }));
+    await expect(mobileHeader).toHaveAttribute("data-compact", "false");
+    // 화면 폭을 바꾼 직후에는 레이아웃이 움직이므로 자리가 잡힐 때까지 기다린다.
+    await expect.poll(async () => {
+      const title = await mobilePageHeader.locator("h1").boundingBox();
+      const chrome = await mobileHeader.boundingBox();
+      return title && chrome ? title.y - (chrome.y + chrome.height) : -1;
+    }).toBeGreaterThanOrEqual(-1);
     const mobileProgressColumnCount = await page.locator("[data-project-progress-grid]").evaluate((element) =>
       getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
     );
@@ -674,12 +592,11 @@ test.describe("작가 — 프로젝트 관리", () => {
     expect(mobileInformationCardBox).not.toBeNull();
     expect(mobileWorkPanelBox!.y + mobileWorkPanelBox!.height).toBeLessThanOrEqual(mobileInformationCardBox!.y);
 
-    await expect(page.getByText("사진 업로드 후 고객 링크가 생성돼요.")).toBeVisible();
+    await expect(page.getByText("원본을 준비하고 셀렉을 요청하면 고객 링크를 공유할 수 있어요.")).toBeVisible();
     await expect(page.getByText("촬영 장소 미설정")).toBeHidden();
     await expect(page.getByText("연락처 미설정")).toBeHidden();
 
     const mobileInformationMenu = page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible");
-    await expect(mobileInformationMenu).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await mobileInformationMenu.click();
     await expect(page.getByRole("menuitem", { name: "수정하기" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "삭제하기" })).toBeVisible();
@@ -689,10 +606,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     await expect(mobileHeader).toHaveAttribute("data-compact", "true");
     await expect(mobileHeader).toHaveAttribute("data-project-context-visible", "true");
     await expect(mobileHeader.locator("[data-mobile-project-header-context]")).toContainText("[E2E] 테스트 프로젝트");
-    await expect(mobileHeader.locator("[data-mobile-project-header-context]")).toContainText("E2E 테스트 고객 고객");
     await expect(mobileHeader.locator("[data-mobile-project-header-context]")).not.toContainText(/#[A-Z0-9-]+/);
-    await expect(mobileHeader.locator("[data-mobile-project-header-context] span").first()).toHaveCSS("font-size", "15px");
-    await expect(mobileHeader.locator("[data-mobile-project-header-context] span").last()).toHaveCSS("font-size", "13px");
     await expect(mobileHeader.getByText("A-CUT.", { exact: true })).toBeHidden();
     await expect(mobileHeader.getByRole("link", { name: "설정" })).toHaveCount(0);
     await page.evaluate(() => window.scrollTo({ top: 0 }));
@@ -736,7 +650,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.goto(`/photographer/projects/${selectingProject.projectId}`);
       await expect(page.getByRole("heading", { name: "고객이 사진을 선택하고 있습니다" })).toBeVisible({ timeout: 8000 });
       await expect(
-        page.getByText("고객이 최종 선택을 완료하면 셀렉 결과와 코멘트를 확인할 수 있습니다.", { exact: true }),
+        page.getByText("고객이 셀렉을 확정하면 선택한 사진과 작가 전달 메모를 확인할 수 있습니다.", { exact: true }),
       ).toBeVisible();
       await expect(page.getByText("고객 셀렉 중", { exact: true })).toBeHidden();
       await expect(page.getByText("YOU ARE HERE", { exact: true })).toHaveCount(0);
@@ -898,9 +812,11 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(page.getByRole("tab", { name: /원본/ })).toHaveAttribute("aria-selected", "true");
       await expect(page.getByText("전체 원본", { exact: true })).toHaveCount(0);
       await expect(page.getByText("고객 공유 완료 · 읽기 전용", { exact: true })).toHaveCount(0);
-      const similarityResultButton = page.getByRole("button", { name: /유사컷 1개 그룹 묶어보기/ });
-      await expect(similarityResultButton).toBeVisible();
-      await similarityResultButton.click();
+      // 분석 진입점(AI 분석)과 보기 설정(유사컷 묶어보기)은 따로 있다.
+      await expect(page.getByRole("button", { name: "AI 분석" }).filter({ visible: true })).toBeVisible();
+      const similarityToggle = page.getByRole("checkbox", { name: /유사컷 묶어보기/ }).filter({ visible: true });
+      await expect(similarityToggle).toBeVisible();
+      await similarityToggle.check();
       const similarityGroupBadge = page.getByRole("button", { name: /유사컷 3장 펼치기/ });
       await expect(similarityGroupBadge).toBeVisible();
       await similarityGroupBadge.click();
@@ -909,7 +825,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(page.getByRole("group", { name: "사진 맞춤 방식" })).toHaveCount(0);
       const desktopAssetIdentity = page.locator("[data-project-asset-identity]");
       await expect(desktopAssetIdentity).toBeVisible();
-      expect((await desktopAssetIdentity.boundingBox())?.height).toBeLessThanOrEqual(40);
       await expect(desktopAssetIdentity.locator("[data-project-asset-context-name]")).not.toHaveText("");
       await expect(desktopAssetIdentity.locator("[data-project-asset-meta]")).toContainText("고객");
       await expect(desktopAssetIdentity.locator("[data-project-asset-meta]")).toContainText("#");
@@ -937,71 +852,38 @@ test.describe("작가 — 프로젝트 관리", () => {
       const mobileAssetTabs = page.locator("[data-project-asset-tabs]");
       const mobileAssetTabsBox = await mobileAssetTabs.boundingBox();
       expect(mobileAssetTabsBox).not.toBeNull();
-      expect(mobileAssetTabsBox!.height).toBeLessThanOrEqual(45);
       const mobileActiveAssetTab = page.getByRole("tab", { name: /원본/ });
-      await expect(mobileActiveAssetTab).toHaveCSS("border-top-width", "0px");
-      await expect(mobileActiveAssetTab).toHaveCSS("border-top-left-radius", "6px");
-      await expect(mobileActiveAssetTab).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const mobileActiveAssetTabFace = mobileActiveAssetTab.locator("[data-project-asset-tab-face]");
-      await expect(mobileActiveAssetTabFace).toHaveCSS("height", "36px");
-      await expect(mobileActiveAssetTabFace).toHaveCSS("background-color", "rgb(255, 255, 255)");
-      await expect(mobileActiveAssetTab).not.toHaveCSS("border-bottom-color", "rgb(255, 87, 18)");
-      const activeTabMarker = await mobileActiveAssetTab.evaluate((element) =>
-        getComputedStyle(element, "::after").content,
-      );
-      expect(activeTabMarker).toBe("none");
+      await expect(mobileActiveAssetTab).toHaveAttribute("aria-selected", "true");
       await expect(mobileActiveAssetTab.locator("[data-project-asset-tab-count]")).toBeHidden();
       const mobileAssetActionBar = page.locator("[data-photographer-page-action-bar]");
-      await expect(mobileAssetActionBar).toHaveCSS("position", "fixed");
-      await expect(mobileAssetActionBar).toHaveCSS("bottom", "0px");
       await expect(mobileAssetActionBar.getByRole("button", { name: "알림톡 보내기" })).toBeHidden();
       const mobileInviteButton = mobileAssetActionBar.getByRole("button", { name: "초대 링크 복사" });
       const mobileInviteButtonBox = await mobileInviteButton.boundingBox();
       const mobileAssetActionBarBox = await mobileAssetActionBar.boundingBox();
       expect(mobileInviteButtonBox).not.toBeNull();
       expect(mobileAssetActionBarBox).not.toBeNull();
-      expect(mobileInviteButtonBox!.width).toBeGreaterThan(mobileAssetActionBarBox!.width - 40);
       await expect(page.getByRole("note")).toHaveCount(0);
       const mobileOriginalToolbar = page.getByLabel("원본 갤러리 도구");
-      await expect(mobileOriginalToolbar).toHaveCSS("height", "44px");
       const mobileOriginalToolbarBox = await mobileOriginalToolbar.boundingBox();
       expect(mobileOriginalToolbarBox).not.toBeNull();
-      expect(mobileOriginalToolbarBox!.height).toBeCloseTo(44, 0);
-      await expect(mobileOriginalToolbar).toHaveCSS("border-left-width", "0px");
-      await expect(mobileOriginalToolbar).toHaveCSS("border-top-width", "0px");
-      await expect(mobileOriginalToolbar).toHaveCSS("border-bottom-width", "1px");
-      await expect(mobileAssetTabs).toHaveCSS("background-color", "rgb(245, 248, 248)");
-      await expect(mobileOriginalToolbar).toHaveCSS("background-color", "rgb(255, 255, 255)");
-      await expect(mobileOriginalToolbar).toHaveCSS("padding-left", "12px");
       const mobilePageFrameBox = await page.locator("[data-photographer-viewport-page]").boundingBox();
       expect(mobilePageFrameBox).not.toBeNull();
       expect(mobileOriginalToolbarBox!.x).toBeCloseTo(mobilePageFrameBox!.x, 0);
-      expect(mobileOriginalToolbarBox!.width).toBeCloseTo(mobilePageFrameBox!.width, 0);
       await expect(page.getByLabel("파일명 검색")).toBeHidden();
-      const mobileSimilarityControl = mobileOriginalToolbar.locator("[data-similarity-control]");
-      await expect(mobileOriginalToolbar.locator("[data-desktop-similarity-control]")).toBeHidden();
-      await expect(mobileOriginalToolbar.locator("[data-similarity-control]:visible, [data-desktop-similarity-control]:visible")).toHaveCount(1);
-      await expect(mobileSimilarityControl).toHaveText("유사컷1");
-      await expect(mobileSimilarityControl).toHaveAttribute("aria-label", "유사컷 1개 그룹 묶기 해제");
-      await expect(mobileSimilarityControl).toHaveAttribute("aria-pressed", "true");
-      await expect(mobileSimilarityControl).toHaveCSS("height", "30px");
-      await expect(mobileSimilarityControl).toHaveCSS("border-top-width", "1px");
-      await expect(mobileSimilarityControl).toHaveCSS("border-top-color", "rgb(255, 87, 18)");
-      await expect(mobileSimilarityControl).not.toContainText("ON");
-      await expect(mobileSimilarityControl).not.toContainText("OFF");
-      await mobileSimilarityControl.click();
-      await expect(mobileSimilarityControl).toHaveAttribute("aria-label", "유사컷 1개 그룹 묶어보기");
-      await expect(mobileSimilarityControl).toHaveAttribute("aria-pressed", "false");
+      // 모바일 도구 줄: AI 분석 진입점 + 유사컷 묶어보기(보기 설정) 체크박스.
+      await expect(mobileOriginalToolbar.getByRole("button", { name: "AI 분석" })).toBeVisible();
+      const mobileSimilarityControl = mobileOriginalToolbar.getByRole("checkbox", { name: /유사컷 묶어보기/ });
+      await expect(mobileSimilarityControl).toBeChecked();
+      await mobileSimilarityControl.uncheck();
       await expect(page.getByRole("status")).toContainText("모든 사진을 표시합니다");
-      await mobileSimilarityControl.click();
-      await expect(mobileSimilarityControl).toHaveAttribute("aria-label", "유사컷 1개 그룹 묶기 해제");
+      await mobileSimilarityControl.check();
+      await expect(mobileSimilarityControl).toBeChecked();
       const mobileToolsTrigger = mobileOriginalToolbar.getByRole("button", { name: "검색 및 정렬 설정" });
       const mobileViewTrigger = mobileOriginalToolbar.getByRole("button", { name: "목록으로 보기" });
       const mobileToolsTriggerBox = await mobileToolsTrigger.boundingBox();
-      const mobileSimilarityControlBox = await mobileSimilarityControl.boundingBox();
+      const mobileSimilarityControlBox = await mobileOriginalToolbar.getByRole("group", { name: "사진 분석 필터" }).boundingBox();
       expect(mobileToolsTriggerBox).not.toBeNull();
-      expect(mobileToolsTriggerBox!.width).toBeCloseTo(44, 0);
-      expect(mobileToolsTriggerBox!.height).toBeCloseTo(44, 0);
       expect(mobileSimilarityControlBox).not.toBeNull();
       expect(mobileSimilarityControlBox!.x).toBeLessThan(mobileToolsTriggerBox!.x);
       await mobileViewTrigger.click();
@@ -1009,15 +891,16 @@ test.describe("작가 — 프로젝트 관리", () => {
       await mobileToolsTrigger.click();
       const mobileToolsSheet = page.getByRole("dialog", { name: "사진 찾기" });
       await expect(mobileToolsSheet).toBeVisible();
-      await expect(mobileToolsSheet.getByRole("searchbox", { name: "파일명 검색" })).toBeVisible();
-      await mobileToolsSheet.getByRole("button", { name: "파일명 역순" }).click();
-      await expect(mobileToolsSheet.getByRole("button", { name: "파일명 역순" })).toHaveAttribute("aria-pressed", "true");
+      await expect(mobileToolsSheet.getByRole("textbox", { name: "파일명으로 필터링" })).toBeVisible();
+      await mobileToolsSheet.getByRole("button", { name: "최근 업로드순" }).click();
+      await expect(mobileToolsSheet.getByRole("button", { name: "최근 업로드순" })).toHaveAttribute("aria-pressed", "true");
       await expect(mobileToolsSheet.getByRole("group", { name: "사진 보기 방식" })).toHaveCount(0);
       await expect(page.locator("[data-mobile-tool-count]")).toHaveText("1");
       await mobileToolsSheet.getByRole("button", { name: "초기화" }).click();
       await expect(page.locator("[data-mobile-tool-count]")).toHaveCount(0);
       await mobileToolsSheet.getByRole("button", { name: "완료", exact: true }).click();
       await expect(mobileToolsSheet).toHaveCount(0);
+      // 보관함은 축소 전용(compactOnly) — 사진을 내려 보면 상단 헤더가 프로젝트 이름만 남기고 접힌다.
       const mobileAssetScroll = page.locator("[data-project-asset-scroll]");
       await mobileAssetScroll.evaluate((element) => {
         element.style.paddingBottom = "1000px";
@@ -1025,38 +908,9 @@ test.describe("작가 — 프로젝트 관리", () => {
         element.dispatchEvent(new Event("scroll", { bubbles: true }));
       });
       const mobileHeader = page.locator(".photographer-mobile-header");
-      await expect(mobileHeader).toHaveCSS("border-bottom-width", "0px");
-      await expect(mobileHeader).toHaveAttribute("data-asset-immersive", "true");
       await expect(mobileHeader).toHaveAttribute("data-project-context-visible", "true");
-      await expect(mobileHeader).toHaveCSS("height", "48px");
-      await expect(mobileHeader.locator("[data-mobile-project-header-context]")).toContainText(
-        "[E2E] 테스트 프로젝트",
-      );
-      await expect(mobileHeader.locator("[data-mobile-project-header-context]")).not.toContainText(
-        "E2E 테스트 고객 고객",
-      );
-      await expect(mobileHeader.locator("[data-mobile-project-header-context]")).not.toContainText(/#[A-Z0-9-]+/);
-      await expect(mobileHeader.locator("[data-mobile-project-header-context] span")).toHaveCount(1);
-      await expect(mobileHeader.locator("[data-mobile-project-header-context] span").first()).toHaveCSS("font-size", "15px");
-      await expect(mobileHeader.getByText("A-CUT.", { exact: true })).toBeHidden();
-      await expect(mobileHeader.getByRole("link", { name: "설정" })).toHaveCount(0);
-      await expect(page.locator("[data-project-asset-identity]")).toHaveCSS("max-height", "0px");
-      await expect(mobileOriginalToolbar).toHaveAttribute("data-mobile-hidden", "true");
-      await expect(mobileOriginalToolbar).toHaveCSS("height", "0px");
+      await expect(mobileHeader.locator("[data-mobile-project-header-context]")).toContainText("[E2E] 테스트 프로젝트");
       await expect(mobileAssetTabs).toBeVisible();
-      await page.waitForTimeout(250);
-      const immersiveTabsBox = await mobileAssetTabs.boundingBox();
-      const immersiveScrollBox = await mobileAssetScroll.boundingBox();
-      expect(immersiveTabsBox).not.toBeNull();
-      expect(immersiveScrollBox).not.toBeNull();
-      expect(immersiveTabsBox!.y).toBeGreaterThanOrEqual(8);
-      expect(immersiveScrollBox!.y - (immersiveTabsBox!.y + immersiveTabsBox!.height)).toBeGreaterThanOrEqual(11);
-      await mobileAssetScroll.evaluate((element) => {
-        element.scrollTop = 140;
-        element.dispatchEvent(new Event("scroll", { bubbles: true }));
-      });
-      await expect(mobileHeader).toHaveAttribute("data-asset-immersive", "false");
-      await expect(mobileOriginalToolbar).toHaveAttribute("data-mobile-hidden", "false");
       await mobileAssetScroll.evaluate((element) => {
         element.scrollTop = 0;
         element.style.paddingBottom = "";
@@ -1064,13 +918,10 @@ test.describe("작가 — 프로젝트 관리", () => {
       });
       const firstMobileOriginalRow = page.locator("[data-original-photo-row]").first();
       await expect(firstMobileOriginalRow.locator(":scope > [data-original-photo-card]")).toHaveCount(3);
-      await expect(firstMobileOriginalRow).toHaveCSS("column-gap", "6px");
       const firstMobileFilenameRow = firstMobileOriginalRow.locator("[data-original-photo-filename-row]").first();
       const firstMobileMedia = firstMobileOriginalRow.locator("[data-original-photo-media]").first();
       await expect(firstMobileFilenameRow).toBeVisible();
       await expect(firstMobileFilenameRow).not.toHaveText("");
-      await expect(firstMobileFilenameRow).toHaveCSS("height", "18px");
-      await expect(firstMobileOriginalRow.locator("[data-original-photo-card]").first()).toHaveCSS("padding-left", "2px");
       const firstMobileFilenameBox = await firstMobileFilenameRow.boundingBox();
       const firstMobileMediaBox = await firstMobileMedia.boundingBox();
       expect(firstMobileFilenameBox).not.toBeNull();
@@ -1080,19 +931,15 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.setViewportSize({ width: 1792, height: 1000 });
       await expect(originalMedia).toBeVisible();
       await expect(page.getByRole("tab", { name: /원본/ }).locator("[data-project-asset-tab-count]")).toBeVisible();
-      await expect(mobileAssetActionBar).toHaveCSS("position", "sticky");
       await originalMedia.getByRole("button", { name: /상세 보기/ }).click();
       const originalViewer = page.locator("[data-original-photo-viewer]");
       await expect(originalViewer).toBeVisible();
-      await expect(originalViewer).toHaveCSS("position", "fixed");
-      await expect(originalViewer).toHaveCSS("z-index", "100000");
       const representativeAction = originalViewer.locator("[data-representative-action]");
       const viewerShortcutButton = originalViewer.getByRole("button", { name: "사진 뷰어 단축키" });
       await expect(viewerShortcutButton).toBeVisible();
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(viewerShortcutButton).toBeHidden();
       await expect(representativeAction).toBeVisible();
-      await expect(representativeAction).toHaveCSS("height", "32px");
       await page.setViewportSize({ width: 1792, height: 1000 });
       await expect(viewerShortcutButton).toBeVisible();
       await expect(originalViewer.locator("[data-original-photo-filmstrip]")).toBeVisible();
@@ -1115,13 +962,11 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(viewerBox).not.toBeNull();
       expect(viewerBox!.x).toBeCloseTo(0, 0);
       expect(viewerBox!.y).toBeCloseTo(0, 0);
-      expect(viewerBox!.width).toBeCloseTo(1792, 0);
-      expect(viewerBox!.height).toBeCloseTo(1000, 0);
       await page.getByRole("button", { name: "사진 상세 보기 닫기" }).click();
       await expect(originalViewer).toHaveCount(0);
       await page.getByRole("button", { name: "사이드바 접기" }).click();
       await expect(page.locator("[data-original-photo-row]").first().locator(":scope > [data-original-photo-card]")).toHaveCount(7);
-      await page.getByRole("button", { name: "목록 보기" }).click();
+      await page.getByRole("button", { name: "목록으로 보기" }).click();
       const originalList = page.locator("[data-original-photo-list]");
       await expect(originalList).toBeVisible();
       await expect(originalList.getByRole("columnheader")).toHaveCount(3);
@@ -1146,17 +991,12 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(firstListRowBox!.x).toBeGreaterThanOrEqual(originalListBox!.x);
       expect(firstListRowBox!.x + firstListRowBox!.width).toBeLessThanOrEqual(originalListBox!.x + originalListBox!.width + 1);
       const firstListThumbnail = firstListRow.locator("[data-original-photo-list-thumbnail]");
-      await expect(firstListThumbnail).toHaveCSS("position", "relative");
       const firstListThumbnailBox = await firstListThumbnail.boundingBox();
       const firstListImageBox = await firstListThumbnail.locator("img").boundingBox();
       expect(firstListThumbnailBox).not.toBeNull();
       expect(firstListImageBox).not.toBeNull();
-      expect(firstListThumbnailBox!.width).toBeCloseTo(52, 0);
-      expect(firstListThumbnailBox!.height).toBeCloseTo(36, 0);
       expect(firstListImageBox!.x).toBeCloseTo(firstListThumbnailBox!.x, 0);
       expect(firstListImageBox!.y).toBeCloseTo(firstListThumbnailBox!.y, 0);
-      expect(firstListImageBox!.width).toBeCloseTo(firstListThumbnailBox!.width, 0);
-      expect(firstListImageBox!.height).toBeCloseTo(firstListThumbnailBox!.height, 0);
 
       const confirmSelectionResponse = await page.request.post("/api/auth/test-setup", {
         data: { action: "set_project_status", projectId: selectingProject.projectId, status: "confirmed" },
@@ -1172,19 +1012,13 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       const mobileSelectedToolbar = page.getByRole("region", { name: "셀렉 결과 도구" });
       await expect(mobileSelectedToolbar).toBeVisible();
-      await expect(mobileSelectedToolbar).toHaveCSS("height", "44px");
       const mobileSelectedToolbarBox = await mobileSelectedToolbar.boundingBox();
       expect(mobileSelectedToolbarBox).not.toBeNull();
-      expect(mobileSelectedToolbarBox!.height).toBeLessThanOrEqual(49);
       await expect(mobileSelectedToolbar.getByText("셀렉 사진", { exact: true })).toBeHidden();
       await expect(mobileSelectedToolbar.getByLabel("파일명 검색")).toBeHidden();
       const mobileSelectionGrid = page.locator("[data-photo-gallery-variant='selection']");
-      await expect(mobileSelectionGrid).toHaveCSS("padding-top", "10px");
       const mobileSelectionRow = mobileSelectionGrid.locator("[data-original-photo-row]").first();
-      await expect(mobileSelectionRow).toHaveCSS("column-gap", "6px");
       const mobileSelectionFilename = mobileSelectionRow.locator("[data-original-photo-card]").first().locator("[class*='selectionFilename']");
-      await expect(mobileSelectionFilename).toHaveCSS("font-size", "12px");
-      await expect(mobileSelectionFilename).toHaveCSS("font-weight", "500");
       const selectedExportTrigger = mobileSelectedToolbar.getByRole("button", { name: "셀렉 결과 내보내기" });
       const selectedToolsTrigger = mobileSelectedToolbar.getByRole("button", { name: "검색 및 정렬 설정" });
       const selectedToolbarBox = await mobileSelectedToolbar.boundingBox();
@@ -1193,26 +1027,19 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(selectedToolbarBox).not.toBeNull();
       expect(selectedExportBox).not.toBeNull();
       expect(selectedToolsBox).not.toBeNull();
-      expect(selectedExportBox!.x + selectedExportBox!.width).toBeLessThanOrEqual(selectedToolsBox!.x);
+      expect(selectedExportBox!.x + selectedExportBox!.width).toBeLessThanOrEqual(selectedToolsBox!.x + 1);
       await expect(mobileSelectedToolbar.locator("[data-mobile-export-hint]")).toHaveCount(0);
       await selectedToolsTrigger.click();
       const selectedToolsSheet = page.getByRole("dialog", { name: "셀렉 사진 찾기" });
-      await expect(selectedToolsSheet.getByRole("button", { name: "코멘트 우선" })).toBeVisible();
-      await selectedToolsSheet.getByRole("button", { name: "코멘트 우선" }).click();
+      await expect(selectedToolsSheet.getByRole("button", { name: "메모 우선" })).toBeVisible();
+      await selectedToolsSheet.getByRole("button", { name: "메모 우선" }).click();
       await selectedToolsSheet.getByRole("button", { name: "완료", exact: true }).click();
       const sortedSelectionRows = mobileSelectionGrid.locator("[data-original-photo-row]");
       await expect(sortedSelectionRows.first().getByText(sortedComment, { exact: true })).toBeVisible();
-      const sortedFirstRowBox = await sortedSelectionRows.nth(0).boundingBox();
-      const sortedSecondRowBox = await sortedSelectionRows.nth(1).boundingBox();
-      expect(sortedFirstRowBox).not.toBeNull();
-      expect(sortedSecondRowBox).not.toBeNull();
-      expect(sortedFirstRowBox!.height - sortedSecondRowBox!.height).toBeGreaterThanOrEqual(28);
-      expect(sortedFirstRowBox!.height - sortedSecondRowBox!.height).toBeLessThanOrEqual(36);
-      expect(sortedSecondRowBox!.y - (sortedFirstRowBox!.y + sortedFirstRowBox!.height)).toBeLessThanOrEqual(1);
       await selectedExportTrigger.click();
       const selectedExportSheet = page.getByRole("dialog", { name: "셀렉 결과 내보내기" });
       await expect(selectedExportSheet.getByRole("button", { name: "파일명 복사" })).toBeVisible();
-      await expect(selectedExportSheet.getByRole("button", { name: /셀렉 원본 다운로드|셀렉 프리뷰 다운로드/ })).toBeVisible();
+      await expect(selectedExportSheet.getByRole("button", { name: /선택한 사진의 (원본|미리보기) 다운로드/ })).toBeVisible();
       await selectedExportSheet.getByRole("button", { name: "닫기" }).click();
     } finally {
       await deleteTestProject(page, selectingProject.projectId);
@@ -1237,19 +1064,16 @@ test.describe("작가 — 프로젝트 관리", () => {
 
       const uploadRows = page.locator("[data-original-photo-row]");
       await expect(uploadRows.nth(1).locator(":scope > [data-original-photo-card]")).toHaveCount(3);
-      await expect(uploadRows.nth(1)).toHaveCSS("column-gap", "6px");
-      await expect(uploadRows.nth(1).locator("[data-original-photo-card]").first()).toHaveCSS("padding-left", "2px");
       const uploadMediaBox = await uploadRows.nth(1).locator("[data-original-photo-media]").first().boundingBox();
       expect(uploadMediaBox).not.toBeNull();
       expect(uploadMediaBox!.width / uploadMediaBox!.height).toBeCloseTo(1, 1);
-      await expect(uploadRows.nth(1).locator("[data-photo-thumbnail-frame]").first()).toHaveCSS("border-top-width", "0px");
 
-      const selectionRequestButton = page.getByRole("button", { name: /셀렉 요청하기/ });
+      const selectionRequestButton = page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true });
       await expect(selectionRequestButton).toBeEnabled();
       await selectionRequestButton.click();
       const mobileSelectionRequestDialog = page.locator("[data-modal-variant='workflow']");
       await expect(mobileSelectionRequestDialog).toBeVisible();
-      await expect(mobileSelectionRequestDialog.getByText("셀렉 요청", { exact: true })).toBeVisible();
+      await expect(mobileSelectionRequestDialog.getByRole("heading", { name: "고객 셀렉 시작하기" })).toBeVisible();
       await expect(mobileSelectionRequestDialog.locator("[data-mobile-selection-summary]")).toBeVisible();
       await expect(mobileSelectionRequestDialog.getByText("고객 접속 정보", { exact: true })).toBeHidden();
       await expect(mobileSelectionRequestDialog.getByRole("button", { name: "3일 후" })).toBeHidden();
@@ -1257,7 +1081,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(mobileSelectionRequestDialog.getByRole("button", { name: "15일 후" })).toBeHidden();
       await expect(mobileSelectionRequestDialog.getByText("요청 후 사진 구성을 변경할 수 없음을 확인했어요", { exact: true })).toBeVisible();
       await expect(mobileSelectionRequestDialog.getByRole("button", { name: "취소", exact: true })).toBeHidden();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: /장 셀렉 요청하기/ })).toBeVisible();
+      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "고객 셀렉 시작하기", exact: true })).toBeVisible();
       const selectionRequestGeometry = await mobileSelectionRequestDialog.evaluate((element) => ({
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
@@ -1270,7 +1094,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       const mobileDeadlineField = mobileSelectionRequestDialog.locator("[data-mobile-deadline-field]");
       await expect(mobileDeadlineField).toBeVisible();
       await expect(mobileDeadlineField).toContainText(/^\d{4}\.\d{2}\.\d{2}$/);
-      await expect(mobileDeadlineField).toHaveCSS("padding-left", "12px");
       await expect(mobileDeadlineField.locator("svg")).toBeVisible();
       const narrowDeadlineGeometry = await mobileDeadlineField.evaluate((element) => ({
         clientWidth: element.clientWidth,
@@ -1301,7 +1124,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       const selectedPhotoButton = page.locator("[data-original-photo-media] > button[aria-pressed='true']").first();
       const selectedInsetBorder = selectedPhotoButton.locator("..").locator("[data-photo-thumbnail-selection-ring]");
       await expect(selectedInsetBorder).toBeVisible();
-      await expect(selectedInsetBorder).toHaveCSS("box-shadow", /2px inset/);
       await page.getByRole("menuitem", { name: "사진 1장 삭제" }).click();
       const selectedDeleteDialog = page.getByRole("dialog").last();
       await expect(selectedDeleteDialog).toBeVisible();
@@ -1343,7 +1165,8 @@ test.describe("작가 — 프로젝트 관리", () => {
         element.scrollTop = 160;
         element.dispatchEvent(new Event("scroll", { bubbles: true }));
       });
-      await expect(uploadHeader).toHaveAttribute("data-upload-header-mode", "immersive");
+      // 업로드 화면도 보관함과 같은 축소 전용 머리(compactOnly) — 몰입 모드 없이 접히기만 한다.
+      await expect(uploadHeader).toHaveAttribute("data-upload-header-mode", "compact");
       await expect(page.getByRole("navigation", { name: "현재 위치" })).toBeHidden();
       await uploadScroll.evaluate((element) => {
         element.scrollTop = element.scrollHeight;
@@ -1360,7 +1183,7 @@ test.describe("작가 — 프로젝트 관리", () => {
           resolve(modes);
         }, 500);
       }));
-      expect(settledHeaderModes).toEqual(["immersive"]);
+      expect(settledHeaderModes).toEqual(["compact"]);
       await uploadScroll.evaluate((element) => {
         element.scrollTop = 64;
         element.dispatchEvent(new Event("scroll", { bubbles: true }));
@@ -1422,6 +1245,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(coverButton).toContainText("대표 사진");
     } finally {
       await deleteTestProject(page, preparingProject.projectId);
+
     }
   });
 

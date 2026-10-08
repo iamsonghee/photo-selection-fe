@@ -23,23 +23,25 @@ test("long press selects only the held photo after grid reflow; the next tap sti
       await route.fulfill({ response, json: Array.isArray(body) ? body.map(update) : update(body) });
     });
     await page.goto(project.uploadUrl);
-    const photos = page.locator("[data-original-photo-media] > button");
+    // 사진 칸마다 버튼이 둘(사진 영역·체크)이라 칸 단위로 첫 버튼을 고른다.
+    const photoMedia = page.locator("[data-original-photo-media]");
+    const photos = { first: () => photoMedia.nth(0).locator("> button").first(), nth: (index: number) => photoMedia.nth(index).locator("> button").first() };
     await expect(photos.first()).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 추가하기", exact: true })).toBeVisible();
     const box = (await photos.first().boundingBox())!;
     const cdp = await context.newCDPSession(page);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
     await page.waitForTimeout(560); // Exercise the actual 450ms touch recognizer.
-    await expect(page.locator('[data-original-photo-media] > button[aria-pressed="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(1);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await expect(page.locator('[data-original-photo-media] > button[aria-pressed="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(1);
     await photos.first().tap();
-    await expect(page.locator('[data-original-photo-media] > button[aria-pressed="true"]')).toHaveCount(0);
+    await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(0);
     await photos.first().tap();
     await photos.nth(1).tap();
-    await expect(page.locator('[data-original-photo-media] > button[aria-pressed="true"]')).toHaveCount(2);
+    await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(2);
     await page.getByRole("button", { name: "취소", exact: true }).tap();
-    await expect(page.locator('[data-original-photo-media] > button[aria-pressed="true"]')).toHaveCount(0);
+    await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(0);
   } finally { await deleteTestProject(page, project.projectId); }
 });
 
