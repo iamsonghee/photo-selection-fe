@@ -26,6 +26,7 @@ import { ViewerCommentPanel } from "@/components/photographer/ViewerCommentPanel
 import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAssetStatusActionBar";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
+import { PhotographerToast } from "@/components/photographer/PhotographerToast";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
@@ -1040,13 +1041,13 @@ export default function ProjectAssetsPageClient({
         qualityState={qualityStatus === "completed" ? "이미 확인 완료" : null}
       />
       {originalDownloadProgress ? (
-        <div role="status" className="fixed bottom-6 left-1/2 z-[100010] min-w-[280px] -translate-x-1/2 rounded-lg border border-border bg-surface px-4 py-3 text-[13px] font-medium text-foreground shadow-lg">
+        <div role="status" className="fixed left-1/2 top-[calc(64px+env(safe-area-inset-top,0px))] z-[100010] w-[min(320px,calc(100vw-32px))] -translate-x-1/2 rounded-xl border border-border-subtle bg-surface px-4 py-3 text-[13px] font-medium text-foreground shadow-[0_12px_32px_rgba(2,56,82,0.18)] md:bottom-6 md:top-auto">
           <p>{selectedDownloadLabel} 저장 중 · {originalDownloadProgress.completed.toLocaleString()} / {originalDownloadProgress.total.toLocaleString()}</p>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-raised">
             <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${originalDownloadProgress.total > 0 ? (originalDownloadProgress.completed / originalDownloadProgress.total) * 100 : 0}%` }} />
           </div>
         </div>
-      ) : toast ? <div role="status" className="fixed bottom-6 left-1/2 z-[100010] -translate-x-1/2 rounded-lg border border-border bg-surface px-4 py-2 text-[13px] font-medium text-foreground shadow-lg">{toast}</div> : null}
+      ) : <PhotographerToast message={toast} />}
     </div>
   );
 }

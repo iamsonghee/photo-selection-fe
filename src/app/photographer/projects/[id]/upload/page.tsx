@@ -59,6 +59,7 @@ import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import { ProjectAssetWorkspaceHeader } from "@/components/photographer/ProjectAssetWorkspaceHeader";
 import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
+import { PhotographerToast } from "@/components/photographer/PhotographerToast";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { UploadConnectionHint } from "@/components/UploadConnectionHint";
 import { MAX_INTERRUPTION_RETRIES, uploadInterruptions, waitIfInterrupted } from "@/lib/upload-resume";
@@ -4548,11 +4549,7 @@ export default function ProjectDetailPage() {
       />
 
       {/* toast */}
-      {toast && (
-        <div style={{ position: "fixed", bottom: isMobile ? "calc(88px + env(safe-area-inset-bottom, 0px))" : 24, left: "50%", transform: "translateX(-50%)", background: "var(--surface-raised)", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontSize: 13, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
-          {toast}
-        </div>
-      )}
+      <PhotographerToast message={toast} />
 
       {/* ── selecting 안내 모달 — 공용 PhotographerModal 재사용 ── */}
       <PhotographerModal

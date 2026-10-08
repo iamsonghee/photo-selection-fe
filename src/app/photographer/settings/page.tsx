@@ -30,6 +30,7 @@ import {
   PhotographerLightPageHeader,
 } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerToast } from "@/components/photographer/PhotographerToast";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import {
   PROJECT_FORM_INPUT_CLASS,
@@ -550,7 +551,7 @@ export default function SettingsPage() {
                     <label className="flex items-center gap-2">
                       <ProjectFormInput
                         aria-label="셀렉 기본 마감 기간"
-                        className={`${SETTINGS_INPUT_CLASS} w-20 text-right md:w-24`}
+                        className={`${SETTINGS_INPUT_CLASS} !w-24 text-right`}
                         type="text"
                         inputMode="numeric"
                         placeholder="미설정"
@@ -681,24 +682,8 @@ export default function SettingsPage() {
         tone="danger"
       />
 
-      {/* 토스트 */}
-      <div className="fixed bottom-6 right-4 md:right-8 z-[210] flex flex-col gap-2 max-w-[calc(100vw-2rem)]">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-3 ${
-              t.isError
-                ? "bg-surface border-danger/40 text-danger"
-                : "bg-surface border-border-strong text-foreground border-l-[3px] border-l-accent"
-            }`}
-          >
-            <span className={`text-xs font-semibold shrink-0 mt-0.5 ${t.isError ? "text-danger" : "text-accent"}`}>
-              {t.isError ? "오류" : "완료"}
-            </span>
-            <span>{t.message}</span>
-          </div>
-        ))}
-      </div>
+      {/* 토스트 — 가장 최근 알림 하나만 공용 토스트로 보인다 */}
+      <PhotographerToast message={toasts.at(-1)?.message} tone={toasts.at(-1)?.isError ? "error" : "neutral"} />
     </div>
   );
 }

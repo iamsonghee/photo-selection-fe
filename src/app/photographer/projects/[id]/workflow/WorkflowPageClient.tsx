@@ -2463,16 +2463,14 @@ export default function WorkflowPageClient({
         <div
           role="status"
           aria-live="polite"
-          className={`fixed right-5 bottom-5 z-[80] max-w-sm rounded-xl border px-4 py-3 shadow-2xl ${
-            exportMessage?.tone === "error"
-              ? "border-red-500/30 bg-red-950/95 text-red-100"
-              : "border-border-strong bg-surface text-foreground"
+          className={`fixed inset-x-4 top-[calc(64px+env(safe-area-inset-top,0px))] z-[100010] rounded-xl border bg-surface px-4 py-3 shadow-[0_12px_32px_rgba(2,56,82,0.18)] md:inset-x-auto md:bottom-5 md:right-5 md:top-auto md:max-w-sm ${
+            exportMessage?.tone === "error" ? "border-danger/30 text-danger" : "border-border-subtle text-foreground"
           }`}
         >
           <div className="flex items-start gap-3">
-            <Download size={15} className="mt-0.5 shrink-0 text-accent" />
+            <Download size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
-              <p className="text-xs font-medium">
+              <p className="text-[13px] font-medium leading-5">
                 {originalDownloadProgress
                   ? `${selectedDownloadLabel} 저장 중 · ${originalDownloadProgress.completed.toLocaleString()} / ${originalDownloadProgress.total.toLocaleString()}`
                   : exportMessage?.text}

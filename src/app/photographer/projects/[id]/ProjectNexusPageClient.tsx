@@ -31,6 +31,7 @@ import { ProjectProgressCard } from "@/components/photographer/project-detail/Pr
 import { formatProjectDisplayId } from "@/components/photographer/ProjectIdText";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerToast } from "@/components/photographer/PhotographerToast";
 import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 import {
   clearPhotographerMobileProjectContext,
@@ -875,13 +876,7 @@ export function ProjectNexusPageClient() {
       </main>
 
       {/* Toast */}
-      {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 z-[210] -translate-x-1/2 rounded-xl border border-border-subtle bg-surface px-4 py-2.5 text-[14px] font-normal leading-5 tracking-[-0.35px] text-foreground shadow-lg pointer-events-none"
-        >
-          {toast}
-        </div>
-      )}
+      <PhotographerToast message={toast} />
 
       {/* Delete modal */}
       <PhotographerConfirmDialog
