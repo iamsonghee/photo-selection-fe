@@ -853,7 +853,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       const mobileAssetTabsBox = await mobileAssetTabs.boundingBox();
       expect(mobileAssetTabsBox).not.toBeNull();
       const mobileActiveAssetTab = page.getByRole("tab", { name: /원본/ });
-      const mobileActiveAssetTabFace = mobileActiveAssetTab.locator("[data-project-asset-tab-face]");
       await expect(mobileActiveAssetTab).toHaveAttribute("aria-selected", "true");
       await expect(mobileActiveAssetTab.locator("[data-project-asset-tab-count]")).toBeHidden();
       const mobileAssetActionBar = page.locator("[data-photographer-page-action-bar]");
@@ -1018,7 +1017,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(mobileSelectedToolbar.getByLabel("파일명 검색")).toBeHidden();
       const mobileSelectionGrid = page.locator("[data-photo-gallery-variant='selection']");
       const mobileSelectionRow = mobileSelectionGrid.locator("[data-original-photo-row]").first();
-      const mobileSelectionFilename = mobileSelectionRow.locator("[data-original-photo-card]").first().locator("[class*='selectionFilename']");
       const selectedExportTrigger = mobileSelectedToolbar.getByRole("button", { name: "셀렉 결과 내보내기" });
       const selectedToolsTrigger = mobileSelectedToolbar.getByRole("button", { name: "검색 및 정렬 설정" });
       const selectedToolbarBox = await mobileSelectedToolbar.boundingBox();
@@ -1027,7 +1025,12 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(selectedToolbarBox).not.toBeNull();
       expect(selectedExportBox).not.toBeNull();
       expect(selectedToolsBox).not.toBeNull();
-      expect(selectedExportBox!.x + selectedExportBox!.width).toBeLessThanOrEqual(selectedToolsBox!.x + 1);
+      // 내보내기와 찾기 버튼이 겹치지 않는다 — 부하가 크면 자리 잡기 전에 잴 수 있어 안정될 때까지 기다린다.
+      await expect.poll(async () => {
+        const exportBox = await selectedExportTrigger.boundingBox();
+        const toolsBox = await selectedToolsTrigger.boundingBox();
+        return exportBox && toolsBox ? toolsBox.x + 1 - (exportBox.x + exportBox.width) : -1;
+      }).toBeGreaterThanOrEqual(0);
       await expect(mobileSelectedToolbar.locator("[data-mobile-export-hint]")).toHaveCount(0);
       await selectedToolsTrigger.click();
       const selectedToolsSheet = page.getByRole("dialog", { name: "셀렉 사진 찾기" });

@@ -159,6 +159,52 @@ function OriginalRecoveryBanner({ count, cachedCount, busy, filenames, inputRef,
   );
 }
 
+/** 복구할 원본을 찾지 못했을 때의 안내 — 실제 오류라 빨간 신호를 쓰되 글자는 읽히게 남색으로 둔다. */
+function OriginalUnmatchedBanner({ filenames, busy, inputRef, onClose, onFiles, onAbandon, className = "" }: {
+  filenames: string[];
+  busy: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onClose: () => void;
+  onFiles: (files: File[]) => void;
+  onAbandon: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`shrink-0 border-b border-danger/25 bg-danger/[0.06] px-4 py-3 ${className}`}>
+      <div className="flex items-center gap-2">
+        <AlertTriangle size={14} className="shrink-0 text-danger" aria-hidden />
+        <p className="flex-1 text-[13px] font-semibold leading-5 text-danger">원본 파일을 찾지 못했습니다 ({filenames.length}개)</p>
+        <button type="button" onClick={onClose} aria-label="원본 찾기 실패 안내 닫기" className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground">
+          <X size={14} aria-hidden />
+        </button>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.</p>
+      <p className="mt-1 truncate font-mono text-xs text-foreground" title={filenames.join(", ")}>{filenames.join(", ")}</p>
+      <div className="mt-2 flex gap-2">
+        <PhotographerLightButton variant="outline" className="h-9 px-3 text-[13px]" disabled={busy} onClick={() => inputRef.current?.click()}>
+          다시 파일 선택
+        </PhotographerLightButton>
+        <PhotographerLightButton variant="secondary" className="h-9 px-3 text-[13px]" disabled={busy} onClick={onAbandon}>
+          원본 업로드 포기
+        </PhotographerLightButton>
+        <input
+          ref={inputRef}
+          disabled={busy}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = "";
+            if (files.length > 0) onFiles(files);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function isRawFile(file: File): boolean {
   const dot = file.name.lastIndexOf(".");
   return dot >= 0 && RAW_EXTENSIONS.has(file.name.slice(dot).toLowerCase());
@@ -481,20 +527,15 @@ function UploadFailureNotice({
               type="button"
               onClick={onToggle}
               aria-expanded={expanded}
-              style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "none", padding: "3px 5px", color: "var(--danger)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "none", padding: "3px 5px", color: "var(--danger)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
             >
               파일 {expanded ? "접기" : "보기"}
               <ChevronDown size={12} style={{ transform: expanded ? "rotate(180deg)" : undefined, transition: "transform 150ms ease" }} />
             </button>
-            <button
-              type="button"
-              onClick={onRetry}
-              disabled={retryDisabled}
-              style={{ display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid rgba(220,46,47,0.35)", borderRadius: 5, background: "rgba(220,46,47,0.08)", padding: "4px 8px", color: "var(--danger)", fontSize: 11, fontWeight: 600, cursor: retryDisabled ? "not-allowed" : "pointer", opacity: retryDisabled ? 0.5 : 1 }}
-            >
-              <RefreshCw size={11} />
+            <PhotographerLightButton variant="secondary" className="h-9 px-3 text-[13px]" onClick={onRetry} disabled={retryDisabled}>
+              <RefreshCw size={13} aria-hidden />
               실패 {failures.length}장 다시 시도
-            </button>
+            </PhotographerLightButton>
           </>
         )}
         <button type="button" aria-label="업로드 오류 닫기" onClick={onDismiss} style={{ marginLeft: failures.length > 0 ? 0 : "auto", background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2, display: "flex" }}>
@@ -506,7 +547,7 @@ function UploadFailureNotice({
           {failures.map(({ file, reason, clientUploadId }, index) => (
             <div
               key={clientUploadId}
-              style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(120px, 0.8fr)", gap: 12, padding: "7px 10px", borderBottom: index < failures.length - 1 ? `1px solid ${BORDER}` : "none", fontSize: 11, lineHeight: 1.45 }}
+              style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(120px, 0.8fr)", gap: 12, padding: "7px 10px", borderBottom: index < failures.length - 1 ? `1px solid ${BORDER}` : "none", fontSize: 12, lineHeight: 1.45 }}
             >
               <span title={file.name} style={{ color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
               <span title={reason} style={{ color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
@@ -934,7 +975,6 @@ export default function ProjectDetailPage() {
   >(null);
   const [clipAnalysisTriggering, setClipAnalysisTriggering] = useState(false);
   /** 마지막 분석 run의 실패 건수(있으면) — "분석 재개" 문구 판단용 */
-  const [clipLastRunFailedCount, setClipLastRunFailedCount] = useState(0);
   /** 현재 활성 사진 수/이미 분석된 수/대기 중인 수 — 버튼 문구(최초/신규/완료)를 결정 */
   const [clipPending, setClipPending] = useState<{
     active: number; alreadyAnalyzed: number; pending: number;
@@ -1042,7 +1082,6 @@ export default function ProjectDetailPage() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.gemini_analysis_status !== undefined) setClipAnalysisStatus(data.gemini_analysis_status);
-      if (data.run) setClipLastRunFailedCount(data.run.failed_count ?? 0);
       if (data.active_photo_count !== undefined) {
         setClipPending({
           active: data.active_photo_count,
@@ -1241,29 +1280,6 @@ export default function ProjectDetailPage() {
 
   /** 버튼 문구/동작을 pending count + 마지막 run 상태로 결정 — 사용자에게는 "Gemini" 같은
    *  구현 기술을 노출하지 않고 기존 OpenCLIP 시절과 동일한 어휘("유사컷 분석")를 그대로 쓴다. */
-  const analysisButtonState = useMemo(() => {
-    if (clipAnalysisStatus === "processing") {
-      return { subtitle: "분석 중… 잠시 후 완료됩니다", buttonLabel: "" };
-    }
-    const pending = clipPending?.pending ?? null;
-    const alreadyAnalyzed = clipPending?.alreadyAnalyzed ?? 0;
-    if (pending === 0 && alreadyAnalyzed > 0) {
-      return { subtitle: "모든 사진 분석이 완료됐습니다", buttonLabel: "분석 결과 보기" };
-    }
-    if (pending !== null && pending > 0 && clipLastRunFailedCount > 0) {
-      return { subtitle: "일부 사진 분석에 실패했습니다. 다시 시도해 주세요", buttonLabel: "분석 재개" };
-    }
-    if (pending !== null && pending > 0 && alreadyAnalyzed > 0) {
-      return {
-        subtitle: "기존 분석 결과는 유지하고 새로 추가된 사진만 분석합니다",
-        buttonLabel: "새 사진 분석",
-      };
-    }
-    return {
-      subtitle: "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다",
-      buttonLabel: "AI 유사컷 분석 시작",
-    };
-  }, [clipAnalysisStatus, clipPending, clipLastRunFailedCount]);
 
   /* 두 분석 중 하나라도 돌고 있으면 버튼은 "진행 중 · 누르면 중단"이 된다 — 유사컷과 품질이
    * 따로 도는데 버튼이 하나뿐이라, 무엇이 도는지가 아니라 **지금 AI가 일하는 중인지**를 말한다. */
@@ -3112,33 +3128,19 @@ export default function ProjectDetailPage() {
     return false;
   };
 
-  const handleStartClipAnalysis = async () => {
-    // 대기 중인 사진이 없으면(이미 전체 분석 완료) API를 다시 부르지 않고 결과만 보여준다 —
-    // 저장된 임베딩·그룹이 이미 최신 상태이므로 그대로 토글만 켠다.
-    if (clipPending && clipPending.pending === 0 && clipPending.alreadyAnalyzed > 0) {
-      setSimilarityToggleOn(true);
-      setToast("이미 최신 분석 결과입니다.");
-      return;
+  /** 찾지 못한 원본은 업로드를 포기하고 복구 목록에서도 뺀다. */
+  const abandonUnmatchedJobs = async () => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    for (const j of unmatchedJobs) {
+      try { await abandonOriginalJob(j.id, token); } catch {}
     }
-    setClipAnalysisTriggering(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}/gemini-analysis`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setToast((data as { error?: string; detail?: string }).error ?? (data as { detail?: string }).detail ?? "분석 시작에 실패했습니다.");
-        return;
-      }
-      setClipAnalysisStatus("processing");
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : "분석 시작에 실패했습니다.");
-    } finally {
-      setClipAnalysisTriggering(false);
-    }
+    setUnmatchedJobs([]);
+    setPendingRecovery((prev) => prev.filter((p) => !unmatchedJobs.some((u) => u.id === p.id)));
   };
+
 
   /** 업로드 완료 모달의 [분석 시작] — 체크한 것만 트리거하고 바로 닫는다.
    * 둘은 서로 독립이라 한쪽이 실패해도 다른 쪽은 그대로 진행시킨다(`allSettled`). */
@@ -3563,69 +3565,19 @@ export default function ProjectDetailPage() {
           )}
           {/* ── 복구 매칭 실패 — 즉시 표시 ── */}
           {unmatchedJobs.length > 0 && (
-            <div style={{ padding: "8px 14px", background: "rgba(220,46,47,0.06)", borderBottom: `1px solid rgba(220,46,47,0.2)`, flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <AlertTriangle size={12} style={{ color: "var(--danger)", flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>
-                  원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
-                </span>
-                <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
-                  <X size={12} />
-                </button>
-              </div>
-              <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
-                파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-                {unmatchedJobs.map((j) => (
-                  <span key={j.id} style={{ fontSize: 11, background: "rgba(220,46,47,0.1)", color: "var(--danger)", padding: "1px 6px", borderRadius: 3 }}>
-                    {j.original_filename ?? "(파일명 없음)"}
-                  </span>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <label style={{ cursor: "pointer" }}>
-                  <input
-                    ref={retryRecoveryFileInputRef}
-                    disabled={recoveryBusy}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      if (retryRecoveryFileInputRef.current) retryRecoveryFileInputRef.current.value = "";
-                      if (files.length > 0) {
-                        // 매칭 실패 job을 pendingRecovery에 넣고 재시도
-                        setPendingRecovery(unmatchedJobs);
-                        setUnmatchedJobs([]);
-                        recoverOriginalFiles(files);
-                      }
-                    }}
-                  />
-                  <span style={{ fontSize: 11, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-                    다시 파일 선택
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  style={{ fontSize: 11, color: "var(--danger)", border: "1px solid rgba(220,46,47,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
-                  onClick={async () => {
-                    const supabase = createClient();
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const token = session?.access_token;
-                    if (!token) return;
-                    for (const j of unmatchedJobs) {
-                      try { await abandonOriginalJob(j.id, token); } catch {}
-                    }
-                    setUnmatchedJobs([]);
-                    setPendingRecovery((prev) => prev.filter((p) => !unmatchedJobs.some((u) => u.id === p.id)));
-                  }}
-                >
-                  원본 업로드 포기
-                </button>
-              </div>
-            </div>
+            <OriginalUnmatchedBanner
+              filenames={unmatchedJobs.map((j) => j.original_filename ?? "(파일명 없음)")}
+              busy={recoveryBusy}
+              inputRef={retryRecoveryFileInputRef}
+              onClose={() => setUnmatchedJobs([])}
+              onFiles={(files) => {
+                // 매칭 실패 job을 pendingRecovery에 넣고 재시도
+                setPendingRecovery(unmatchedJobs);
+                setUnmatchedJobs([]);
+                recoverOriginalFiles(files);
+              }}
+              onAbandon={abandonUnmatchedJobs}
+            />
           )}
         </div>
       )}
@@ -3668,67 +3620,20 @@ export default function ProjectDetailPage() {
       )}
       {/* 데스크톱 복구 매칭 실패 배너 */}
       {unmatchedJobs.length > 0 && (
-        <div className="prj-desktop-toolbar" style={{ padding: "8px 16px", background: "rgba(220,46,47,0.06)", borderBottom: `1px solid rgba(220,46,47,0.2)`, flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <AlertTriangle size={12} style={{ color: "var(--danger)", flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>
-              원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
-            </span>
-            <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
-              <X size={12} />
-            </button>
-          </div>
-          <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
-            파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-            {unmatchedJobs.map((j) => (
-              <span key={j.id} style={{ fontSize: 11, background: "rgba(220,46,47,0.1)", color: "var(--danger)", padding: "1px 6px", borderRadius: 3 }}>
-                {j.original_filename ?? "(파일명 없음)"}
-              </span>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <label style={{ cursor: "pointer" }}>
-              <input
-                ref={retryRecoveryFileInputRefDesktop}
-                type="file"
-                accept="image/*"
-                multiple
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (retryRecoveryFileInputRefDesktop.current) retryRecoveryFileInputRefDesktop.current.value = "";
-                  if (files.length > 0) {
-                    setPendingRecovery(unmatchedJobs);
-                    setUnmatchedJobs([]);
-                    recoverOriginalFiles(files);
-                  }
-                }}
-              />
-              <span style={{ fontSize: 11, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-                다시 파일 선택
-              </span>
-            </label>
-            <button
-              type="button"
-              style={{ fontSize: 11, color: "var(--danger)", border: "1px solid rgba(220,46,47,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
-              onClick={async () => {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
-                const token = session?.access_token;
-                if (!token) return;
-                for (const j of unmatchedJobs) {
-                  try { await abandonOriginalJob(j.id, token); } catch {}
-                }
-                setUnmatchedJobs([]);
-                setPendingRecovery((prev) => prev.filter((p) => !unmatchedJobs.some((u) => u.id === p.id)));
-              }}
-            >
-              원본 업로드 포기
-            </button>
-          </div>
-        </div>
+        <OriginalUnmatchedBanner
+          className="prj-desktop-toolbar"
+          filenames={unmatchedJobs.map((j) => j.original_filename ?? "(파일명 없음)")}
+          busy={recoveryBusy}
+          inputRef={retryRecoveryFileInputRefDesktop}
+          onClose={() => setUnmatchedJobs([])}
+          onFiles={(files) => {
+            // 매칭 실패 job을 pendingRecovery에 넣고 재시도
+            setPendingRecovery(unmatchedJobs);
+            setUnmatchedJobs([]);
+            recoverOriginalFiles(files);
+          }}
+          onAbandon={abandonUnmatchedJobs}
+        />
       )}
 
       {/* main */}
@@ -4075,73 +3980,6 @@ export default function ProjectDetailPage() {
           </div>
         </section>
       </main>
-
-      {/* ── AI 유사컷 분석 — 초대 링크 활성화와 독립된 별도 트리거 ── */}
-      {canUploadOriginals(project.status) && displayPhotos.length > 0 && (
-        <div
-          className="hidden"
-          style={{
-            flexShrink: 0,
-            background: SURFACE_1,
-            borderTop: `1px solid ${BORDER}`,
-            padding: "10px 24px",
-            display: "none",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
-              AI 유사컷 분석
-            </div>
-            <div style={{ fontSize: 11, color: TEXT_MUTED }}>
-              {analysisButtonState.subtitle}
-            </div>
-          </div>
-          {clipAnalysisStatus === "processing" ? (
-            <button
-              type="button"
-              onClick={handleCancelClipAnalysis}
-              disabled={clipAnalysisTriggering}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid rgba(220,46,47,0.4)",
-                borderRadius: 8,
-                color: "var(--danger)",
-                fontSize: 12, fontWeight: 500,
-                cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
-                opacity: clipAnalysisTriggering ? 0.6 : 1,
-              }}
-            >
-              <X size={14} />
-              분석 중단
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleStartClipAnalysis}
-              disabled={clipAnalysisTriggering}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px",
-                background: "transparent",
-                border: `1px solid ${BORDER_MID}`,
-                borderRadius: 8,
-                color: TEXT_NORMAL,
-                fontSize: 12, fontWeight: 500,
-                cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
-                opacity: clipAnalysisTriggering ? 0.6 : 1,
-              }}
-            >
-              <Sparkles size={14} />
-              {analysisButtonState.buttonLabel}
-            </button>
-          )}
-        </div>
-      )}
 
       {/* ── Gemini 유사컷 그룹핑 POC — 관리자용 데스크톱 실험 기능 ── */}
       {isAdminTier && canUploadOriginals(project.status) && displayPhotos.length > 0 && (
