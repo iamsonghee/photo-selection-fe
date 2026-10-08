@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/legal/LegalDocument";
+import { OG_MAIN_IMAGE, SITE_NAME } from "@/lib/site-metadata";
+
+const title = "이용약관 | A-CUT";
+const description = "A-CUT 서비스 이용약관";
 
 export const metadata: Metadata = {
-  title: "이용약관 | A-CUT",
-  description: "A-CUT 서비스 이용약관",
+  title,
+  description,
   alternates: { canonical: "/terms" },
+  openGraph: { title, description, url: "/terms", siteName: SITE_NAME, images: [OG_MAIN_IMAGE], type: "website", locale: "ko_KR" },
 };
 
 export default function TermsPage() {
