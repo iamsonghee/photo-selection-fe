@@ -46,7 +46,7 @@ export default function CustomerDonePage() {
           </div>
           <div className={ui.body}>
             <div
-              style={{ width: 68, height: 68, borderRadius: "50%", background: "#fff3ed", color: "#ff4d00", display: "grid", placeItems: "center", fontSize: 30, margin: "0 auto" }}
+              style={{ width: 68, height: 68, borderRadius: "50%", background: "var(--surface-raised)", color: "var(--foreground)", display: "grid", placeItems: "center", fontSize: 30, margin: "0 auto" }}
             >
               ✓
             </div>

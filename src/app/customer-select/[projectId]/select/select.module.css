@@ -38,7 +38,7 @@
 .switchRow span { display: flex; flex-direction: column; gap: 2px; }
 .switchRow small { color: var(--muted-foreground); font-size: 11px; font-weight: 500; }
 .switchRow i { flex: none; position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--border-strong); transition: background-color 140ms ease; }
-.switchRow i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 140ms ease; }
+.switchRow i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 140ms ease; }
 .switchRow[aria-checked="true"] i { background: var(--accent); }
 .switchRow[aria-checked="true"] i::after { transform: translateX(14px); }
 .retidyRow { margin-top: 4px; border-top: 1px solid var(--border-subtle) !important; border-radius: 0 0 8px 8px !important; }
@@ -286,7 +286,7 @@
 @keyframes detailSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .detailSpinner { animation: detailSpinnerIn 0s linear 600ms forwards; } }
 .detailError { position: absolute; left: 50%; bottom: 24px; z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 13px; white-space: nowrap; }
-.detailError button { padding: 5px 12px; border: 0; border-radius: 999px; background: #fff; color: #0a0b0d; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.detailError button { padding: 5px 12px; border: 0; border-radius: 999px; background: var(--surface); color: #0a0b0d; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .memoRetry { margin-left: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 /* 크게 보기: 사진만 남긴다(위쪽 줄·띠·패널 숨김, 배경 완전 검정). */
 .detailImage img { cursor: zoom-in; }
