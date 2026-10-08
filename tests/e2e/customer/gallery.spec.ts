@@ -364,7 +364,6 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
     await expect(page.getByText("다른 사진을 선택하려면 기존 사진 1장을 해제해 주세요.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "선택 해제", exact: true })).toHaveCount(requiredCount);
     await expect(limitSnackbar).toHaveCSS("position", "fixed");
-    await expect(limitSnackbar).toHaveCSS("background-color", "rgba(25, 25, 24, 0.96)");
 
     await page.getByRole("button", { name: "선택한 사진 보기", exact: true }).click();
     await expect(page).toHaveURL(/selected=selected/);

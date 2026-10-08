@@ -1016,7 +1016,6 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(mobileSelectedToolbar.getByText("셀렉 사진", { exact: true })).toBeHidden();
       await expect(mobileSelectedToolbar.getByLabel("파일명 검색")).toBeHidden();
       const mobileSelectionGrid = page.locator("[data-photo-gallery-variant='selection']");
-      const mobileSelectionRow = mobileSelectionGrid.locator("[data-original-photo-row]").first();
       const selectedExportTrigger = mobileSelectedToolbar.getByRole("button", { name: "셀렉 결과 내보내기" });
       const selectedToolsTrigger = mobileSelectedToolbar.getByRole("button", { name: "검색 및 정렬 설정" });
       const selectedToolbarBox = await mobileSelectedToolbar.boundingBox();
