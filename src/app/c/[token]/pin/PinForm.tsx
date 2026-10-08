@@ -1,16 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/CustomerEntryShell";
-import { useSelectionOptional } from "@/contexts/SelectionContext";
 import styles from "../customer-entry.module.css";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 export default function PinForm({ token, from }: { token: string; from: string }) {
-  const router = useRouter();
-  const selection = useSelectionOptional();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
@@ -34,14 +30,9 @@ export default function PinForm({ token, from }: { token: string; from: string }
       if (data.success) {
         // 이동이 끝날 때까지 submitting을 유지 — 풀면 4자리 pin이 남아 자동 제출 effect가 재요청을 반복해 잠금에 걸린다.
         navigating = true;
-        // 같은 [token] 레이아웃의 SelectionProvider가 PIN 전에 401로 비어 있으므로 새 쿠키로 다시 받은 뒤
-        // 이동한다(전체 새로고침 대신). 컨텍스트가 없으면(예외 경로) 예전처럼 전체 이동.
-        if (selection) {
-          await selection.reloadProject();
-          router.replace(from);
-        } else {
-          window.location.href = from;
-        }
+        // 전체 이동 — PIN 전에 미리 불러온 /c/[token]이 "PIN으로 보내기(307)"로 라우터 캐시에 남아 있어
+        // router.replace는 다시 이 화면으로 돌아온다. replace라 뒤로가기로 PIN 화면에 돌아오지 않는다.
+        window.location.replace(from);
       } else if (data.locked) {
         setLocked(true);
         setRetryAfter(data.retryAfterSeconds ?? 60);
@@ -57,7 +48,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
     } finally {
       if (!navigating) setSubmitting(false);
     }
-  }, [from, locked, submitting, token, selection, router]);
+  }, [from, locked, submitting, token]);
 
   const appendDigit = useCallback((digit: string) => {
     if (locked || submitting) return;
