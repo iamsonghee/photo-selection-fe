@@ -25,7 +25,7 @@ const CUSTOMER_CANCEL_MAX = 3;
 const LOCKED_STATUS_TONE = {
   approved: { color: "#12833f", label: "확정" },
   revision_requested: { color: "#b26a00", label: "재보정 요청" },
-  pending: { color: "rgba(2, 56, 82, 0.52)", label: "검토 대기" },
+  pending: { color: "var(--subtle-foreground)", label: "검토 대기" },
 } as const;
 
 /* 배지는 사진 위 오른쪽 위에 얹고, 값은 전 페이지(검토 목록 `.rgv-card-pill`)와 똑같이 쓴다 —
@@ -417,7 +417,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
       </header>
 
       <aside className="locked-mobile-status">
-        <span><CheckCircle2 size={16} fill="#ff4d00" color="#fff" aria-hidden />사진 셀렉이 완료되어 작가가 보정 중이에요</span>
+        <span><CheckCircle2 size={16} fill="var(--accent)" color="#fff" aria-hidden />사진 셀렉이 완료되어 작가가 보정 중이에요</span>
         <OriginalDownloadEntry token={token} variant="banner" />
       </aside>
 
@@ -493,30 +493,30 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
       </main>
 
       <style>{`
-        .locked-mobile { min-height: 100dvh; background: #fff; color: #023852; font-family: Pretendard, "Pretendard Variable", sans-serif; }
-        .locked-mobile-appbar { height: calc(48px + env(safe-area-inset-top)); box-sizing: border-box; padding: env(safe-area-inset-top) 20px 0; display: flex; align-items: center; border-bottom: 1px solid #dfe1e4; background: #fff; }
-        .locked-mobile-appbar button { width: 24px; height: 44px; padding: 0; border: 0; background: transparent; color: #023852; display: grid; place-items: center; }
+        .locked-mobile { min-height: 100dvh; background: var(--surface); color: var(--foreground); font-family: Pretendard, "Pretendard Variable", sans-serif; }
+        .locked-mobile-appbar { height: calc(48px + env(safe-area-inset-top)); box-sizing: border-box; padding: env(safe-area-inset-top) 20px 0; display: flex; align-items: center; border-bottom: 1px solid #dfe1e4; background: var(--surface); }
+        .locked-mobile-appbar button { width: 24px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--foreground); display: grid; place-items: center; }
         .locked-mobile-appbar h1 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: -.32px; }
-        .locked-mobile-status { min-height: 52px; box-sizing: border-box; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(255,77,0,.08); border-bottom: 1px solid rgba(255,77,0,.18); }
-        .locked-mobile-status > span { min-width: 0; display: flex; align-items: center; gap: 6px; color: #023852; font-size: 12px; line-height: 19px; font-weight: 700; letter-spacing: -.24px; white-space: nowrap; }
-        .locked-mobile-toolbar { height: 48px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .locked-mobile-status { min-height: 52px; box-sizing: border-box; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(var(--accent-rgb), .08); border-bottom: 1px solid rgba(var(--accent-rgb), .18); }
+        .locked-mobile-status > span { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; line-height: 19px; font-weight: 700; letter-spacing: -.24px; white-space: nowrap; }
+        .locked-mobile-toolbar { height: 48px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
         .locked-mobile-scope { position: relative; }
-        .locked-mobile-scope > button { height: 36px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #023852; font-size: 12px; }
+        .locked-mobile-scope > button { height: 36px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; }
         .locked-mobile-scope > button strong { font-weight: 600; }
-        .locked-mobile-scope > button span { color: rgba(2, 56, 82, 0.52); }
-        .locked-mobile-scope > div { position: absolute; top: 40px; left: 0; z-index: 20; width: 132px; padding: 6px; border: 1px solid #dfe1e4; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
-        .locked-mobile-scope > div button { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #023852; font-size: 12px; }
+        .locked-mobile-scope > button span { color: var(--subtle-foreground); }
+        .locked-mobile-scope > div { position: absolute; top: 40px; left: 0; z-index: 20; width: 132px; padding: 6px; border: 1px solid #dfe1e4; border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+        .locked-mobile-scope > div button { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: var(--foreground); font-size: 12px; }
         .locked-mobile-scope > div button:active { background: #f1f3f6; }
-        .locked-mobile-search-toggle { width: 30px; height: 30px; padding: 0; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: rgba(2, 56, 82, 0.52); display: grid; place-items: center; }
-        .locked-mobile-search { height: 42px; margin: 0 20px 8px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 6px; display: flex; align-items: center; gap: 8px; color: rgba(2, 56, 82, 0.52); }
-        .locked-mobile-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #023852; font-size: 13px; }
+        .locked-mobile-search-toggle { width: 30px; height: 30px; padding: 0; border: 1px solid #bfbfbf; border-radius: 4px; background: var(--surface); color: var(--subtle-foreground); display: grid; place-items: center; }
+        .locked-mobile-search { height: 42px; margin: 0 20px 8px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 6px; display: flex; align-items: center; gap: 8px; color: var(--subtle-foreground); }
+        .locked-mobile-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--foreground); font-size: 13px; }
         .locked-mobile-grid-wrap { padding: 0 20px 20px; touch-action: pan-y; }
-        .locked-mobile-card { min-width: 0; padding: 4px 4px 8px; overflow: hidden; border: 1.5px solid #fff; border-radius: 4px; background: #f1f3f6; color: #023852; text-align: left; }
+        .locked-mobile-card { min-width: 0; padding: 4px 4px 8px; overflow: hidden; border: 1.5px solid #fff; border-radius: 4px; background: #f1f3f6; color: var(--foreground); text-align: left; }
         .locked-mobile-image { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: #aab0b8; display: block; }
         .locked-density-2 .locked-mobile-image { aspect-ratio: 151.5 / 103.479; }
         .locked-mobile-image img { width: 100%; height: 100%; display: block; object-fit: cover; }
         .locked-mobile-placeholder { width: 100%; height: 100%; display: grid; place-items: center; color: #fff; font-size: 8px; }
-        .locked-mobile-selected-check { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 2px; background: #ff4d00; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+        .locked-mobile-selected-check { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 2px; background: var(--accent); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
         .locked-density-4 .locked-mobile-selected-check { width: 14px; height: 14px; }
         .locked-density-4 .locked-mobile-selected-check svg { width: 9px; height: 9px; }
         .locked-density-5 .locked-mobile-selected-check { top: 3px; left: 3px; width: 12px; height: 12px; }
@@ -525,11 +525,11 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
         .locked-density-2 .locked-mobile-meta { min-height: 31px; padding: 5px 3px 0; display: flex; flex-direction: column; gap: 2px; }
         .locked-mobile-meta strong { overflow: hidden; font-size: 10px; line-height: 16px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
         .locked-mobile-meta small { overflow: hidden; color: #787878; font-size: 8px; line-height: 14px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-        .locked-mobile-meta small.has-comment { color: #ff4d00; }
+        .locked-mobile-meta small.has-comment { color: var(--accent); }
         .locked-density-3 .locked-mobile-image { aspect-ratio: 106.333 / 103.479; }
         .locked-density-4 .locked-mobile-image { aspect-ratio: 79.25 / 79; }
         .locked-density-3 .locked-mobile-card, .locked-density-4 .locked-mobile-card, .locked-density-5 .locked-mobile-card { padding: 0; }
-        .locked-mobile-empty { margin: 80px 0; color: rgba(2, 56, 82, 0.52); font-size: 13px; text-align: center; }
+        .locked-mobile-empty { margin: 80px 0; color: var(--subtle-foreground); font-size: 13px; text-align: center; }
       `}</style>
     </div>
   );
@@ -836,13 +836,13 @@ export default function LockedPage() {
           position: sticky; top: 0; z-index: 50; flex-shrink: 0;
           display: flex; align-items: center; justify-content: space-between; gap: 20px;
           min-height: 64px; padding: 10px 32px;
-          background: #fff; border-bottom: 1px solid #eef0f2;
+          background: var(--surface); border-bottom: 1px solid #eef0f2;
         }
         .lk-head-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
         .lk-brand-mark {
           width: 32px; height: 32px; flex: 0 0 32px;
           display: grid; place-items: center; border-radius: 8px;
-          background: #ff4d00; color: #fff; text-decoration: none;
+          background: var(--accent); color: #fff; text-decoration: none;
           font: 800 16px/1 Pretendard, sans-serif;
           box-shadow: 0 1px 2px rgba(25,25,24,.12);
         }
@@ -861,7 +861,7 @@ export default function LockedPage() {
         .lk-readonly {
           display: inline-flex; align-items: center; gap: 4px;
           padding: 2px 7px; border-radius: 999px;
-          background: rgba(255,77,0,.08); border: 1px solid rgba(255,77,0,.22); color: var(--accent);
+          background: rgba(var(--accent-rgb), .08); border: 1px solid rgba(var(--accent-rgb), .22); color: var(--accent);
           font: 700 10px/1.4 Pretendard, sans-serif;
         }
         .lk-head-right { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; }
@@ -884,13 +884,13 @@ export default function LockedPage() {
         .lk-section-label { color: var(--customer-ink); }
         .lk-section-count { color: var(--customer-ink-secondary); }
 
-        .lk-card { background: #fff; border: 1px solid var(--customer-divider); }
+        .lk-card { background: var(--surface); border: 1px solid var(--customer-divider); }
         /* 값은 검토 목록 .rgv-card-pill과 동일 — 같은 결과를 두 화면에서 같은 모양으로 본다 */
         .lk-badge {
           position: absolute; top: 8px; right: 8px; z-index: 3;
           display: inline-flex; align-items: center; gap: 3px;
           padding: 2px 7px; border: 1px solid; border-radius: 999px;
-          background: #fff; font: 700 10px/1.5 Pretendard, sans-serif; letter-spacing: -.2px;
+          background: var(--surface); font: 700 10px/1.5 Pretendard, sans-serif; letter-spacing: -.2px;
         }
         .lk-card-btn { transition: border-color .15s ease, box-shadow .15s ease; }
         .lk-card-btn:enabled:hover { border-color: #b9bec4; box-shadow: 0 2px 8px rgba(25,25,24,.06); }
@@ -933,7 +933,7 @@ export default function LockedPage() {
         .lk-footer-note b { color: var(--customer-ink); }
         .lk-cancel-btn {
           height: 36px; padding: 0 16px; border-radius: 8px;
-          border: 1px solid var(--customer-divider); background: #fff; color: var(--customer-danger-text);
+          border: 1px solid var(--customer-divider); background: var(--surface); color: var(--customer-danger-text);
           font: 700 12px/1 Pretendard, sans-serif; cursor: pointer;
           transition: border-color .15s ease, color .15s ease;
         }

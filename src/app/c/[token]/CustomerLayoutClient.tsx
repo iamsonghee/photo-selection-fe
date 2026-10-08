@@ -5,6 +5,7 @@ import { SelectionProvider } from "@/contexts/SelectionContext";
 import { ReviewProvider } from "@/contexts/ReviewContext";
 import { CustomerImageCacheProvider } from "@/contexts/CustomerImageCacheContext";
 import { isCustomerLightRoute } from "@/lib/customer-light-routes";
+import lightTheme from "@/styles/PhotographerLightTheme.module.css";
 
 export default function CustomerLayoutClient({
   children,
@@ -14,18 +15,15 @@ export default function CustomerLayoutClient({
   const params = useParams();
   const pathname = usePathname();
   const token = (params?.token as string) ?? "";
-  // 순백 캔버스를 쓰는 라우트는 셸에서 한 번 판정해 overscroll 영역까지 같은 색을 유지한다.
+  // 순백 캔버스를 쓰는 라우트는 셸에서 한 번 판정해 overscroll 영역까지 같은 색을 유지하고,
+  // 작가 Light 토큰을 씌워 text-foreground·bg-surface 같은 공용 토큰도 밝은 값으로 풀리게 한다.
   const isLight = isCustomerLightRoute(pathname);
 
   return (
     <SelectionProvider>
       <CustomerImageCacheProvider key={token}>
         <ReviewProvider>
-          <div className={`customer-app-shell relative min-h-[100dvh] bg-background text-foreground${isLight ? " customer-light-shell" : ""}`}>
-            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
-              <div className="absolute -left-24 top-[6%] h-72 w-72 rounded-full bg-[#4f7eff]/12 blur-[100px]" />
-              <div className="absolute right-[-12%] top-[32%] h-64 w-64 rounded-full bg-violet-500/8 blur-[90px]" />
-            </div>
+          <div className={`customer-app-shell relative min-h-[100dvh] bg-background text-foreground${isLight ? ` customer-light-shell ${lightTheme.lightTheme}` : ""}`}>
             <div className="relative z-10">{children}</div>
           </div>
         </ReviewProvider>

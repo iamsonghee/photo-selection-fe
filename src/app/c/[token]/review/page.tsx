@@ -418,13 +418,13 @@ function ReviewGalleryView({
           height: 51px; padding: 0 20px;
           padding-top: env(safe-area-inset-top, 0px);
           box-sizing: content-box;
-          background: #fff; border-bottom: 1px solid #eef0f2;
+          background: var(--surface); border-bottom: 1px solid #eef0f2;
         }
         .rgv-head-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
         .rgv-brand-mark {
           width: 26px; height: 26px; flex: 0 0 26px;
           display: grid; place-items: center; border-radius: 7px;
-          background: #ff4d00; color: #fff; text-decoration: none;
+          background: var(--accent); color: #fff; text-decoration: none;
           font: 800 14px/1 Pretendard, sans-serif;
           box-shadow: 0 1px 2px rgba(25,25,24,.12);
           -webkit-tap-highlight-color: transparent;
@@ -480,7 +480,7 @@ function ReviewGalleryView({
         /* 수령 모드 안내 — 필터 탭이 서던 자리를 그대로 쓴다(아래 격자와의 간격이 같아야 한다) */
         .rgv-receipt-note {
           margin: 0 0 12px; padding: 10px 12px;
-          border-radius: 8px; background: rgba(255,77,0,.06);
+          border-radius: 8px; background: rgba(var(--accent-rgb), .06);
           font-size: 12px; line-height: 1.55; letter-spacing: -.2px;
           color: var(--customer-ink-secondary);
         }
@@ -510,7 +510,7 @@ function ReviewGalleryView({
         /* 검토 결과는 이 화면에만 있는 정보라 갤러리에 짝이 없다 — 갤러리 체크박스와 같은 자리(위쪽)에 둔다 */
         .rgv-card-pill {
           position: absolute; top: 8px; right: 8px; z-index: 3;
-          background-color: #fff;
+          background-color: var(--surface);
         }
         /* PC는 목록 폭이 넓어져 3열로 두면 썸네일이 과하게 커진다 — 폭에 맞춰 열 수를 늘린다.
          * 컨테이너에 최대 폭을 줘서 초광폭 모니터에서 한 줄이 끝없이 늘어지는 것도 막는다. */
@@ -538,7 +538,7 @@ function ReviewGalleryView({
         .rgv-density { flex-shrink:0; min-height:44px; padding:0 10px; border:1px solid var(--customer-divider); border-radius:8px; font-size:12px; }
         .rgv-remaining { font-size:12px; color:var(--customer-ink-secondary); white-space:nowrap; }
         .rgv-head-right { flex-wrap:wrap; justify-content:flex-end; }
-        .rgv-comment { position:absolute; left:8px; bottom:8px; padding:6px; border-radius:6px; background:#fff; color:var(--customer-ink); }
+        .rgv-comment { position:absolute; left:8px; bottom:8px; padding:6px; border-radius:6px; background:var(--surface); color:var(--customer-ink); }
         .rgv-tab { min-height:44px; }
       `}</style>
 
@@ -727,6 +727,14 @@ function DeliveryReceiptView({
   return (
     <div
       style={{
+        /* 사진을 보는 화면이라 암실 — 셸의 Light 토큰 대신 이 화면 안에서는 공용 토큰을 암실 값으로 되돌린다. */
+        ["--background" as string]: "var(--darkroom-stage)",
+        ["--foreground" as string]: "var(--darkroom-text)",
+        ["--muted-foreground" as string]: "var(--darkroom-muted)",
+        ["--surface" as string]: "var(--darkroom-surface)",
+        ["--surface-raised" as string]: "var(--darkroom-raised)",
+        ["--border" as string]: "var(--darkroom-border)",
+        colorScheme: "dark",
         minHeight: "100dvh",
         background: "var(--background)",
         color: "var(--foreground)",

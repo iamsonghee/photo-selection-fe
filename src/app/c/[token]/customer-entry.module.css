@@ -1,11 +1,11 @@
 .pinCanvas,
 .invalidCanvas {
-  --entry-text: #023852;
-  --entry-text-secondary: rgba(2, 56, 82, 0.68);
-  --entry-control: #023852;
-  --entry-divider: #d7dfe3;
+  --entry-text: var(--foreground);
+  --entry-text-secondary: var(--muted-foreground);
+  --entry-control: var(--foreground);
+  --entry-divider: var(--border);
   --entry-danger: #ff3636;
-  --entry-accent: #ff4d00;
+  --entry-accent: var(--accent);
 }
 
 .pinCanvas {
@@ -90,7 +90,7 @@
 
 .pinBottom {
   margin-top: auto;
-  background: #fff;
+  background: var(--surface);
 }
 
 .keypad {
@@ -155,7 +155,7 @@
   justify-content: center;
   border: 0;
   border-radius: 8px;
-  background: #ff4d00;
+  background: var(--accent);
   color: #fff;
   font: inherit;
   font-size: 16px;
@@ -262,7 +262,7 @@
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
-  color: rgba(2, 56, 82, 0.68);
+  color: var(--muted-foreground);
 }
 
 .deadlineDate {
@@ -377,7 +377,7 @@
 .entryDescription { word-break: keep-all; overflow-wrap: anywhere; }
 .projectLabel { margin: 0; color: #737373; font-size: 13px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
 .deadlineRow { flex-wrap: wrap; gap: 8px; }
-.deadlineLabel { color: rgba(2, 56, 82, 0.68); font-size: 13px; }
+.deadlineLabel { color: var(--muted-foreground); font-size: 13px; }
 .deadlineDate { font-size: 15px; }
 .pinCanvas { min-height: 0; }
 .pinContent { padding: 0 12px 12px; }
@@ -386,8 +386,8 @@
 .pinCanvas .entryDescription { font-size: 14px; }
 .pinStatusArea { padding: 12px 24px; }
 .pinSlots { padding: 0; gap: 12px; }
-.pinSlot { height: 58px; align-items: center; border: 1px solid #d7dfe3; border-radius: 10px; background: #fafafa; }
-.pinSlotFilled { border-color: #ff4d00; background: #fff6f1; }
+.pinSlot { height: 58px; align-items: center; border: 1px solid var(--border); border-radius: 10px; background: #fafafa; }
+.pinSlotFilled { border-color: var(--accent); background: #fff6f1; }
 .pinSlotError { border-color: #ff3636; background: #fff6f6; }
 .pinFeedback { min-height: 48px; font-weight: 400; }
 .pinBottom { margin-top: 12px; }

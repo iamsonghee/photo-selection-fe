@@ -12,6 +12,11 @@
   --customer-danger-text: #484b51;
 }
 
+/* 라이트 라우트는 셸에 작가 Light 토큰(.lightTheme)이 함께 붙는다. 고객 화면 캔버스는 작가 화면의 옅은 회청색이 아니라 순백이다. */
+.customer-app-shell.customer-light-shell {
+  --background: var(--customer-canvas);
+}
+
 
 /* 고객 화면의 순백 캔버스는 overscroll 영역까지 같은 색을 유지한다.
  * --customer-canvas는 자손에 스코프돼 조상인 html/body에서는 직접 쓸 수 없다. */

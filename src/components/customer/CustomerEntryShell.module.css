@@ -1,7 +1,7 @@
 .viewport {
   min-height: 100dvh;
   background: #f3f4f5;
-  color: #023852;
+  color: var(--foreground);
   font-family: "Pretendard", "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -12,7 +12,7 @@
   min-height: 100dvh;
   margin: 0 auto;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 .header {
@@ -22,7 +22,7 @@
   min-height: calc(52px + env(safe-area-inset-top, 0px));
   align-items: flex-end;
   padding: env(safe-area-inset-top, 0px) 24px 12px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .headerOverlay {
@@ -44,7 +44,7 @@
   min-height: 100dvh;
   overflow: visible;
   overscroll-behavior: none;
-  background: #fff;
+  background: var(--surface);
 }
 
 .canvas.responsiveCanvas {
@@ -66,6 +66,6 @@
 .authViewport { display: grid; align-items: center; padding: 32px 24px; }
 .authCanvas { width: 100%; max-width: 440px; min-height: 0; border-radius: 24px; box-shadow: 0 12px 48px #02385208; border: 1px solid #e5e7e9; padding-top: 20px; }
 @media (max-width: 767px) {
-  .authViewport { display: block; padding: 0; background: #fff; }
+  .authViewport { display: block; padding: 0; background: var(--surface); }
   .authCanvas { max-width: none; min-height: 100dvh; border: 0; border-radius: 0; padding-top: 12px; box-shadow: none; }
 }

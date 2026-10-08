@@ -1,7 +1,7 @@
 .root {
-  --background: #fff; --foreground: #023852; --muted-foreground: #696d70; --subtle-foreground: #85898c;
+  --background: var(--surface); --foreground: var(--foreground); --muted-foreground: #696d70; --subtle-foreground: #85898c;
   --surface: #fff; --surface-raised: #f7f7f4; --border: #e4e5e1; --border-subtle: #ecece8;
-  --customer-divider: #e4e5e1; --customer-ink: #023852; --customer-ink-secondary: #696d70;
+  --customer-divider: #e4e5e1; --customer-ink: var(--foreground); --customer-ink-secondary: #696d70;
   color-scheme: light; min-height: 100dvh; display: flex; flex-direction: column; overflow-x: hidden;
   color: var(--foreground); background: #fbfbf9;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; -webkit-font-smoothing: antialiased;

@@ -79,8 +79,8 @@ export function SelectionConfirmFooter({
         }
         .ac-confirm-footer-attention .ac-confirm-footer-progress-label { animation: ac-limit-label 360ms ease-out; }
         .ac-confirm-footer-attention .ac-confirm-footer-track { animation: ac-limit-track 360ms ease-out; }
-        @keyframes ac-limit-label { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-3px); color: #ff4d00; } 60% { transform: translateX(3px); color: #ff4d00; } }
-        @keyframes ac-limit-track { 0%, 100% { box-shadow: none; } 40% { box-shadow: 0 0 0 3px rgba(255,77,0,.24); } }
+        @keyframes ac-limit-label { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-3px); color: var(--accent); } 60% { transform: translateX(3px); color: var(--accent); } }
+        @keyframes ac-limit-track { 0%, 100% { box-shadow: none; } 40% { box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .24); } }
 
         /* 고객 라이트 톤 — 폭에 상관없이 적용(768px 이상 갤러리 하단바 재스킨의 핵심).
          * <767px에서는 아래 .ac-confirm-footer-gallery 규칙이 layout까지 추가로 덮어써 기존 모바일 모습을 그대로 유지한다. */
@@ -113,8 +113,8 @@ export function SelectionConfirmFooter({
           .ac-confirm-footer-progress-label { font-size: 9px !important; }
           .ac-confirm-footer-btn { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
           .ac-confirm-footer.ac-confirm-footer-gallery {
-            background: #fff !important;
-            border-top: 1px solid #d7dfe3 !important;
+            background: var(--surface) !important;
+            border-top: 1px solid var(--border) !important;
             backdrop-filter: none !important;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-inner {
@@ -126,7 +126,7 @@ export function SelectionConfirmFooter({
             grid-template-columns: 1fr !important;
             grid-template-rows: 24px 48px !important;
             gap: 8px !important;
-            background: #fff;
+            background: var(--surface);
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-progress { gap: 4px !important; }
           .ac-confirm-footer-gallery .ac-confirm-footer-progress-label {
@@ -138,26 +138,26 @@ export function SelectionConfirmFooter({
             letter-spacing: 0 !important;
             text-transform: none !important;
           }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:first-child { color: #023852 !important; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: #023852 !important; font-size: 14px; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: #023852; font-size: 15px; font-weight: 800; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:first-child { color: var(--foreground) !important; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: var(--foreground) !important; font-size: 14px; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: var(--foreground); font-size: 15px; font-weight: 800; }
           .ac-confirm-footer-gallery .ac-confirm-footer-track {
             height: 4px !important;
             border-radius: 999px;
-            background: #eef3f4 !important;
+            background: var(--surface-raised) !important;
             overflow: hidden;
           }
-          .ac-confirm-footer-gallery .ac-confirm-footer-fill { background: #023852 !important; border-radius: 999px; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-fill { background: var(--foreground) !important; border-radius: 999px; }
           .ac-confirm-footer-gallery .ac-confirm-footer-action { width: 100%; }
           .ac-confirm-footer-gallery .ac-confirm-footer-meta { display: none; }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn {
             width: 100%; height: 48px !important; padding: 0 20px !important;
             justify-content: center; border-radius: 8px; clip-path: none;
-            background: #ff4d00; color: #fff; font-size: 15px !important;
+            background: var(--accent); color: #fff; font-size: 15px !important;
             font-weight: 700; letter-spacing: -0.3px;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn:disabled {
-            opacity: 1; background: #d7dfe3; color: #aab0b8;
+            opacity: 1; background: var(--border); color: #aab0b8;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn svg { display: none; }
         }
@@ -223,7 +223,7 @@ export function SelectionConfirmFooter({
               aria-valuemin={0}
               aria-valuemax={N}
               aria-valuenow={Math.min(Y, N)}
-              style={{ width: "100%", height: 3, background: isLight ? "#eef3f4" : "var(--surface)" }}
+              style={{ width: "100%", height: 3, background: isLight ? "var(--surface-raised)" : "var(--surface)" }}
             >
               <div
                 className="ac-confirm-footer-fill"

@@ -1,10 +1,10 @@
 .canvas {
-  --entry-text: #023852;
-  --entry-text-secondary: rgba(2, 56, 82, 0.68);
-  --entry-control: #023852;
-  --entry-divider: #d7dfe3;
+  --entry-text: var(--foreground);
+  --entry-text-secondary: var(--muted-foreground);
+  --entry-control: var(--foreground);
+  --entry-divider: var(--border);
   --entry-danger: #ff3636;
-  --entry-accent: #ff4d00;
+  --entry-accent: var(--accent);
   display: grid;
   width: 100%;
   height: 100dvh;
@@ -20,7 +20,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 .hero {
@@ -38,7 +38,7 @@
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 68% 24%, rgba(255, 77, 0, 0.11), transparent 32%),
+    radial-gradient(circle at 68% 24%, rgba(var(--accent-rgb), 0.11), transparent 32%),
     linear-gradient(145deg, #f4f4f2 0%, #e7e9e8 100%);
 }
 
@@ -48,7 +48,7 @@
   height: 44px;
   place-items: center;
   border-radius: 12px;
-  background: #ff4d00;
+  background: var(--accent);
   color: #fff;
   font-size: 23px;
   font-weight: 800;
@@ -118,7 +118,7 @@
   flex: 0 0 30px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   object-fit: cover;
 }
 
@@ -137,7 +137,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #023852;
+  color: var(--foreground);
 }
 
 .profileDialog::backdrop { background: rgba(16, 18, 20, 0.42); }
@@ -147,7 +147,7 @@
   width: 100%;
   padding: 14px 24px calc(26px + env(safe-area-inset-bottom, 0px));
   border-radius: 24px 24px 0 0;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 -16px 44px rgba(18, 22, 26, 0.2);
 }
 
@@ -176,13 +176,13 @@
 }
 
 .profileHeading { display: flex; align-items: center; gap: 14px; padding-right: 44px; }
-.profileAvatar { width: 56px; height: 56px; flex: 0 0 56px; border: 1px solid #e3e5e6; border-radius: 50%; background: #fff; object-fit: cover; }
+.profileAvatar { width: 56px; height: 56px; flex: 0 0 56px; border: 1px solid #e3e5e6; border-radius: 50%; background: var(--surface); object-fit: cover; }
 .profileEyebrow { margin: 0 0 3px; color: #92979a; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; }
 .profileTitle { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.35; letter-spacing: -0.025em; }
 .profileBio { margin: 20px 0 0; color: #505457; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .profileLinks { display: flex; gap: 8px; margin-top: 20px; }
 .profileLinks a { display: inline-flex; min-height: 42px; flex: 1; align-items: center; justify-content: center; gap: 7px; border: 1px solid #e0e3e5; border-radius: 12px; color: #303336; font-size: 14px; font-weight: 600; text-decoration: none; }
-.profileLinks a:focus-visible { outline: 2px solid #ff4d00; outline-offset: 2px; }
+.profileLinks a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .copy {
   display: flex;
@@ -250,7 +250,7 @@
     gap: clamp(32px, 4vh, 40px);
     padding: 40px clamp(48px, 5vw, 80px) clamp(72px, 10vh, 112px);
     overflow: hidden;
-    background: #fff;
+    background: var(--surface);
   }
 
   .heroImage { transform: scale(1.001); }
@@ -312,14 +312,14 @@
     gap: 12px;
     margin: 0 auto;
     padding: 0;
-    background: #fff;
+    background: var(--surface);
   }
 
   .actions :global(.original-download-entry-trigger) {
     min-height: 44px;
     border-color: #e5e7e9;
     background: #fafafa;
-    color: rgba(2, 56, 82, 0.68);
+    color: var(--muted-foreground);
     font-size: 14px;
     font-weight: 500;
   }

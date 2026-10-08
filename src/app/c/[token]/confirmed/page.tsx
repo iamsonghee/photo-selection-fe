@@ -57,7 +57,7 @@ export default function ConfirmedPage() {
 
   if (loading) return <CustomerPageSkeleton variant="page" />;
   if (!project) {
-    return <main className="flex min-h-dvh items-center justify-center bg-white text-sm text-[rgba(2,56,82,0.52)]">존재하지 않는 초대 링크입니다.</main>;
+    return <main className="flex min-h-dvh items-center justify-center bg-white text-sm text-[var(--subtle-foreground)]">존재하지 않는 초대 링크입니다.</main>;
   }
   if (["selecting", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status)) {
     return <CustomerPageSkeleton variant="page" />;
@@ -166,8 +166,8 @@ export default function ConfirmedPage() {
           min-height: 100dvh;
           display: flex;
           flex-direction: column;
-          background: #fff;
-          color: #023852;
+          background: var(--surface);
+          color: var(--foreground);
           font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif;
         }
         .confirmed-brandbar {
@@ -176,7 +176,7 @@ export default function ConfirmedPage() {
           display: flex;
           align-items: flex-end;
           padding: env(safe-area-inset-top) 20px 12px;
-          background: #fff;
+          background: var(--surface);
           border-bottom: 1px solid #f1f2f3;
         }
         .confirmed-main {
@@ -194,11 +194,11 @@ export default function ConfirmedPage() {
           place-items: center;
           border-radius: 50%;
           background: #fff3ed;
-          color: #ff4d00;
+          color: var(--accent);
         }
         .confirmed-copy { width: 100%; margin-top: 20px; }
         .confirmed-copy h1 { margin: 0; font-size: 24px; line-height: 36px; font-weight: 600; letter-spacing: -1.47px; }
-        .confirmed-copy p { margin: 12px 0 0; color: rgba(2, 56, 82, 0.68); font-size: 14px; line-height: 21px; font-weight: 400; }
+        .confirmed-copy p { margin: 12px 0 0; color: var(--muted-foreground); font-size: 14px; line-height: 21px; font-weight: 400; }
         .confirmed-selection-summary {
           min-height: 72px;
           margin-top: 32px;
@@ -219,14 +219,14 @@ export default function ConfirmedPage() {
           place-items: center;
           border-radius: 8px;
           background: #fff3ed;
-          color: #ff4d00;
+          color: var(--accent);
         }
         .confirmed-selection-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-        .confirmed-selection-copy strong { color: #023852; font-size: 15px; line-height: 22px; font-weight: 700; letter-spacing: -.3px; }
-        .confirmed-selection-copy span { color: rgba(2, 56, 82, 0.52); font-size: 12px; line-height: 18px; }
+        .confirmed-selection-copy strong { color: var(--foreground); font-size: 15px; line-height: 22px; font-weight: 700; letter-spacing: -.3px; }
+        .confirmed-selection-copy span { color: var(--subtle-foreground); font-size: 12px; line-height: 18px; }
         .confirmed-download { margin-top: 32px; }
-        .confirmed-download h2 { margin: 0 0 10px; color: #023852; font-size: 14px; line-height: 22px; font-weight: 700; letter-spacing: -.28px; }
-        .confirmed-download-note { margin: 10px 4px 0; display: flex; align-items: center; gap: 7px; color: rgba(2, 56, 82, 0.52); font-size: 11px; line-height: 17px; }
+        .confirmed-download h2 { margin: 0 0 10px; color: var(--foreground); font-size: 14px; line-height: 22px; font-weight: 700; letter-spacing: -.28px; }
+        .confirmed-download-note { margin: 10px 4px 0; display: flex; align-items: center; gap: 7px; color: var(--subtle-foreground); font-size: 11px; line-height: 17px; }
         .confirmed-download-note svg { flex: 0 0 15px; }
         .confirmed-primary {
           width: 100%;
@@ -237,7 +237,7 @@ export default function ConfirmedPage() {
           align-items: center;
           justify-content: center;
           border-radius: 8px;
-          background: #ff4d00;
+          background: var(--accent);
           color: #fff;
           font-size: 15px;
           line-height: 22px;
@@ -246,7 +246,7 @@ export default function ConfirmedPage() {
           text-decoration: none;
           transition: background-color 140ms ease, transform 100ms ease;
         }
-        .confirmed-primary:hover { background: #e94b0d; }
+        .confirmed-primary:hover { background: var(--accent-hover); }
         .confirmed-primary:active { transform: scale(.99); }
         .confirmed-secondary {
           width: 100%;
@@ -254,23 +254,23 @@ export default function ConfirmedPage() {
           margin-top: 18px;
           border: 0;
           background: transparent;
-          color: rgba(2, 56, 82, 0.68);
+          color: var(--muted-foreground);
           font: 400 13px/20px Pretendard, sans-serif;
           text-decoration: underline;
           text-underline-offset: 3px;
           cursor: pointer;
         }
         .confirmed-secondary:disabled { color: #aab0b8; cursor: not-allowed; text-decoration: none; }
-        .confirmed-primary:focus-visible, .confirmed-secondary:focus-visible { outline: 2px solid #ff4d00; outline-offset: 2px; }
+        .confirmed-primary:focus-visible, .confirmed-secondary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .confirmed-cancel-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.5); }
-        .confirmed-cancel-dialog { width: min(335px, 100%); box-sizing: border-box; padding: 24px; border-radius: 12px; background: #fff; text-align: center; }
-        .confirmed-cancel-icon { width: 40px; height: 40px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 50%; background: #fff3ed; color: #ff4d00; }
+        .confirmed-cancel-dialog { width: min(335px, 100%); box-sizing: border-box; padding: 24px; border-radius: 12px; background: var(--surface); text-align: center; }
+        .confirmed-cancel-icon { width: 40px; height: 40px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 50%; background: #fff3ed; color: var(--accent); }
         .confirmed-cancel-dialog h2 { margin: 0; font-size: 19px; line-height: 29px; }
-        .confirmed-cancel-dialog p { margin: 8px 0 20px; color: rgba(2, 56, 82, 0.68); font-size: 12px; line-height: 19px; }
+        .confirmed-cancel-dialog p { margin: 8px 0 20px; color: var(--muted-foreground); font-size: 12px; line-height: 19px; }
         .confirmed-cancel-dialog .confirmed-cancel-error { margin-top: -8px; color: #d92d20; }
         .confirmed-cancel-dialog > div { display: flex; gap: 8px; }
-        .confirmed-cancel-dialog button { flex: 1; height: 44px; border: 1px solid #d9d9d9; border-radius: 4px; background: #fff; color: #023852; font-size: 14px; cursor: pointer; }
-        .confirmed-cancel-dialog button.danger { border-color: #ff4d00; background: #ff4d00; color: #fff; font-weight: 700; }
+        .confirmed-cancel-dialog button { flex: 1; height: 44px; border: 1px solid #d9d9d9; border-radius: 4px; background: var(--surface); color: var(--foreground); font-size: 14px; cursor: pointer; }
+        .confirmed-cancel-dialog button.danger { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; }
         @media (min-width: 768px) {
           .confirmed-main { width: min(100%, 440px); padding-top: 56px; }
         }
