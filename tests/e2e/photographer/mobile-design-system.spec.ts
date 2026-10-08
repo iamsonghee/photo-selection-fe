@@ -35,6 +35,8 @@ test("long press selects only the held photo after grid reflow; the next tap sti
     await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(1);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(1);
+    // 화면 낭독기에는 선택한 사진 하나당 '선택 해제' 버튼이 하나만 읽힌다(사진 버튼·체크 버튼 중복 없음).
+    await expect(page.getByRole("button", { name: /선택 해제$/ })).toHaveCount(1);
     await photos.first().tap();
     await expect(page.locator('[data-original-photo-media]:has(> button[aria-pressed="true"])')).toHaveCount(0);
     await photos.first().tap();

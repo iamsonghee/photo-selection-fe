@@ -242,6 +242,11 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
     else props.onPhotoClick(index);
   };
 
+  // 같은 일을 하는 선택 버튼이 둘이면 화면 낭독기·키보드에는 하나만 남긴다(사진마다 같은 이름이 두 번 읽히지 않게).
+  // 파일명 줄 선택 버튼이 있으면 마우스 올림 선택 버튼을, 모바일 선택 모드에서는 사진 버튼이 선택을 맡으니 체크 버튼을 감춘다.
+  const hasHeaderSelect = !selectionVariant && !props.compact && props.showFilename !== false && !props.readonly;
+  const hideMobileCheckboxFromAT = Boolean(props.mobileManageMode);
+
   return (
     <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.squareMedia ? styles.gridCellSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${props.mobileSelectionVisible ? styles.gridCellMobileSelectable : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
       <PhotoAssetPreview filename={name} active={selected}
@@ -273,8 +278,10 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
         />
         {props.selectionOnHover && !photo.isPending ? (
           <button type="button" className={styles.hoverSelectButton}
-            aria-label={`${name} ${selected ? "선택 해제" : "선택"}`}
-            aria-pressed={selected}
+            aria-label={hasHeaderSelect ? undefined : `${name} ${selected ? "선택 해제" : "선택"}`}
+            aria-pressed={hasHeaderSelect ? undefined : selected}
+            aria-hidden={hasHeaderSelect || undefined}
+            tabIndex={hasHeaderSelect ? -1 : undefined}
             onClick={(event) => { event.stopPropagation(); props.onToggleSelected?.(photo.id, { range: event.shiftKey }); }}>
             <span className={styles.hoverSelectFace}>{selected ? <SelectionMark recommendation={props.selectionMark === "recommendation"} /> : null}</span>
           </button>
@@ -284,8 +291,10 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
             type="button"
             data-mobile-selection-checkbox
             className={styles.mobileSelectionCheckbox}
-            aria-label={`${name} ${selected ? "선택 해제" : "선택"}`}
-            aria-pressed={selected}
+            aria-label={hideMobileCheckboxFromAT ? undefined : `${name} ${selected ? "선택 해제" : "선택"}`}
+            aria-pressed={hideMobileCheckboxFromAT ? undefined : selected}
+            aria-hidden={hideMobileCheckboxFromAT || undefined}
+            tabIndex={hideMobileCheckboxFromAT ? -1 : undefined}
             onClick={(event) => {
               event.stopPropagation();
               if (props.mobileManageMode) props.onToggleSelected?.(photo.id);
