@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import LandingPage from "./landing/page";
 import { LANDING_FAQ } from "./landing/faq";
 import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   openGraph: { title, description, url: "/", siteName: SITE_NAME, images: [OG_MAIN_IMAGE], type: "website", locale: "ko_KR" },
   twitter: { card: "summary_large_image", title, description, images: [OG_MAIN_IMAGE] },
 };
+
+// 루트 viewport는 브라우저 확대를 막는다(maximumScale 1). 소개 페이지인 랜딩은 확대를 허용한다(접근성).
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 5 };
 
 // 검색 엔진용 구조화 데이터. 화면에 있는 사실(사업자 정보·FAQ)만 담고 후기·평점은 넣지 않는다.
 const jsonLd = {

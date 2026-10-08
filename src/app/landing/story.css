@@ -240,9 +240,9 @@
 #selection-demo .as-card-meta{padding:0 8px;font-size:11px;margin-top:8px;}
 #selection-demo .as-like-people i{background:#f0f0f0;color:#525252;width:18px;height:18px;line-height:18px;font-size:10px;}
 #selection-demo .as-like-people i.as-person-purple{background:#e5e5e5;color:#404040;}
-.as-card-rating{display:flex;align-items:center;padding:0 5px 4px;min-height:32px;}
+.as-card-rating{display:flex;flex-wrap:wrap;align-items:center;padding:0 5px 4px;min-height:32px;}
 .as-card-rating button{display:inline-flex;align-items:center;justify-content:center;padding:5px 2px;min-width:24px;min-height:28px;border:0;background:none;color:var(--ac-accent,#ff4d00);}
-.as-card-rating .as-comment-link{margin-left:auto;font-size:10px;color:#737373;padding:5px;}
+.as-card-rating .as-comment-link{margin-left:auto;font-size:12px;color:#737373;padding:5px;}
 #selection-demo .as-rating button{color:var(--ac-accent,#ff4d00);}
 #selection-demo .as-inspector{display:grid;grid-template-columns:180px 160px 1fr;gap:12px 20px;align-items:center;}
 #selection-demo .as-inspector-heading{margin:0;}
@@ -260,7 +260,9 @@
 
 #selection-demo .as-kicker{color:#737373;}
 .as-card-rating .as-comment-link{white-space:nowrap;flex-shrink:0;}
-@media(max-width:700px){.as-card-rating button{min-width:20px;padding-inline:1px;}.as-card-rating .as-comment-link{padding-inline:2px;}}
+/* 별 버튼은 터치 기준 24px을 지킨다. 한 줄에 다 들어가지 않는 폭에서는 '요청'이 다음 줄로 내려간다(flex-wrap). */
+@media(max-width:700px){.as-card-rating button{padding-inline:0;}.as-card-rating .as-comment-link{padding-inline:2px;}}
+@media(max-width:349px){.as-card-rating button{min-width:20px;}}
 
 /* 상세보기에서만 큰 사진과 편집 기능을 보여주며 갤러리 위치는 유지한다. */
 .as-detail{padding:0;border:1px solid #e5e5e5;border-radius:14px;width:min(1080px,calc(100vw - 48px));max-width:none;max-height:calc(100dvh - 48px);margin:auto;color:#262626;background:white;}

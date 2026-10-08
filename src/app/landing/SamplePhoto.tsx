@@ -31,7 +31,9 @@ function SamplePhotoImage({ src, id, retouched, priority }: { src: string; id: s
   }, [src]);
 
   return <div className="ac-sample-image" data-image-state={status} data-photo-id={id} data-version={retouched ? "retouched" : "original"}>
-    {status !== "loaded" && <span className="ac-sample-image-status" role={status === "error" ? "status" : undefined}>{status === "error" ? "사진을 불러오지 못했어요." : "사진 불러오는 중"}</span>}
+    {/* 불러오는 동안은 글자 없이 골격만 — 사진 버튼 안에 접근성 이름과 다른 글자가 보이지 않게 한다. */}
+    {status === "loading" && <span className="ac-sample-image-skeleton skeleton-block" aria-hidden="true" />}
+    {status === "error" && <span className="ac-sample-image-status" role="status">사진을 불러오지 못했어요.</span>}
     {/* 로컬 JPEG를 직접 사용해 이미지 최적화 서버나 외부 URL 없이 동일 자산을 공유한다. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img ref={imageRef} src={src} width={photo.width} height={photo.height} alt={`${photo.filename} · ${photo.description} · ${retouched ? "보정본" : "원본"} (AI 생성)`} loading={priority ? "eager" : "lazy"} decoding="async" fetchPriority={priority ? "high" : "auto"} style={{ objectPosition: photo.objectPosition }} onLoad={() => setStatus("loaded")} onError={() => setStatus("error")} />
