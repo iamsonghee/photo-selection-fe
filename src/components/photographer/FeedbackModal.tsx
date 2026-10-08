@@ -132,7 +132,7 @@ export function FeedbackButton({
                   disabled={submitting}
                   className={`min-h-10 rounded-lg border px-3 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
                     category === c
-                      ? "border-accent bg-accent/8 text-accent"
+                      ? "border-foreground bg-surface text-foreground ring-1 ring-inset ring-foreground"
                       : "border-border-subtle bg-surface text-muted-foreground hover:bg-surface-raised hover:text-foreground"
                   }`}
                 >

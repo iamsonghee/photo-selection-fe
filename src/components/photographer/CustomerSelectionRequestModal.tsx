@@ -421,7 +421,7 @@ export function CustomerSelectionRequestModal({
         </section>
 
         <section className="sm:hidden">
-          <label className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-accent/25 bg-accent/5 px-3.5 py-3">
+          <label className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-border-subtle bg-surface-raised px-3.5 py-3">
             <input
               type="checkbox"
               checked={photoLockAcknowledged}
@@ -435,7 +435,7 @@ export function CustomerSelectionRequestModal({
           </label>
         </section>
 
-        <section className="hidden rounded-lg border border-accent/25 bg-accent/5 px-4 py-3.5 sm:block">
+        <section className="hidden rounded-lg border border-border-subtle bg-surface-raised px-4 py-3.5 sm:block">
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"

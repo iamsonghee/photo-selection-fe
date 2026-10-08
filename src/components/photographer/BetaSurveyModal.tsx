@@ -301,6 +301,29 @@ export function BetaSurveyModal({
       description="짧은 답변으로 A-CUT을 더 편하게 만드는 데 도움을 주세요."
       maxWidth={520}
       mobilePresentation="fullscreen"
+      // 다른 팝업과 같이 버튼은 스크롤 밖 하단에 고정한다 — 긴 설문에서도 제출이 늘 보인다.
+      footer={done ? undefined : (
+        <div className="flex justify-end gap-2">
+          <PhotographerLightButton
+            type="button"
+            variant="secondary"
+            onClick={handleLater}
+            disabled={pending !== null}
+          >
+            나중에
+          </PhotographerLightButton>
+          <PhotographerLightButton
+            type="button"
+            variant="primary"
+            onClick={handleSubmit}
+            disabled={pending !== null}
+            pending={pending === "submit"}
+            pendingLabel="제출 중…"
+          >
+            제출
+          </PhotographerLightButton>
+        </div>
+      )}
     >
       {done ? (
         <div className="flex flex-col gap-4">
@@ -526,29 +549,6 @@ export function BetaSurveyModal({
           )}
 
           {error && <p className="text-xs text-danger">{error}</p>}
-
-          <div className="flex justify-end">
-            <div className="flex gap-2">
-              <PhotographerLightButton
-                type="button"
-                variant="secondary"
-                onClick={handleLater}
-                disabled={pending !== null}
-              >
-                나중에
-              </PhotographerLightButton>
-              <PhotographerLightButton
-                type="button"
-                variant="primary"
-                onClick={handleSubmit}
-                disabled={pending !== null}
-                pending={pending === "submit"}
-                pendingLabel="제출 중…"
-              >
-                제출
-              </PhotographerLightButton>
-            </div>
-          </div>
         </div>
       )}
     </PhotographerModal>

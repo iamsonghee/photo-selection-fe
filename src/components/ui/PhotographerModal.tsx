@@ -72,7 +72,7 @@ export function PhotographerModal({
         data-modal-variant={variant}
         data-confirmation-density={variant === "confirmation" ? confirmationDensity : undefined}
         data-mobile-presentation={variant === "standard" ? mobilePresentation : undefined}
-        className={`flex w-full min-w-0 flex-col overflow-hidden bg-surface shadow-[0_12px_32px_rgba(2,56,82,0.18)] md:max-h-[calc(100dvh-32px)] md:max-w-[var(--modal-max-width)] md:rounded-2xl md:border md:border-border-subtle ${
+        className={`flex w-full min-w-0 flex-col overflow-hidden break-keep bg-surface shadow-[0_12px_32px_rgba(2,56,82,0.18)] md:max-h-[calc(100dvh-32px)] md:max-w-[var(--modal-max-width)] md:rounded-2xl md:border md:border-border-subtle ${
           mobileFullscreen
             ? "h-[100dvh] max-h-[100dvh] rounded-none border-0"
             : "max-h-[calc(100dvh-24px)] rounded-2xl border border-border-subtle"
