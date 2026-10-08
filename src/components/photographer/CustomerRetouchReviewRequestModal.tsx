@@ -184,7 +184,7 @@ export function CustomerRetouchReviewRequestModal({
                       : "bg-surface-raised text-muted-foreground hover:bg-border-subtle hover:text-foreground"
                   }`}
                 >
-                  +{days}일
+                  {days}일 후
                 </button>
               );
             })}
