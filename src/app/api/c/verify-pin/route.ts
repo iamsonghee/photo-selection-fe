@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const accessPin = (project as { access_pin: string | null }).access_pin;
 
-    // 2. Check rate limiting: 5 attempts within 1 minute
+    // 2. Check rate limiting: 5 failed attempts within 1 minute
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
     const { data: attempts } = await admin
       .from("pin_attempts")
@@ -45,13 +45,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Record this attempt
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-    await admin.from("pin_attempts").insert({
-      project_token: token,
-      ip_address: ip,
-    });
-
     // 4. Verify PIN
     const isMatch = accessPin === null || accessPin === pin;
 
@@ -69,7 +62,12 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    // 6. Wrong PIN — return remaining attempts
+    // 6. Wrong PIN — record failure (성공은 잠금 횟수에 넣지 않음) and return remaining attempts
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    await admin.from("pin_attempts").insert({
+      project_token: token,
+      ip_address: ip,
+    });
     const remaining = 5 - (attemptsCount + 1);
     return NextResponse.json({ success: false, remaining }, { status: 401 });
   } catch (e) {

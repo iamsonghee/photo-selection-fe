@@ -21,6 +21,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
     if (pinValue.length !== 4 || submitting || locked) return;
     setSubmitting(true);
     setError(null);
+    let navigating = false;
 
     try {
       const res = await fetch("/api/c/verify-pin", {
@@ -31,6 +32,8 @@ export default function PinForm({ token, from }: { token: string; from: string }
       const data = await res.json();
 
       if (data.success) {
+        // 이동이 끝날 때까지 submitting을 유지 — 풀면 4자리 pin이 남아 자동 제출 effect가 재요청을 반복해 잠금에 걸린다.
+        navigating = true;
         // 같은 [token] 레이아웃의 SelectionProvider가 PIN 전에 401로 비어 있으므로 새 쿠키로 다시 받은 뒤
         // 이동한다(전체 새로고침 대신). 컨텍스트가 없으면(예외 경로) 예전처럼 전체 이동.
         if (selection) {
@@ -48,10 +51,11 @@ export default function PinForm({ token, from }: { token: string; from: string }
         setPin("");
       }
     } catch {
+      navigating = false;
       setError("오류가 발생했습니다. 다시 시도해 주세요.");
       setPin("");
     } finally {
-      setSubmitting(false);
+      if (!navigating) setSubmitting(false);
     }
   }, [from, locked, submitting, token, selection, router]);
 
