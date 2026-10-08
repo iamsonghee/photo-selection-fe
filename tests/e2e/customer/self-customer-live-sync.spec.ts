@@ -122,10 +122,11 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   });
 
   await page.goto("/customer-select/delivery-sync/export");
-  await expect(page.getByRole("heading", { name: "1장을 보낼게요" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1장을 골랐어요" })).toBeVisible();
+  await page.getByText("다른 전달 방식", { exact: true }).click();
   const [csvDownload] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "CSV 다운로드" }).click(),
+    page.getByRole("button", { name: "파일명과 메모 CSV" }).click(),
   ]);
   expect(csvDownload.suggestedFilename()).toBe("전달 확인_selections.csv");
   let csv = "";
@@ -134,7 +135,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
 
   const [txtDownload] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "TXT 다운로드" }).click(),
+    page.getByRole("button", { name: "파일명만 TXT" }).click(),
   ]);
   expect(txtDownload.suggestedFilename()).toBe("전달 확인_selections.txt");
   let txt = "";

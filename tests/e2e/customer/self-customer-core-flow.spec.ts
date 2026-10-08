@@ -98,7 +98,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const viewerReviewText = await confirm.innerText();
   await confirm.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
-  await expect(page.getByRole("heading", { name: `${selectedCount}장을 보낼게요` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: `${selectedCount}장을 골랐어요` })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
   expect(reviewTexts).toContain(`약속한 10장보다 ${Math.abs(selectedCount - 10)}장 ${selectedCount > 10 ? "많아요" : "적어요"}`);
   await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
@@ -117,10 +117,12 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const exportTexts = await page.locator("body").innerText();
   await page.getByRole("button", { name: "링크 복사" }).click();
   expect(projectStatePatches).toEqual([]);
-  const csvBox = await page.getByRole("button", { name: "CSV 다운로드" }).boundingBox();
-  const txtBox = await page.getByRole("button", { name: "TXT 다운로드" }).boundingBox();
-  const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV 다운로드" }).click()]);
-  const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "TXT 다운로드" }).click()]);
+  // 파일로 받기는 '다른 전달 방식' 안에 접혀 있다(9950db67).
+  await page.getByText("다른 전달 방식", { exact: true }).click();
+  const csvBox = await page.getByRole("button", { name: "파일명과 메모 CSV" }).boundingBox();
+  const txtBox = await page.getByRole("button", { name: "파일명만 TXT" }).boundingBox();
+  const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "파일명과 메모 CSV" }).click()]);
+  const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "파일명만 TXT" }).click()]);
   const csvBytes = await readFile(await csv.path());
   const csvText = csvBytes.toString("utf8");
   await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review-export.png`, fullPage: true });
