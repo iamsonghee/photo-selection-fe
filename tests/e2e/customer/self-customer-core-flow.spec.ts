@@ -68,10 +68,10 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   // 목표 장수는 참고값이다 — 장수만 알려주고 더 고르거나 줄이라고 압박하지 않는다.
   // 진행은 분수 대신 문장: 한 일(지금까지 N장) + 할 일(약속 장수 정도).
   expect(galleryTexts).toContain(`지금까지 ${selectedCount}장 골랐어요`);
-  expect(galleryTexts).toContain("10장 정도 골라주세요");
-  expect(galleryTexts).not.toContain("더 골라주세요");
+  expect(galleryTexts).toContain("10장 정도 골라 주세요");
+  expect(galleryTexts).not.toContain("더 골라 주세요");
   expect(galleryTexts).not.toContain("더 선택해 주세요");
-  expect(galleryTexts).not.toContain("줄여주세요");
+  expect(galleryTexts).not.toContain("줄여 주세요");
   const confirm = page.getByRole("button", { name: /선택 결과 확인하기/ }).last();
   const confirmBox = await confirm.boundingBox();
   const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));

@@ -181,8 +181,8 @@ export default function InvitePageClient() {
             {(ctx?.Y ?? 0) > 0
               ? <>지금까지 <strong className={styles.introAccent}>{ctx?.Y} / {project.requiredCount}장</strong>을 선택했어요. 이어서 확인해보세요.</>
               : recommendedCount > 0
-              ? <>총 {project.requiredCount}장을 골라주세요. 작가가 추천한 <strong className={styles.introAccent}>{recommendedCount.toLocaleString()}장</strong>부터 확인할 수 있어요.</>
-              : <>총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라주세요.</>}
+              ? <>총 {project.requiredCount}장을 골라 주세요. 작가가 추천한 <strong className={styles.introAccent}>{recommendedCount.toLocaleString()}장</strong>부터 확인할 수 있어요.</>
+              : <>총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라 주세요.</>}
           </p>
         </div>
         <div className={styles.deadlineRow} aria-label={`셀렉 마감일 ${format(deadlineDate, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>

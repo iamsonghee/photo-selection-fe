@@ -757,7 +757,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   // 고객 상세뷰어의 완료 동작은 고정된 하단에서 제공해 선택 시 사진 높이가 변하지 않는다.
   const selectionCompletion = canEditFinalSelection ? (
     <div className="fs-completion" aria-label="셀렉 진행">
-      <span aria-live="polite">{adapter ? `${Y}장 선택 · 목표 ${N}장` : `${Y} / ${N}장 선택${targetMatched ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}`}</span>
+      <span aria-live="polite">{adapter ? `${Y}장 선택 · 목표 ${N}장` : `${Y} / ${N}장 선택${targetMatched ? " 완료" : Y > N ? ` · ${Y - N}장 줄여 주세요` : ` · ${Math.max(0, N - Y)}장 남음`}`}</span>
       <button type="button" disabled={selectionSaving || (Boolean(adapter) && Y === 0)} onClick={() => adapter?.onReview ? adapter.onReview() : router.push(`/c/${token}/gallery?selected=${targetMatched ? "selected" : "all"}&grouped=0`)}>{selectionSaving ? "선택 저장 중…" : adapter ? "최종 검토하기" : targetMatched ? `선택한 ${Y}장 확인하기` : "전체 사진에서 더 고르기"}</button>
     </div>
   ) : (
@@ -1523,7 +1523,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 <span className="fs-comment-toggle-text">
                   {commentSaveStatus === "error"
                     ? "저장 실패 · 다시 시도"
-                    : draftComment.trim() || "작가에게 전달할 메모를 남겨주세요"}
+                    : draftComment.trim() || "작가에게 전달할 메모를 남겨 주세요"}
                 </span>
               </button>
             )}

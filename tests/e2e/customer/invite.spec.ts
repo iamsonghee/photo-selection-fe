@@ -174,7 +174,7 @@ test.describe("고객 — 초대 링크 모바일", () => {
     await page.goto(`/c/${project.accessToken}`);
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText(/총 .*장 중 마음에 드는 .*장을 골라주세요/)).toBeVisible();
+    await expect(page.getByText(/총 .*장 중 마음에 드는 .*장을 골라 주세요/)).toBeVisible();
     const startLink = page.getByRole("link", { name: "사진 선택하기" });
     await expect(startLink).toBeVisible();
     const box = await startLink.boundingBox();

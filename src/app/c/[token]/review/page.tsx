@@ -793,7 +793,7 @@ function DeliveryReceiptView({
           {filename}
         </h1>
         <p style={{ fontSize: 13, color: "var(--muted-foreground)", margin: "8px 0 0", lineHeight: 1.6 }}>
-          작가가 보정한 사진을 확인해 주세요. 확인이 끝나면 아래 [수령 완료]를 눌러 알려주세요.
+          작가가 보정한 사진을 확인해 주세요. 확인이 끝나면 아래 [수령 완료]를 눌러 알려 주세요.
         </p>
       </section>
 

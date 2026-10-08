@@ -103,7 +103,7 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
     </CustomerInviteIntro>
 
     {sheet === "name" && myColor && (
-      <Sheet title="이름을 알려주세요" onClose={() => setSheet(null)}>
+      <Sheet title="이름을 알려 주세요" onClose={() => setSheet(null)}>
         <form className={s.form} onSubmit={submit}>
           <p>함께 고르는 사람에게 이 이름으로 보여요.</p>
           <label className={s.field}>

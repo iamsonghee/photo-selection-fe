@@ -33,8 +33,8 @@ export function ProjectCardPeople({ projectId, participants, shareToken, shareEn
     // 이 층에 갇혀 플로팅 버튼·헤더(z-40) 아래로 깔린다. 카드 전체 링크보다 뒤에 오는 positioned 요소라 클릭은 그대로 받는다.
     <div className="pointer-events-auto relative flex min-w-0 flex-1 items-center gap-3">
       <span className="flex -space-x-2" aria-hidden>
-        {people.slice(0, 4).map((person) => <span key={person.id} className="grid size-8 place-items-center rounded-full border-2 border-surface text-[11px] font-bold text-white" style={{ background: person.hex }}>{person.name.slice(0, 1)}</span>)}
-        {people.length > 4 ? <span className="grid size-8 place-items-center rounded-full border-2 border-surface bg-surface-raised text-[11px] font-bold text-muted-foreground">+{people.length - 4}</span> : null}
+        {people.slice(0, 4).map((person) => <span key={person.id} className="grid size-8 place-items-center rounded-full border-2 border-surface text-xs font-bold text-white" style={{ background: person.hex }}>{person.name.slice(0, 1)}</span>)}
+        {people.length > 4 ? <span className="grid size-8 place-items-center rounded-full border-2 border-surface bg-surface-raised text-xs font-bold text-muted-foreground">+{people.length - 4}</span> : null}
       </span>
       <span className="min-w-0 flex-1 text-[13px]">
         <strong className="font-bold">함께 고르기 {people.length}명</strong>

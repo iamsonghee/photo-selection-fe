@@ -35,7 +35,7 @@ export function CustomerAccountMenu({ account }: { account: CustomerAccountSumma
       <div className="px-4 py-4">
         <p className="truncate text-sm font-bold text-foreground">{account.displayName}</p>
         <p className="mt-1 truncate text-xs text-muted-foreground">{account.email}</p>
-        {provider ? <p className="mt-1 text-[11px] text-muted-foreground">{provider} 계정으로 로그인</p> : null}
+        {provider ? <p className="mt-1 text-xs text-muted-foreground">{provider} 계정으로 로그인</p> : null}
       </div>
       <div className="border-t border-border-subtle px-4 py-3">
         <div className="flex items-center justify-between gap-3 text-xs">

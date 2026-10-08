@@ -33,7 +33,7 @@ export function SelectionConfirmFooter({
   buttonLabel?: string;
   /** 버튼 좌측 안내 문구 표시 여부. 기본 true */
   showMeta?: boolean;
-  /** 안내 문구를 직접 지정한다. 기본 문구는 셀렉 기준("사진을 N장 더 골라주세요")이라
+  /** 안내 문구를 직접 지정한다. 기본 문구는 셀렉 기준("사진을 N장 더 골라 주세요")이라
    * 같은 모양을 쓰되 말만 다른 화면(보정본 검토)에서 이 값으로 갈아 끼운다. */
   metaText?: string;
   /** 진행바 표시 여부. 기본 true.
@@ -254,9 +254,9 @@ export function SelectionConfirmFooter({
                 >
                   {metaText ??
                     (remaining > 0
-                      ? `사진을 ${remaining}장 더 골라주세요`
+                      ? `사진을 ${remaining}장 더 골라 주세요`
                       : remaining === 0
-                        ? "모두 선택했어요! 의뢰 버튼을 눌러주세요"
+                        ? "모두 선택했어요! 의뢰 버튼을 눌러 주세요"
                         : `${Math.abs(remaining)}장 초과됐어요`)}
                 </p>
               </div>

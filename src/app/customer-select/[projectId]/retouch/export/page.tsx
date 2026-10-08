@@ -71,7 +71,7 @@ export default function RetouchExportPage() {
             <h1 className={ui.title}>재보정 요청 전달</h1>
           </div>
           <div className={ui.body}>
-            <p className={ui.bodyText}>아래 내용을 복사해서 작가님께 보내주세요.</p>
+            <p className={ui.bodyText}>아래 내용을 복사해서 작가님께 보내 주세요.</p>
             <pre className={ui.exportBlock}>{text}</pre>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.btnSm}`} style={{ flex: 1 }} onClick={handleCopy}>

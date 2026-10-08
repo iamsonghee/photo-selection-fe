@@ -1035,7 +1035,7 @@ export default function ReviewViewerPage() {
             </div>
 
             {!isRevision && (
-              <p className="rvx-decision-help">수정이 필요하면 재보정을 고른 뒤 사유를 남겨주세요.</p>
+              <p className="rvx-decision-help">수정이 필요하면 재보정을 고른 뒤 사유를 남겨 주세요.</p>
             )}
 
             {/* 재보정을 선택한 사진에서만 사유 입력을 펼친다. */}
@@ -1069,7 +1069,7 @@ export default function ReviewViewerPage() {
               />
               {revisionError && <p className="rvx-comment-error">{revisionError}</p>}
               {reasonNudge && isRevision && !revisionDraft.trim() && !revisionError && (
-                <p className="rvx-comment-error">작가가 무엇을 고쳐야 할지 알 수 있게 적어주세요.</p>
+                <p className="rvx-comment-error">작가가 무엇을 고쳐야 할지 알 수 있게 적어 주세요.</p>
               )}
             </div>
 

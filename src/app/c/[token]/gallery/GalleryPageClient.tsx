@@ -696,7 +696,7 @@ export default function GalleryPageClient() {
         else showAllPhotos();
       } else {
         setRecommendationError(result === "limit-reached"
-          ? "현재 선택과 추천을 모두 포함하면 정해진 장수를 넘어요. 체크박스로 원하는 사진을 골라주세요."
+          ? "현재 선택과 추천을 모두 포함하면 정해진 장수를 넘어요. 체크박스로 원하는 사진을 골라 주세요."
           : "일부 사진을 저장하지 못했어요. 체크 상태를 확인하고 다시 시도해 주세요.");
       }
     } finally {
@@ -1147,7 +1147,7 @@ export default function GalleryPageClient() {
           Y={confirmationCount}
           N={N}
           position="fixed"
-          progressLabel={Y < N ? `${N - Y}장 더 골라주세요` : "선택한 사진"}
+          progressLabel={Y < N ? `${N - Y}장 더 골라 주세요` : "선택한 사진"}
           disabled={selectionSaving || applyingRecommendations || confirming || (!canConfirm && !recommendationReview && tabFilter !== "selected")}
           onConfirm={() => {
             if (canConfirm) {

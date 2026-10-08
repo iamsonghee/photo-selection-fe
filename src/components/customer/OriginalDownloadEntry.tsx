@@ -592,7 +592,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                         <span>{info.fileCount.toLocaleString()}장 · {formatStoredFileSizeBytes(info.totalBytes)} · ZIP {info.archiveFiles.length}개</span>
                       </div>
                     </div>
-                    <span className="original-download-parts-help">아래 파일을 하나씩 눌러 받아주세요.</span>
+                    <span className="original-download-parts-help">아래 파일을 하나씩 눌러 받아 주세요.</span>
                     <div className="original-download-part-list">
                       {info.archiveFiles.map((file) => (
                         <button

@@ -617,7 +617,7 @@ export default function CustomerUploadPage() {
                 <div className="flex shrink-0 items-center md:hidden">
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
                     <SlidersHorizontal size={18} aria-hidden />
-                    {nameFilter.trim() || sort !== "taken-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "taken-asc")}</span> : null}
+                    {nameFilter.trim() || sort !== "taken-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-xs font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "taken-asc")}</span> : null}
                   </ProjectAssetMobileIconButton>
                 </div>
               </div>

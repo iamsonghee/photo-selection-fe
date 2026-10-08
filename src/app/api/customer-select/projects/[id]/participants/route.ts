@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (access.isOwner) return NextResponse.json({ error: "소유자에게는 초대 참여가 필요하지 않습니다." }, { status: 400 });
     if (!trimmedNickname) return NextResponse.json({ error: "닉네임을 입력해 주세요." }, { status: 400 });
     const { error } = await admin.from("customer_project_participants").insert({ project_id: projectId, color, nickname: trimmedNickname });
-    if (error?.code === "23505") return NextResponse.json({ error: "방금 다른 참여자가 이 색을 선택했어요. 다른 색을 골라주세요." }, { status: 409 });
+    if (error?.code === "23505") return NextResponse.json({ error: "방금 다른 참여자가 이 색을 선택했어요. 다른 색을 골라 주세요." }, { status: 409 });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

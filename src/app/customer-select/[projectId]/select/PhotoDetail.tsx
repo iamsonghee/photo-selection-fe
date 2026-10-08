@@ -367,7 +367,7 @@ export function PhotoDetail({
             value={draft}
             maxLength={1000}
             readOnly={!canAct}
-            placeholder="예: 피부톤 밝게, 배경 사람 지워주세요"
+            placeholder="예: 피부톤 밝게, 배경 사람 지워 주세요"
             onChange={(event) => {
               setDraft(event.target.value);
               draftRef.current.text = event.target.value;

@@ -496,7 +496,7 @@ function SelectScreen() {
 
   // 진행은 분수 대신 문장으로 — 이미 한 일(크게)과 앞으로 할 일(작게).
   const doneText = pickedTotal ? `지금까지 ${pickedTotal}장 골랐어요` : "아직 고른 사진이 없어요";
-  const guideText = target ? `${target}장 정도 골라주세요` : "마음에 드는 사진을 골라주세요";
+  const guideText = target ? `${target}장 정도 골라 주세요` : "마음에 드는 사진을 골라 주세요";
   // 모바일 하단 바 왼쪽: 지금 장면(누르면 장면 목록 시트)과 대화 — 떠 있던 장면 버튼을 하단 바 한 줄로 합쳤다. PC는 사이드바가 맡는다.
   const sceneDock = sceneMode && scenes ? <>
     <button type="button" className={s.barScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">

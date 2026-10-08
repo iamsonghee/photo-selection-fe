@@ -102,14 +102,14 @@ export default function AboutPageClient() {
               <h3>마음에 드는 사진 선택하기</h3>
               <p>
                 사진을 클릭하면 크게 볼 수 있어요. 마음에 드는 사진은 버튼 한 번으로 선택됩니다. {photographerName}님이 요청한 {N}장을
-                골라주세요.
+                골라 주세요.
               </p>
             </div>
             <div className={styles.stepCard}>
               <div className={styles.stepNum}>STEP.03</div>
               <h3>최종 확정하기</h3>
               <p>
-                {N}장을 다 고르셨으면 확정 버튼을 눌러주세요. 작가님께 바로 전달되고, 보정이 시작됩니다. 확정 전까지는 언제든 변경할 수
+                {N}장을 다 고르셨으면 확정 버튼을 눌러 주세요. 작가님께 바로 전달되고, 보정이 시작됩니다. 확정 전까지는 언제든 변경할 수
                 있어요.
               </p>
             </div>
