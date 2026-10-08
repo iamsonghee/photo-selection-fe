@@ -462,7 +462,7 @@ Tailwind 기본 `2xl`은 1536px이므로 1440px wide 전환과 같은 의미로 
 ### 12.1 기본
 
 - 문서 `lang="ko"` 유지
-- viewport의 `maximumScale: 1` 제거 대상
+- viewport의 `maximumScale: 1` 제거 대상 — 랜딩(`/`)은 2026-10-08에 `maximumScale: 5`로 해제(`src/app/page.tsx`), 나머지 화면은 루트·작가 레이아웃 값 1 유지
 - 의미 있는 텍스트 12px 이상
 - 일반 텍스트 WCAG AA 4.5:1, 큰 텍스트/아이콘 3:1 이상
 - 핵심 행동 touch target 최소 44×44px, 모바일 primary CTA 높이 48px
