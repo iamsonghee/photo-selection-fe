@@ -231,6 +231,22 @@ A컷은 한 화면을 라이트/다크로 토글하는 제품이 아니라 두 �
 - **Focus:** 주황 계열 링(`focus-visible`).
 - **Mobile:** 16px 글자.
 
+### Modals / Dialogs
+`PhotographerModal` 한 틀만 쓴다. variant(확인/작업/일반)는 의도와 테스트 훅일 뿐 모양을 바꾸지 않고, 폭은 `maxWidth`로 정한다.
+- **Frame:** 흰 면, 16px, subtle 테두리, Overlay 그림자. 왼쪽 정렬 20px 굵은 제목 + 보조 설명, 오른쪽 닫기(X)는 항상.
+- **Actions:** 버튼은 본문 스크롤 밖 하단(footer)에 고정한다. 긴 내용에서도 다음 행동이 늘 보인다.
+- **Text:** 한글은 단어 단위 줄바꿈(`break-keep`).
+- **Notice box:** 주의·안내 상자는 띄운 면 + subtle 테두리. 주황 면을 쓰지 않는다.
+- **Mobile:** 카드(기본) 또는 전체 화면(`mobilePresentation="fullscreen"`).
+
+### Selection Chips
+- **Selected:** 흰 면 + 남색 테두리(1px + 안쪽 1px 링), 남색 글자.
+- **Unselected:** 흰 면 + subtle 테두리, muted 글자. hover 시 강한 테두리.
+- 선택 상태에 주황·청록 면을 쓰지 않는다(주황은 행동, 청록은 고객 표시).
+
+### Toast
+`PhotographerToast`(작가 공용). 흰 면, 12px, Overlay 그림자, 14px 글자. 모바일은 헤더 아래 위쪽, PC는 아래쪽 가운데. 고객 화면은 놓이는 공간을 따른다(갤러리 흰 면, 상세 뷰어 암실 색).
+
 ### Navigation
 - **PC 사이드바:** 현재 항목은 흰 면 + 왼쪽 안쪽 3px 주황 표시. 아이콘만 주황이고 라벨은 기본 남색. 20px 아이콘, 44×44 터치 영역.
 - **모바일:** 고정 브랜드 헤더(95% 흰 면 + blur), 하단 탭 없음.
