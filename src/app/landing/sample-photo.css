@@ -5,6 +5,15 @@
 .ac-sample-image[data-image-state="loading"] img, .ac-sample-image[data-image-state="error"] img { opacity: 0; }
 /* 랜딩은 라이트 캔버스([data-acut-light-canvas]) 밖이라 골격 색을 여기서 준다(값은 globals.css 라이트 캔버스와 같다). */
 .ac-sample-image-skeleton { position: absolute; inset: 0; --skeleton-base: rgba(2, 56, 82, 0.09); --skeleton-highlight: rgba(255, 255, 255, 0.7); }
+/* 공용 skeleton-shimmer는 띠가 칸 밖에서 출발해 처음 0.4초·주기의 절반 동안 빈 회색으로 보인다. 사진 칸은 짧게 지나가므로
+ * 띠가 처음부터 칸 안에 있고 쉬지 않고 지나가게 한다. 동작 줄이기 설정이면 공용과 같이 움직이지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-sample-image-skeleton { animation: ac-sample-shimmer 1.2s linear infinite; }
+}
+@keyframes ac-sample-shimmer {
+  from { background-position: 124% 0; }
+  to { background-position: -24% 0; }
+}
 .ac-sample-image-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; font-size: 12px !important; letter-spacing: 0 !important; color: #5f6b55; }
 .ac-sample-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: #7c8474; background: #e8ebe5; }
 .ac-sample-placeholder span { font-size: 12px; letter-spacing: .1em; }
