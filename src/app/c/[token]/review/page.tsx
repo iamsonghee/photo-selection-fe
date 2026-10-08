@@ -774,8 +774,8 @@ function DeliveryReceiptView({
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <span
             style={{
-              fontFamily: MONO,
-              fontSize: 10,
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
               color: ACCENT,
               background: "rgba(var(--accent-rgb), 0.1)",
               border: "1px solid rgba(var(--accent-rgb), 0.3)",
@@ -827,7 +827,7 @@ function DeliveryReceiptView({
               {photos.length > 0 && (
                 <div style={{
                   position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-                  zIndex: 10, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.7)",
+                  zIndex: 10, fontFamily: MONO, fontSize: 12, color: "rgba(255,255,255,0.7)",
                   background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
                   border: "1px solid rgba(255,255,255,0.1)", borderRadius: 99,
                   padding: "3px 12px", pointerEvents: "none", userSelect: "none",
@@ -882,7 +882,7 @@ function DeliveryReceiptView({
                 aria-label="사진 크게 보기"
               >
                 <div style={{ position: "absolute", top: 10, left: 10, zIndex: 2, display: "flex", gap: 8, pointerEvents: "none" }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.28)", padding: "4px 9px", borderRadius: 999 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.28)", padding: "4px 9px", borderRadius: 999 }}>
                     {holdOriginal ? "원본" : versionLabel}
                   </span>
                 </div>
@@ -937,7 +937,7 @@ function DeliveryReceiptView({
                         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.7 }}
                       />
                     )}
-                    <span style={{ position: "absolute", top: 6, left: 7, fontFamily: MONO, fontSize: 10, color: "rgba(255,255,255,0.85)", background: "rgba(0,0,0,0.55)", padding: "1px 5px", borderRadius: 4 }}>
+                    <span style={{ position: "absolute", top: 6, left: 7, fontFamily: MONO, fontSize: 12, color: "rgba(255,255,255,0.85)", background: "rgba(0,0,0,0.55)", padding: "1px 5px", borderRadius: 4 }}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
                   </div>
@@ -972,7 +972,7 @@ function DeliveryReceiptView({
               background: ACCENT,
               border: "none",
               borderRadius: 12,
-              color: "#000",
+              color: "#fff",
               fontFamily: "var(--font-sans)",
               fontSize: 14,
               fontWeight: 700,
@@ -1033,11 +1033,11 @@ function DeliveryReceiptView({
             <h3 id="rcpt-confirm-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--foreground)" }}>
               보정본 수령 완료
             </h3>
-            <p style={{ margin: "10px 0 18px", fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+            <p style={{ margin: "10px 0 18px", fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6, wordBreak: "keep-all" }}>
               수령 완료 시 프로젝트가 납품 완료 상태로 바뀌고, 더 이상 변경할 수 없습니다.
             </p>
             {errorMsg && (
-              <p style={{ margin: "0 0 12px", fontSize: 12, color: "#ef4444" }}>{errorMsg}</p>
+              <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--danger)" }}>{errorMsg}</p>
             )}
             <div style={{ display: "flex", gap: 10 }}>
               <button
@@ -1065,7 +1065,7 @@ function DeliveryReceiptView({
                   flex: 1, height: 44,
                   background: ACCENT,
                   border: "none",
-                  color: "#000",
+                  color: "#fff",
                   fontSize: 13, fontWeight: 700,
                   borderRadius: 10,
                   cursor: submitting ? "not-allowed" : "pointer",
