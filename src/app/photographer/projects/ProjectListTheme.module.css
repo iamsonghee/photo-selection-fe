@@ -7,7 +7,7 @@
 }
 
 .desktopFab {
-  color: #ffffff;
+  color: var(--accent-foreground);
 }
 
 @media (min-width: 768px) {
@@ -62,8 +62,8 @@
 .stateLabel { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
 .stateLabel i { width:6px; height:6px; flex-shrink:0; border-radius:50%; background:var(--subtle-foreground); }
 .stateLabel[data-actor=photographer] i { background:var(--accent); }.stateLabel[data-actor=customer] i { background:var(--customer-foreground); }
-.projectTable small { display:block; font-size:11px; color:var(--muted-foreground); margin:3px 0; }
-.dueLabel { display:block; font-size:11px; font-weight:600; color:var(--accent); margin-top:2px; }.dueLabel[data-level=danger] { color:var(--danger); }
+.projectTable small { display:block; font-size:12px; color:var(--muted-foreground); margin:3px 0; }
+.dueLabel { display:block; font-size:12px; font-weight:600; color:var(--accent); margin-top:2px; }.dueLabel[data-level=danger] { color:var(--danger); }
 .emptyDeadline { font-size:12px; color:var(--subtle-foreground); }
 .nextAction { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; padding:6px 10px; border:1px solid var(--border-subtle); border-radius:7px; font-size:12px; font-weight:600; }
 .nextAction svg { flex-shrink:0; }.nextAction[data-primary=true] { color:var(--foreground); background:var(--surface); border-color:var(--border-subtle); }
@@ -74,7 +74,7 @@
 .progress[data-actor=customer] { --step-color:var(--customer-foreground); }
 .progress[data-actor=completed] { --step-color:var(--muted-foreground); }
 .progressSteps { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; margin:0; padding:0; list-style:none; }
-.progressSteps li { display:flex; flex-direction:column; gap:6px; min-width:0; text-align:center; font-size:10px; line-height:14px; color:var(--muted-foreground); white-space:nowrap; }
+.progressSteps li { display:flex; flex-direction:column; gap:6px; min-width:0; text-align:center; font-size:12px; line-height:14px; color:var(--muted-foreground); white-space:nowrap; }
 .progressSegment { display:block; height:4px; border-radius:2px; background:var(--border-subtle); }
 .progressSteps li[data-done=true] .progressSegment { background:var(--border-strong); }
 .progressSteps li[data-current=true] { font-weight:700; color:var(--foreground); }
@@ -124,7 +124,7 @@
 .identityColumn { width:auto; }.shootColumn { width:110px; }.statusColumn { width:260px; }.currentColumn { width:125px; }.deadlineColumn { width:185px; }.actionColumn { width:150px; }
 .currentState { display:flex; flex-direction:column; gap:5px; font-size:12px; }
 .currentState strong { font-weight:600; }
-.currentState > span { color:var(--muted-foreground); font-size:11px; }
+.currentState > span { color:var(--muted-foreground); font-size:12px; }
 .inlineState,.inlineShoot { display:none; }
 .deadlineLine { display:flex; align-items:baseline; gap:7px; white-space:nowrap; }
 .deadlineLine .dueLabel { display:inline; margin:0; }
@@ -141,7 +141,7 @@
 }
 @container (max-width:600px) {
   .identityColumn { width:30%; }.statusColumn { width:24%; }.deadlineColumn { width:28%; }.actionColumn { width:18%; }
-  .deadlineLine { gap:4px; font-size:11px; }.deadlineLine .dueLabel { font-size:10px; }
+  .deadlineLine { gap:4px; font-size:12px; }.deadlineLine .dueLabel { font-size:12px; }
 }
 /* 넓은 화면의 여유 공간도 여러 열에 나눠 프로젝트 뒤의 긴 공백을 줄인다. */
 @container (min-width:1151px) {
@@ -151,7 +151,6 @@
 /* 헤더와 행은 같은 6열 격자를 사용해 단계명이 구간과 어긋나지 않도록 한다. */
 .desktopList { max-width:1504px; margin-inline:auto; }
 .progress { max-width:none; }
-.stepHeader { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; margin-top:8px; text-align:center; font-size:10px; font-weight:400; color:var(--muted-foreground); white-space:nowrap; }
 .progressSegment { height:5px; }
 .projectMeta { display:flex; align-items:center; gap:8px; overflow:visible; min-width:0; }
 .customerName { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -161,12 +160,11 @@
 .locationTooltip { display:none; position:absolute; left:0; top:100%; z-index:3; width:max-content; max-width:240px; padding:6px 8px; background:var(--surface); border:1px solid var(--border-strong); border-radius:6px; white-space:normal; overflow-wrap:anywhere; box-shadow:0 4px 12px #0001; }
 .location:hover .locationTooltip,.location:focus .locationTooltip { display:block; }
 .location:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.inlineShoot { font-size:11px; color:var(--muted-foreground); }
+.inlineShoot { font-size:12px; color:var(--muted-foreground); }
 @container (min-width:1151px) {
   .identityColumn { width:22%; }.shootColumn { width:10%; }.statusColumn { width:24%; }.currentColumn { width:12%; }.deadlineColumn { width:17%; }.actionColumn { width:15%; }
 }
 @container (max-width:700px) {
-  .stepHeader { display:none; }
   .projectMeta { flex-wrap:wrap; gap:3px 6px; }.location { max-width:100%; }
 }
 

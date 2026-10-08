@@ -74,7 +74,7 @@ function SettingsSectionHeading({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-[18px] font-bold leading-6 tracking-[-0.45px] text-foreground md:text-[20px] md:leading-7">{title}</h2>
-          {status ? <span className="rounded-md bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted-foreground ring-1 ring-inset ring-border-subtle">{status}</span> : null}
+          {status ? <span className="rounded-md bg-surface px-2 py-0.5 text-xs font-semibold text-muted-foreground ring-1 ring-inset ring-border-subtle">{status}</span> : null}
         </div>
         <p className="mt-1 break-keep text-[13px] leading-5 text-muted-foreground">{description}</p>
       </div>
@@ -214,6 +214,21 @@ export default function SettingsPage() {
       setSaving(false);
     }
   };
+
+  // 바꾼 내용이 있는 쪽 저장만 주황으로 켠다 — 두 저장 버튼이 한 화면에 동시에 켜지지 않게(One Orange Rule).
+  const instagramHandle = (profile?.instagramUrl ?? "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "");
+  const profileDirty = !!profile && (
+    editName !== (profile.name ?? "")
+    || editBio !== (profile.bio ?? "")
+    || editInstagram !== instagramHandle
+    || editPortfolio !== (profile.portfolioUrl ?? "")
+    || editPhone !== (profile.contactPhone ?? "")
+  );
+  const defaultsDirty = !!profile && (
+    defaultDeadlineDays !== (profile.defaultSelectionDeadlineDays === null ? "" : String(profile.defaultSelectionDeadlineDays))
+    || defaultIncludeOriginal !== profile.defaultIncludeOriginal
+    || defaultUploadStrategy !== profile.defaultUploadStrategy
+  );
 
   const handleCancel = () => {
     if (!profile) return;
@@ -400,7 +415,7 @@ export default function SettingsPage() {
                       ) : (
                         <>
                           <Camera size={16} className="text-white" />
-                          <span className="text-[10px] font-semibold text-white">이미지 변경</span>
+                          <span className="text-xs font-semibold text-white">이미지 변경</span>
                         </>
                       )}
                     </div>
@@ -417,12 +432,12 @@ export default function SettingsPage() {
                       <span className="text-[13px] text-muted-foreground truncate">{profile.email ?? ""}</span>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 xl:justify-center">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-accent/8 px-2 py-0.5 text-[11px] font-semibold text-accent ring-1 ring-inset ring-accent/20">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-surface px-2 py-0.5 text-xs font-semibold text-muted-foreground ring-1 ring-inset ring-border-subtle">
                         <Check size={11} strokeWidth={2.5} aria-hidden />
                         Google 연결됨
                       </span>
                       {joinDate && (
-                        <span className="text-[11px] text-disabled-foreground">{joinDate} 가입</span>
+                        <span className="text-xs text-disabled-foreground">{joinDate} 가입</span>
                       )}
                     </div>
                   </div>
@@ -502,7 +517,7 @@ export default function SettingsPage() {
                     type="button"
                     variant="secondary"
                     onClick={handleCancel}
-                    disabled={saving}
+                    disabled={saving || !profileDirty}
                   >
                     취소
                   </PhotographerLightButton>
@@ -510,6 +525,7 @@ export default function SettingsPage() {
                     type="button"
                     variant="primary"
                     onClick={handleSave}
+                    disabled={!profileDirty}
                     pending={saving}
                     pendingLabel="저장 중…"
                   >
@@ -529,7 +545,7 @@ export default function SettingsPage() {
                   <SettingsRow
                     icon={CalendarDays}
                     label="셀렉 기본 마감 기간"
-                    description="고객에게 셀렉을 요청하는 날부터 계산합니다."
+                    description="고객 셀렉을 시작하는 날부터 계산합니다. 비워 두면 시작할 때 정합니다."
                   >
                     <label className="flex items-center gap-2">
                       <ProjectFormInput
@@ -537,6 +553,7 @@ export default function SettingsPage() {
                         className={`${SETTINGS_INPUT_CLASS} w-20 text-right md:w-24`}
                         type="text"
                         inputMode="numeric"
+                        placeholder="미설정"
                         value={defaultDeadlineDays}
                         onChange={(event) => setDefaultDeadlineDays(event.target.value.replace(/[^0-9]/g, ""))}
                       />
@@ -569,7 +586,7 @@ export default function SettingsPage() {
                             role="radio"
                             aria-checked={selected}
                             onClick={() => setDefaultUploadStrategy(value)}
-                            className={`rounded-xl border px-4 py-3 text-left transition-colors ${selected ? "border-accent bg-accent/5" : "border-border-subtle bg-surface hover:bg-surface-raised"}`}
+                            className={`rounded-xl border px-4 py-3 text-left transition-colors ${selected ? "border-foreground bg-surface ring-1 ring-inset ring-foreground" : "border-border-subtle bg-surface hover:bg-surface-raised"}`}
                           >
                             <span className="block text-sm font-bold text-foreground">{label}</span>
                             <span className="mt-1 block break-keep text-xs leading-[18px] text-muted-foreground">{description}</span>
@@ -585,6 +602,7 @@ export default function SettingsPage() {
                     type="button"
                     variant="primary"
                     onClick={handleDefaultsSave}
+                    disabled={!defaultsDirty}
                     pending={savingDefaults}
                     pendingLabel="저장 중…"
                   >
@@ -674,7 +692,7 @@ export default function SettingsPage() {
                 : "bg-surface border-border-strong text-foreground border-l-[3px] border-l-accent"
             }`}
           >
-            <span className={`text-[10px] font-semibold shrink-0 mt-0.5 ${t.isError ? "text-danger" : "text-accent"}`}>
+            <span className={`text-xs font-semibold shrink-0 mt-0.5 ${t.isError ? "text-danger" : "text-accent"}`}>
               {t.isError ? "오류" : "완료"}
             </span>
             <span>{t.message}</span>

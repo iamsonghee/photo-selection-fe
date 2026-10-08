@@ -53,7 +53,7 @@ export function CustomerList({ customers, selectedId, search, filter, counts, lo
             <button type="button" aria-current={selectedId === customer.id ? "true" : undefined} onClick={() => onSelect(customer.id)} className={`w-full border-l-[3px] p-4 text-left transition-colors hover:bg-surface-raised ${selectedId === customer.id ? "border-l-accent bg-surface-raised" : "border-l-transparent"}`}>
               <span className="flex items-center justify-between gap-3">
                 <span className="min-w-0 break-words text-sm font-bold">{customer.name}</span>
-                {customer.projectCount > 0 && <span className="shrink-0 rounded-full bg-surface-raised px-2 py-1 text-[11px] font-medium text-muted-foreground">{customer.projectCount > 1 ? "재방문" : "신규"}</span>}
+                {customer.projectCount > 0 && <span className="shrink-0 rounded-full bg-surface-raised px-2 py-1 text-xs font-medium text-muted-foreground">{customer.projectCount > 1 ? "재방문" : "신규"}</span>}
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">{customer.phone ? formatPhone(customer.phone) : "연락처 미등록"}</span>
               <span className="mt-3 block text-xs text-muted-foreground">{customer.latestShootDate ? `최근 촬영 ${customer.latestShootDate.replaceAll("-", ".")}` : "촬영 이력 없음"}</span>

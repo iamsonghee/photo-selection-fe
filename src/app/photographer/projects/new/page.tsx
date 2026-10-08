@@ -455,7 +455,7 @@ export default function NewProjectPage() {
                         장
                       </span>
                     </div>
-                    <span className="hidden text-[10px] text-disabled-foreground md:inline">고객이 선택할 사진 수</span>
+                    <span className="hidden text-xs text-disabled-foreground md:inline">고객이 선택할 사진 수</span>
                   </ProjectFormField>
                 </div>
 

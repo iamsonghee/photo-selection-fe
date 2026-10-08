@@ -283,7 +283,7 @@ export default function ProjectsPage() {
         <div className="mx-5 grid grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1" role="group" aria-label="프로젝트 빠른 필터">
           {([{ key: "all", label: "전체", count: tabCounts.all }, { key: "mine", label: "내 작업", count: quickCounts.mine }, { key: "waiting", label: "고객 대기", count: quickCounts.waiting }, { key: "completed", label: "완료", count: tabCounts.completed }] as const).map(tab => {
             const selected = tab.key === "completed" ? activeTab === "completed" : activeTab === "all" && quickFilter === tab.key;
-            return <button key={tab.key} type="button" aria-pressed={selected} onClick={() => { setActiveTab(tab.key === "completed" ? "completed" : "all"); setQuickFilter(tab.key === "completed" ? "all" : tab.key); }} className={`min-h-11 rounded-lg px-1 text-xs font-semibold ${selected ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}`}>{tab.label}<span className="ml-1 text-[10px] opacity-70">{tab.count}</span></button>;
+            return <button key={tab.key} type="button" aria-pressed={selected} onClick={() => { setActiveTab(tab.key === "completed" ? "completed" : "all"); setQuickFilter(tab.key === "completed" ? "all" : tab.key); }} className={`min-h-11 rounded-lg px-1 text-xs font-semibold ${selected ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}`}>{tab.label}<span className="ml-1 text-xs opacity-70">{tab.count}</span></button>;
           })}
         </div>
         <div className="flex items-center justify-between gap-2 px-5 py-2">
@@ -314,7 +314,7 @@ export default function ProjectsPage() {
           <label className="block pt-4 text-xs font-semibold text-muted-foreground">진행 단계<select aria-label="진행 단계 필터" value={stepFilter} onChange={e => setStepFilter(e.target.value === "all" ? "all" : Number(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6)} className="mt-2 h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-foreground"><option value="all">전체 단계</option><option value="1">1 · 원본</option><option value="2">2 · 셀렉</option><option value="3">3 · 보정</option><option value="4">4 · 1차 재보정</option><option value="5">5 · 2차 재보정</option><option value="6">6 · 납품</option></select></label>
           <div data-mobile-project-date-filter className="py-5">
             <div className="grid grid-cols-[minmax(0,1fr)_12px_minmax(0,1fr)] items-end gap-2">
-              <label className="min-w-0 text-[11px] font-medium text-muted-foreground">
+              <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 시작일
                 <input
                   type="date"
@@ -326,7 +326,7 @@ export default function ProjectsPage() {
                 />
               </label>
               <span className="pb-3 text-center text-xs text-disabled-foreground" aria-hidden>~</span>
-              <label className="min-w-0 text-[11px] font-medium text-muted-foreground">
+              <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 종료일
                 <input
                   type="date"
@@ -339,13 +339,9 @@ export default function ProjectsPage() {
               </label>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setMobileFilterOpen(false)}
-            className="h-12 w-full rounded-lg bg-accent text-[15px] font-bold text-white transition-colors active:bg-[#e94b0d]"
-          >
+          <PhotographerLightButton size="work-panel" onClick={() => setMobileFilterOpen(false)} className="w-full">
             완료
-          </button>
+          </PhotographerLightButton>
         </ProjectAssetMobileSheet>
 
         {/* cards list */}

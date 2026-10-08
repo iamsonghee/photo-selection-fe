@@ -144,7 +144,7 @@ export function ProjectFormField({
           {info ? <FieldInfoTip text={info} ariaLabel={`${label} 설명`} /> : null}
         </div>
         {children}
-        {hint ? <p id={hintId} className={hintClassName ?? "text-[11px] text-disabled-foreground mt-1.5"}>{hint}</p> : info ? <span id={hintId} className="sr-only">{info}</span> : null}
+        {hint ? <p id={hintId} className={hintClassName ?? "text-xs text-disabled-foreground mt-1.5"}>{hint}</p> : info ? <span id={hintId} className="sr-only">{info}</span> : null}
       </div>
       {error ? <ProjectFormError id={errorId}>{error}</ProjectFormError> : null}
     </FieldContext.Provider>
@@ -244,7 +244,7 @@ export function ProjectShootTypeSelector({
             onClick={() => onChange(active ? null : optionValue)}
             className={`flex min-h-11 min-w-[30%] flex-1 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-lg border px-1 py-2.5 text-[12px] font-medium transition-colors sm:min-h-0 sm:min-w-0 sm:py-3.5 ${
               active
-                ? "border-accent/50 bg-accent/8 text-accent"
+                ? "border-foreground bg-surface font-semibold text-foreground ring-1 ring-inset ring-foreground"
                 : "border-border-subtle bg-transparent text-muted-foreground hover:border-border-strong hover:text-foreground"
             }`}
           >
@@ -276,7 +276,7 @@ export function ProjectRevisionSelector({
             onClick={() => onChange(optionValue)}
             className={`min-h-11 flex-1 rounded-lg border py-2.5 text-[14px] font-semibold transition-colors sm:min-h-0 sm:py-3.5 sm:text-[15px] ${
               active
-                ? "border-accent/50 bg-accent/8 text-accent"
+                ? "border-foreground bg-surface font-semibold text-foreground ring-1 ring-inset ring-foreground"
                 : "border-border-subtle bg-transparent text-subtle-foreground hover:border-border-strong hover:text-foreground"
             }`}
           >
@@ -348,9 +348,9 @@ export function ProjectFormToggleRow({
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-0.5">
             <span className="text-[14px] font-semibold text-muted-foreground">
-              {label}<span className="text-accent"> *</span>
+              {label}
             </span>
-            {disabled ? <span className="ml-1 rounded bg-surface-raised px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">변경 불가</span> : null}
+            {disabled ? <span className="ml-1 rounded bg-surface-raised px-1.5 py-0.5 text-xs font-medium text-muted-foreground">변경 불가</span> : null}
             <span className="md:hidden">
               <FieldInfoTip
                 text={description}
@@ -399,9 +399,8 @@ export function ProjectPinControl({
         >
           <span className="md:hidden">고객 비밀번호</span>
           <span className="hidden md:inline">고객 비밀번호 (PIN)</span>
-          <span className="text-accent"> *</span>
         </span>
-        {disabled ? <span className="text-[11px] font-medium text-muted-foreground">변경 불가</span> : null}
+        {disabled ? <span className="text-xs font-medium text-muted-foreground">변경 불가</span> : null}
         <span className="hidden text-[12px] text-muted-foreground md:inline">
           고객이 갤러리 링크를 열 때 입력할 4자리 숫자를 설정해 주세요
         </span>
