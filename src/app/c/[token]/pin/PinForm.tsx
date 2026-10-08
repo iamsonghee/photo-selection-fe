@@ -106,7 +106,8 @@ export default function PinForm({ token, from }: { token: string; from: string }
 
   return (
     <CustomerEntryShell layout="auth" className={styles.pinCanvas}>
-      <CustomerEntryHeader href={token ? `/c/${token}` : undefined} />
+      {/* 링크 없음 — 인증 전 /c/[token]은 이 화면으로 되돌아오고, 미리 불러온 307이 라우터 캐시에 남는다. */}
+      <CustomerEntryHeader />
       <div className={styles.pinContent}>
         <div className={styles.entryCopy}>
           <h1 className={styles.entryTitle}>비밀번호를 입력해 주세요</h1>
