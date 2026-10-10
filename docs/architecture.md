@@ -113,7 +113,7 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 - `/`는 JSON-LD(Organization·WebSite·FAQPage)를 렌더링한다. FAQ 문장은 `src/app/landing/faq.ts`의 `LANDING_FAQ`를 화면(`LandingStory`)과 함께 쓴다. 실제 후기·평점이 없으므로 리뷰·평점 스키마는 넣지 않는다(`PRODUCT.md` Evidence on Hand).
 - 아이콘: 파비콘은 SVG 마크(`BRAND_MARK_SVG`), apple-touch-icon은 180px PNG(`BRAND_APPLE_TOUCH_ICON_PNG`), 구조화 데이터 로고는 512px PNG(`BRAND_LOGO_PNG`)다(`src/lib/brand-assets.ts`, `public/brand/`).
 - IndexNow: `public/6b450f64221525ea4daabc787f24e635.txt` 키 파일로 사이트 소유를 증명한다. `npm run seo:indexnow`(`scripts/indexnow-submit.mjs`)는 운영 sitemap의 URL을 출력만 하고, `-- --submit`을 붙이면 네이버(`searchadvisor.naver.com/indexnow`)와 공용 엔드포인트(`api.indexnow.org`)에 보낸다. Google은 IndexNow를 지원하지 않는다.
-- Google Search Console의 `acut.kr` 도메인 속성은 DNS로 소유권 인증이 완료됐고 `https://www.acut.kr/sitemap.xml`을 제출했다(2026-10-10). 사이트맵 보고서는 `가져올 수 없음`·발견된 페이지 0개로 표시되지만, 같은 날 실시간 URL 검사에서는 Google이 XML(공개 URL 4개)을 `200 OK`로 가져왔고 크롤링 허용을 확인했다. 홈 `/`은 색인된 상태다. 보고서의 실제 처리 완료 여부는 재확인해야 한다.
+- Google Search Console의 `acut.kr` 도메인 속성은 DNS로 소유권 인증이 완료됐고 `https://www.acut.kr/sitemap.xml`을 제출했다(2026-10-10). 최초 보고서는 `가져올 수 없음`·발견된 페이지 0개였으나, 같은 날 코드·DNS·방화벽 설정을 변경하지 않은 진단 도중 `성공`·유형 `Sitemap`·발견된 페이지 4개로 전환됐다. 운영 XML 문법 검사와 HTTP 응답(`200`, `application/xml`, 리다이렉트 없음), robots.txt 크롤링 허용 및 Google 실시간 가져오기 성공을 확인했다. 최초 실패의 내부 원인은 확인되지 않았다. 홈 `/`은 색인된 상태이며 사이트맵의 URL 발견과 각 페이지의 색인 완료는 별개다.
 - 네이버 서치어드바이저의 `https://www.acut.kr`은 HTML 태그 방식으로 소유권 확인을 완료하고 `https://www.acut.kr/sitemap.xml`과 홈 `/`의 수집을 요청했다(2026-10-10). 확인용 `naver-site-verification` 메타 태그는 홈 `src/app/page.tsx`의 `metadata.verification.other`에 정의했다. 기존 `http://acut.kr` 항목은 소유확인 대기 상태로 남아 있다.
 - GA 등 분석 도구는 아직 연동하지 않았다.
 
