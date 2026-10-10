@@ -6,7 +6,7 @@ import type { LabeledScene } from "@/lib/scene-label-score";
 
 /** 장면 검수(/admin/scenes)용 서버 조회. 서비스 화면 데이터는 읽기만 하고, 정답은 customer_scene_labels에만 쓴다. */
 
-export type ReviewPhoto = { id: string; thumbUrl: string | null; takenAt: string | null; filename: string };
+export type ReviewPhoto = { id: string; thumbUrl: string | null; previewUrl: string | null; takenAt: string | null; filename: string };
 export type SceneLabelRow = { project_id: string; shoot_type: string | null; scenes: LabeledScene[]; ai_scenes: LabeledScene[] | null; note: string | null; labeled_by: string; updated_at: string };
 
 // 장면 실행 settings가 없을 때(2026-10-03 장면 실행 분리 전에 만든 장면) 검수 라벨 `ai_settings`에 남기는 값 — 그때 규칙(gap-v1).
@@ -22,8 +22,8 @@ export async function loadSceneReview(projectId: string) {
   const admin = getAdminClient();
   const { data: project } = await admin.from("customer_projects").select("id, name, shoot_type, photo_count, created_at").eq("id", projectId).maybeSingle();
   if (!project) return null;
-  type PhotoRow = { id: string; thumb_url: string | null; taken_at: string | null; order_index: number; filename: string; scene_id: string | null };
-  const photos = (await allRows<PhotoRow>((from, to) => admin.from("customer_photos").select("id, thumb_url, taken_at, order_index, filename, scene_id").eq("project_id", projectId).order("order_index").range(from, to))).sort(byCaptureOrder);
+  type PhotoRow = { id: string; thumb_url: string | null; preview_url: string | null; taken_at: string | null; order_index: number; filename: string; scene_id: string | null };
+  const photos = (await allRows<PhotoRow>((from, to) => admin.from("customer_photos").select("id, thumb_url, preview_url, taken_at, order_index, filename, scene_id").eq("project_id", projectId).order("order_index").range(from, to))).sort(byCaptureOrder);
   const { data: sceneRows } = await admin.from("customer_scenes").select("id, scene_index, name").eq("project_id", projectId).order("scene_index");
   const { data: label, error: labelError } = await admin.from("customer_scene_labels").select("*").eq("project_id", projectId).maybeSingle();
 
@@ -36,7 +36,7 @@ export async function loadSceneReview(projectId: string) {
   }
   return {
     project: { id: project.id as string, name: project.name as string, shootType: (project.shoot_type as string | null) ?? null, createdAt: project.created_at as string },
-    photos: photos.map((photo): ReviewPhoto => ({ id: photo.id, thumbUrl: photo.thumb_url, takenAt: photo.taken_at, filename: photo.filename })),
+    photos: photos.map((photo): ReviewPhoto => ({ id: photo.id, thumbUrl: photo.thumb_url, previewUrl: photo.preview_url, takenAt: photo.taken_at, filename: photo.filename })),
     aiScenes,
     label: (label as SceneLabelRow | null) ?? null,
     labelTableMissing: Boolean(labelError),
