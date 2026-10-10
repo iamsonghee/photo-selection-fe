@@ -55,32 +55,51 @@ async function getNonConflictingFileHandle(
   throw new Error("저장할 파일명을 만들 수 없습니다.");
 }
 
+async function saveFileToDirectory(directory: WritableDirectoryHandle, file: DirectoryDownloadFile) {
+  const response = await fetch(file.url);
+  if (!response.ok) throw new Error(`${file.filename}을(를) 가져오지 못했습니다.`);
+  const fileHandle = await getNonConflictingFileHandle(directory, file.filename);
+  const writable = await fileHandle.createWritable();
+  try {
+    if (response.body) {
+      await response.body.pipeTo(writable);
+    } else {
+      await writable.write(await response.blob());
+      await writable.close();
+    }
+  } catch (error) {
+    await writable.abort(error).catch(() => {});
+    throw error;
+  }
+}
+
 /**
- * 파일을 하나씩 내려받아 사용자가 선택한 폴더에 바로 기록한다.
+ * 파일을 내려받아 사용자가 선택한 폴더에 바로 기록한다.
  * 응답 전체를 Blob으로 보관하지 않아 원본 묶음이 커져도 브라우저 메모리가 급증하지 않는다.
+ * 기본은 한 장씩이다. `concurrency`를 올리면 그만큼 동시에 받는데, 같은 이름 피하기
+ * (`getNonConflictingFileHandle`)가 동시 실행을 고려하지 않으므로 파일명이 모두 다를 때만 쓴다.
+ * 하나라도 실패하면 새 파일을 더 시작하지 않고 첫 오류를 던진다.
  */
 export async function saveFilesToDirectory(
   directory: WritableDirectoryHandle,
   files: DirectoryDownloadFile[],
   onProgress?: (completed: number, total: number) => void,
+  { concurrency = 1 }: { concurrency?: number } = {},
 ) {
-  for (let index = 0; index < files.length; index++) {
-    const file = files[index];
-    const response = await fetch(file.url);
-    if (!response.ok) throw new Error(`${file.filename}을(를) 가져오지 못했습니다.`);
-    const fileHandle = await getNonConflictingFileHandle(directory, file.filename);
-    const writable = await fileHandle.createWritable();
-    try {
-      if (response.body) {
-        await response.body.pipeTo(writable);
-      } else {
-        await writable.write(await response.blob());
-        await writable.close();
+  let next = 0;
+  let completed = 0;
+  let failed = false;
+  const worker = async () => {
+    while (!failed && next < files.length) {
+      const file = files[next++];
+      try {
+        await saveFileToDirectory(directory, file);
+      } catch (error) {
+        failed = true;
+        throw error;
       }
-    } catch (error) {
-      await writable.abort(error).catch(() => {});
-      throw error;
+      onProgress?.(++completed, files.length);
     }
-    onProgress?.(index + 1, files.length);
-  }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, files.length)) }, worker));
 }
