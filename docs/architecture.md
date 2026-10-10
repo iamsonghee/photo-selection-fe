@@ -113,7 +113,9 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 - `/`는 JSON-LD(Organization·WebSite·FAQPage)를 렌더링한다. FAQ 문장은 `src/app/landing/faq.ts`의 `LANDING_FAQ`를 화면(`LandingStory`)과 함께 쓴다. 실제 후기·평점이 없으므로 리뷰·평점 스키마는 넣지 않는다(`PRODUCT.md` Evidence on Hand).
 - 아이콘: 파비콘은 SVG 마크(`BRAND_MARK_SVG`), apple-touch-icon은 180px PNG(`BRAND_APPLE_TOUCH_ICON_PNG`), 구조화 데이터 로고는 512px PNG(`BRAND_LOGO_PNG`)다(`src/lib/brand-assets.ts`, `public/brand/`).
 - IndexNow: `public/6b450f64221525ea4daabc787f24e635.txt` 키 파일로 사이트 소유를 증명한다. `npm run seo:indexnow`(`scripts/indexnow-submit.mjs`)는 운영 sitemap의 URL을 출력만 하고, `-- --submit`을 붙이면 네이버(`searchadvisor.naver.com/indexnow`)와 공용 엔드포인트(`api.indexnow.org`)에 보낸다. Google은 IndexNow를 지원하지 않는다.
-- 현재 Google Search Console·네이버 서치어드바이저 등록과 분석 도구는 없다.
+- Google Search Console의 `acut.kr` 도메인 속성은 DNS로 소유권 인증이 완료됐고 `https://www.acut.kr/sitemap.xml`을 제출했다(2026-10-10). 제출 직후 상태는 `가져올 수 없음`이므로 실제 수집 성공은 재확인해야 한다.
+- 네이버 서치어드바이저에는 `https://www.acut.kr`을 등록했다(2026-10-10). 소유권 확인용 `naver-site-verification` 메타 태그는 홈 `src/app/page.tsx`의 `metadata.verification.other`에 정의했다. 운영 배포 후 소유확인과 사이트맵 제출이 남아 있다. 기존 `http://acut.kr` 항목도 남아 있다.
+- GA 등 분석 도구는 아직 연동하지 않았다.
 
 > 이 문서는 2026-07-13 기준 `photo-selection-fe`(Next.js)와 `photo-selection-be`(FastAPI, `clip-service` 포함) 실제 코드를 근거로 작성되었습니다.
 > 추측이 필요한 부분은 모두 **`확인 필요`**로 표시했습니다. 값이 확인되었더라도 실제 운영 환경(Railway/Vercel/Supabase 대시보드) 설정까지 코드로 검증할 수 없는 항목은 별도로 표시합니다.

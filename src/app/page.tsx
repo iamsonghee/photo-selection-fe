@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: "/" },
+  verification: { other: { "naver-site-verification": "f3a12f0599e3ff5dfdd9c95703783d6e3580e267" } },
   openGraph: { title, description, url: "/", siteName: SITE_NAME, images: [OG_MAIN_IMAGE], type: "website", locale: "ko_KR" },
   twitter: { card: "summary_large_image", title, description, images: [OG_MAIN_IMAGE] },
 };
