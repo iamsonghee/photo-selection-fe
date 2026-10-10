@@ -26,6 +26,7 @@ export default function RetouchUploadPage() {
   const [choosing, setChoosing] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
   const assignedCount = assignments.filter(Boolean).length;
@@ -45,9 +46,13 @@ export default function RetouchUploadPage() {
     setAssignments(next.map((file) => mapping.find((row) => row.file === file)?.target.id ?? null));
     setChoosing(null);
     setError(null);
+    setNotice(null);
   }
 
   function assign(index: number, photoId: string) {
+    // 원본 하나엔 보정본 하나만 — 다른 파일에 이미 연결된 원본이면 그쪽 연결을 풀고 알려 준다.
+    const displaced = assignments.findIndex((id, fileIndex) => id === photoId && fileIndex !== index);
+    setNotice(displaced >= 0 ? `원본 ${photoById.get(photoId)?.filename ?? ""} 연결을 이 파일로 옮겼어요. ${files[displaced].name} 파일은 원본을 다시 골라 주세요.` : null);
     setAssignments((current) => current.map((id, fileIndex) => fileIndex === index ? photoId : id === photoId ? null : id));
     setChoosing(null);
   }
@@ -70,10 +75,15 @@ export default function RetouchUploadPage() {
       const result = await uploadRetouched(projectId, uploadFiles, pairs.map(({ photoId }) => photoId), pairs.map(({ file }) => file.name));
       await refresh();
       if (result.uploaded !== pairs.length) {
-        setError(`${result.uploaded}장은 올렸어요. 실패한 사진은 다시 선택해 주세요.`);
-        setFiles([]);
-        setPreviews([]);
-        setAssignments([]);
+        // 올라간 파일만 빼고 실패한 파일은 연결 그대로 남겨 바로 다시 올릴 수 있게 한다(파일 이름은 선택 단계에서 중복을 막았다).
+        const saved = new Set((result.versions ?? []).map((version) => version.filename));
+        const keep = files.flatMap((file, index) => saved.has(file.name) ? [] : [index]);
+        const failed = pairs.filter(({ file }) => !saved.has(file.name)).map(({ file }) => file.name);
+        setFiles(keep.map((index) => files[index]));
+        setPreviews(keep.map((index) => URL.createObjectURL(files[index])));
+        setAssignments(keep.map((index) => assignments[index]));
+        setNotice(null);
+        setError(`${result.uploaded}장은 올렸어요. 올리지 못한 파일: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? ` 외 ${failed.length - 3}장` : ""}. 남겨 둔 사진을 다시 올려 주세요.`);
         return;
       }
       router.push(`/customer-select/${projectId}/retouch/compare`);
@@ -104,6 +114,7 @@ export default function RetouchUploadPage() {
 
       {files.length > 0 ? <section className={s.section}>
         <div className={s.sectionHead}><h2>사진 연결 확인</h2><span>{assignedCount}장 연결 · {files.length - assignedCount}장 확인 필요</span></div>
+        {notice && <p role="status" className={s.help}>{notice}</p>}
         <div className={s.pairs}>
           {files.map((file, index) => {
             const photo = assignments[index] ? photoById.get(assignments[index]!) : null;
@@ -119,9 +130,12 @@ export default function RetouchUploadPage() {
               </div>
               {choosing === index && <div className={s.chooser}>
                 <p>이 보정본에 맞는 원본을 눌러 주세요.</p>
-                <div className={s.choices}>{photos.map((target) => <button type="button" key={target.id} aria-label={`${target.filename}에 연결`} onClick={() => assign(index, target.id)}>
-                  <img src={target.url} alt="" /><span>{target.filename}</span>
-                </button>)}</div>
+                <div className={s.choices}>{photos.map((target) => {
+                  const usedBy = assignments.findIndex((id, fileIndex) => id === target.id && fileIndex !== index);
+                  return <button type="button" key={target.id} data-used={usedBy >= 0 || undefined} aria-label={`${target.filename}에 연결${usedBy >= 0 ? ` (${files[usedBy].name}에 연결됨)` : ""}`} onClick={() => assign(index, target.id)}>
+                    <img src={target.url} alt="" /><span>{target.filename}</span>{usedBy >= 0 && <small>다른 파일에 연결됨</small>}
+                  </button>;
+                })}</div>
               </div>}
             </article>;
           })}

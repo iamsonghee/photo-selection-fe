@@ -86,7 +86,7 @@ export async function uploadRetouched(
   photoIds: string[],
   // 압축하면 `이름.jpg`로 바뀐다 — 원래 이름으로 보내야 BE가 돌려주는 실패 목록·저장 파일명이 선택한 파일과 맞는다.
   filenames: string[]
-): Promise<{ uploaded: number; rejected: string[] }> {
+): Promise<{ uploaded: number; rejected: string[]; versions?: { filename: string }[] }> {
   const formData = new FormData();
   formData.append("project_id", projectId);
   files.forEach((f, i) => formData.append("files", f, filenames[i]));
@@ -99,6 +99,17 @@ export async function uploadRetouched(
     throw new Error(msg ?? "업로드 실패");
   }
   return res.json();
+}
+
+/** 잘못 연결해 올린 보정본 한 장 삭제(R2 파일까지 BE가 정리). */
+export async function deleteRetouched(projectId: string, versionId: string) {
+  const res = await fetch(`${CUSTOMER_UPLOAD_API}/retouched/${versionId}?project_id=${encodeURIComponent(projectId)}`, { method: "DELETE", headers: await authHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    // FastAPI 기본 404("Not Found")는 서버에 삭제 API가 아직 없는 경우(BE 배포 전) — 영어 원문 대신 안내한다.
+    const detail = typeof data.detail === "string" && data.detail !== "Not Found" ? data.detail : null;
+    throw new Error(detail ?? "지금은 보정본을 지울 수 없어요. 잠시 후 다시 시도해 주세요.");
+  }
 }
 
 export async function setRetouchDecision(
