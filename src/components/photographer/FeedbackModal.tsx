@@ -27,7 +27,7 @@ export function FeedbackButton({
   const pathname = usePathname();
   const messageId = useId();
   const errorId = useId();
-  const projectIdMatch = pathname.match(/^\/app\/studio\/projects\/([^/]+)(?:\/|$)/);
+  const projectIdMatch = pathname.match(/^\/studio\/projects\/([^/]+)(?:\/|$)/);
   const projectId = projectIdMatch && projectIdMatch[1] !== "new" ? projectIdMatch[1] : null;
 
   const [category, setCategory] = useState<Category>("bug");

@@ -10,8 +10,8 @@ export type PhotographerNavItem = {
 
 /** 설정은 프로필(아바타/이름) 클릭으로 진입 — MENU 목록에는 넣지 않는다. */
 export const PHOTOGRAPHER_NAV_ITEMS: PhotographerNavItem[] = [
-  { href: "/app/studio/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
-  { href: "/app/studio/projects",  label: "프로젝트",  icon: FolderOpen,    comingSoon: false },
-  { href: "/app/studio/customers", label: "고객관리",  icon: Users,         comingSoon: false },
+  { href: "/studio/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
+  { href: "/studio/projects",  label: "프로젝트",  icon: FolderOpen,    comingSoon: false },
+  { href: "/studio/customers", label: "고객관리",  icon: Users,         comingSoon: false },
   { href: "#",                        label: "통계",      icon: BarChart3,     comingSoon: true  },
 ];

@@ -131,7 +131,7 @@ export function ProjectInformationCard({
         >
           <div>
             <dt className="text-[11px] font-medium text-muted-foreground">고객</dt>
-            <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{project.customerId ? <Link className="underline underline-offset-4" href={`/app/studio/customers?customerId=${project.customerId}`}>{project.customerName}</Link> : project.customerName}</dd>
+            <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{project.customerId ? <Link className="underline underline-offset-4" href={`/studio/customers?customerId=${project.customerId}`}>{project.customerName}</Link> : project.customerName}</dd>
           </div>
           {project.location?.trim() ? (
             <div>
@@ -185,7 +185,7 @@ export function ProjectInformationCard({
         <div className="flex items-center gap-3 pb-5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--customer-soft)] text-sm font-semibold text-cyan">{getInitial(project.customerName || "?")}</span>
           <div className="min-w-0">
-            <p className="break-words text-[15px] font-semibold">{project.customerId ? <Link className="underline underline-offset-4" href={`/app/studio/customers?customerId=${project.customerId}`}>{project.customerName}</Link> : project.customerName || "고객 미등록"}</p>
+            <p className="break-words text-[15px] font-semibold">{project.customerId ? <Link className="underline underline-offset-4" href={`/studio/customers?customerId=${project.customerId}`}>{project.customerName}</Link> : project.customerName || "고객 미등록"}</p>
             {project.customerPhone && <p data-project-customer-phone className="mt-1 text-xs text-muted-foreground">{project.customerPhone}</p>}
           </div>
         </div>

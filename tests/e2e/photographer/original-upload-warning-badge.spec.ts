@@ -44,7 +44,7 @@ test("원본 포함 프로젝트의 미전송 원본 수를 목록 경고 배지
       tier: "beta", current: 1, max: 10, maxPhotosPerProject: 2000, betaStatus: "approved",
     } }));
 
-    await page.goto("/app/studio/projects");
+    await page.goto("/studio/projects");
     await expect(page.getByRole("region", { name: "PC 프로젝트 목록" })
       .getByText("원본 미업로드 2장", { exact: true })).toBeVisible();
     expect(recoveryQuerySeen).toBe(true);

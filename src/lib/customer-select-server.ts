@@ -9,7 +9,7 @@ import { SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { customerShareCookieName } from "@/lib/customer-select-share-auth";
 import { isAdminEmail } from "@/lib/admin-emails";
-import { CUSTOMER_PHOTO_LIMIT } from "@/app/app/select/_lib/upload-limit";
+import { CUSTOMER_PHOTO_LIMIT } from "@/app/select/_lib/upload-limit";
 import type { ColorTag, PeopleKind, Photo, StarRating } from "@/types";
 
 export async function getCurrentCustomerAuthUser(): Promise<User | null> {

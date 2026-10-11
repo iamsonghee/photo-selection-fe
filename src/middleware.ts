@@ -79,7 +79,7 @@ async function handleAdminGate(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL("/", req.url));
   }
   if (!isAdminEmail(user.email)) {
-    return NextResponse.redirect(new URL("/app/studio/dashboard", req.url));
+    return NextResponse.redirect(new URL("/studio/dashboard", req.url));
   }
 
   return response;
@@ -263,9 +263,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   }
 
   // 소유자 전용 화면만 보호한다. 공유 셀렉·작가 초대·하객 링크의 인증은 기존대로 유지한다.
-  if (pathname === "/app/studio" || pathname.startsWith("/app/studio/") ||
-      pathname === "/app/select" || /^\/app\/select\/(?:new|guest)(?:\/|$)/.test(pathname) ||
-      /^\/app\/select\/[^/]+\/settings$/.test(pathname)) {
+  if (pathname.startsWith("/studio/") ||
+      pathname === "/select/projects" || /^\/select\/(?:new|guest)(?:\/|$)/.test(pathname) ||
+      /^\/select\/[^/]+\/settings$/.test(pathname)) {
     return handleWorkspaceGate(req);
   }
 

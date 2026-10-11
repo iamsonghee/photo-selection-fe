@@ -77,8 +77,8 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
 // 1) 셀프 고객 로그인(신규 계정): /customer-select로 바로, photographers 행은 만들되 작가 지표는 없음, 쿠키는 지움
 {
   const state = setup();
-  const r = await callback({ cookie: "/app/select" });
-  assert.equal(r.location, `${ORIGIN}/app/select`);
+  const r = await callback({ cookie: "/select/projects" });
+  assert.equal(r.location, `${ORIGIN}/select/projects`);
   assert.equal(photographerInserts(state).length, 1);
   assert.equal(photographerInserts(state)[0].payload.auth_id, "auth-1");
   assert.deepEqual(events(state), []);
@@ -90,8 +90,8 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
 // 2) 셀프 고객 로그인(기존 계정): 행은 안 만들고 first_login도 안 남김
 {
   const state = setup({ existingPhotographer: { id: "p-1" } });
-  const r = await callback({ cookie: "/app/select/new" });
-  assert.equal(r.location, `${ORIGIN}/app/select/new`);
+  const r = await callback({ cookie: "/select/new" });
+  assert.equal(r.location, `${ORIGIN}/select/new`);
   assert.equal(photographerInserts(state).length, 0);
   assert.deepEqual(events(state), []);
 }
@@ -125,19 +125,19 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
 // 6) 쿠키가 없으면 쿼리 next를 보조로 쓴다(같은 출처 경로만)
 {
   const state = setup({ existingPhotographer: { id: "p-1" } });
-  const r = await callback({ query: "/app/select" });
-  assert.equal(r.location, `${ORIGIN}/app/select`);
+  const r = await callback({ query: "/select/projects" });
+  assert.equal(r.location, `${ORIGIN}/select/projects`);
   assert.deepEqual(events(state), []);
 }
 
 // 7) code 없음 → 홈, 세션 교환 실패 → 오류 쿼리와 함께 홈. DB는 건드리지 않음
 {
   const state = setup();
-  assert.equal(new URL((await callback({ code: null, cookie: "/app/select" })).location).pathname, "/login");
-  const failed = await callback({ code: "bad", cookie: "/app/select" });
+  assert.equal(new URL((await callback({ code: null, cookie: "/select/projects" })).location).pathname, "/login");
+  const failed = await callback({ code: "bad", cookie: "/select/projects" });
   assert.equal(new URL(failed.location).pathname, "/login");
   assert.equal(new URL(failed.location).searchParams.get("error"), "oauth");
-  assert.equal(new URL(failed.location).searchParams.get("next"), "/app/select");
+  assert.equal(new URL(failed.location).searchParams.get("next"), "/select/projects");
   assert.match(failed.setCookie, /[Mm]ax-[Aa]ge=0/);
   assert.equal(state.inserts.length, 0);
 }
@@ -147,14 +147,14 @@ console.log("auth-callback: ok");
 // 명시적 스튜디오 진입은 기존 작가 지표를 유지한다.
 {
   const state = setup();
-  const r = await callback({ cookie: "/app/studio/dashboard" });
-  assert.equal(r.location, `${ORIGIN}/app/studio/dashboard`);
+  const r = await callback({ cookie: "/studio/dashboard" });
+  assert.equal(r.location, `${ORIGIN}/studio/dashboard`);
   assert.deepEqual(events(state), ["signup_completed", "first_login"]);
 }
 // 초대 링크와 일반 로그인은 작가 이용 지표에 섞지 않는다.
 {
   const state = setup();
-  const r = await callback({ cookie: "/c/example/review", query: "/app/studio/dashboard" });
+  const r = await callback({ cookie: "/c/example/review", query: "/studio/dashboard" });
   assert.equal(r.location, `${ORIGIN}/c/example/review`);
   assert.deepEqual(events(state), []);
 }

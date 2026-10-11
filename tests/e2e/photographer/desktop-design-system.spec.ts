@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("PC form controls retain label, group selection and error relationships", async ({ page }) => {
-  await page.goto("/app/studio/projects/new");
+  await page.goto("/studio/projects/new");
   const name = page.getByLabel("프로젝트명", { exact: false });
   await expect(name).toBeVisible();
   await page.locator("label").filter({ hasText: "프로젝트명" }).click();
@@ -32,7 +32,7 @@ test("PC form controls retain label, group selection and error relationships", a
 });
 
 test("PC settings labels and feedback theme, pending lock, focus restoration", async ({ page }) => {
-  await page.goto("/app/studio/settings");
+  await page.goto("/studio/settings");
   for (const label of ["작가명 또는 스튜디오명", "소개글", "연락처", "인스타그램", "포트폴리오"]) {
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
   }
@@ -70,7 +70,7 @@ test("PC settings labels and feedback theme, pending lock, focus restoration", a
 });
 
 test("PC settings layout keeps readable columns across desktop widths", async ({ page }) => {
-  await page.goto("/app/studio/settings");
+  await page.goto("/studio/settings");
   const summary = page.locator("[data-settings-profile-summary]");
   const profilePanel = page.locator("[data-settings-panel]").first();
 
@@ -94,7 +94,7 @@ test("PC settings layout keeps readable columns across desktop widths", async ({
 test("PC confirmation traps focus and cannot close during a pending operation", async ({ page }) => {
   const project = await createTestProject(page);
   try {
-    await page.goto(`/app/studio/projects/${project.projectId}`);
+    await page.goto(`/studio/projects/${project.projectId}`);
     await page.getByLabel("프로젝트 더보기").filter({ visible: true }).click();
     const trigger = page.getByRole("menuitem", { name: "삭제하기" });
     await trigger.click();
@@ -147,7 +147,7 @@ test("PC confirmation traps focus and cannot close during a pending operation", 
 
 test("PC settings shares the Light shell, Sidebar and page heading", async ({ page }) => {
   // 사용 매뉴얼 화면은 bb8142fe에서 삭제됐다 — 같은 라이트 셸 규칙을 설정 화면으로 확인한다.
-  await page.goto("/app/studio/settings");
+  await page.goto("/studio/settings");
   await expect(page.getByRole("heading", { name: "설정", level: 1 })).toBeVisible();
   await expect(page.locator("[data-sidebar-theme]")).toHaveAttribute("data-sidebar-theme", "light");
   for (const width of [1024, 1280, 1440, 1920]) {

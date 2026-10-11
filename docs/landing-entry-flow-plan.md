@@ -148,13 +148,13 @@
 |---|---|---|
 | 통합/스튜디오/개인 소개 | `/`, `/studio`, `/select` | 유지 |
 | 공통 로그인·공간 선택 | `/login`, `/workspaces` | 유지 |
-| 스튜디오 작업 공간 | `/photographer/**` | `/app/studio/**` |
-| 개인 작업 공간 | `/customer-select/**` | `/app/select/**` |
+| 스튜디오 작업 공간 | `/photographer/**` | `/studio/**` |
+| 개인 작업 공간 | `/customer-select/**` | `/select/**` |
 | 작가 초대·하객 링크 | `/c/**`, `/g/**` | 공유 URL은 안정적으로 유지 |
-| 개인 공유 링크 | `/customer-select/[id]/**` | `/app/select/[id]/**`로 307, 공유 쿼리 보존 |
+| 개인 공유 링크 | `/customer-select/[id]/**` | `/select/[id]/**`로 307, 공유 쿼리 보존 |
 | 외부 결과 공유 | `/customer-select/result/**` | 유지: 기존 인증 쿠키 경로 보존 |
 
-작업 화면 파일과 내부 링크·경로 판별·로그인 목적지·테스트를 새 주소로 이전했다. middleware의 307 호환 연결은 쿼리와 메서드를 보존한다. `/api/**`·`/auth/callback`·`/c/**`·`/g/**`와 외부 결과 공유 주소·쿠키는 유지한다. 새 `/app/**`에도 검색 제외 헤더를 적용한다. 브라우저 영구 캐시를 피하기 위해 호환 연결은 현재 307을 사용한다.
+작업 화면 파일과 내부 링크·경로 판별·로그인 목적지·테스트를 새 주소로 이전했다. middleware의 307 호환 연결은 쿼리와 메서드를 보존한다. `/api/**`·`/auth/callback`·`/c/**`·`/g/**`와 외부 결과 공유 주소·쿠키는 유지한다. 새 `/studio/**`·`/select/**`에도 검색 제외 헤더를 적용한다. 브라우저 영구 캐시를 피하기 위해 호환 연결은 현재 307을 사용한다.
 
 ### 검증 범위
 
@@ -174,9 +174,17 @@
 
 ### 작업 주소 이전 검증 (2026-10-11 후속)
 
-- 실제 화면 트리를 `src/app/app/studio`, `src/app/app/select`로 이동하고 내부 링크·테마/활성 메뉴 경로 판별·테스트를 갱신했다. 기존 파일 101개가 새 위치에 모두 있음을 대조했으며 API 라우트 93개는 주소를 유지한다.
+- 당시 실제 화면 트리를 `src/app/app/studio`, `src/app/app/select`로 이동하고 내부 링크·테마/활성 메뉴 경로 판별·테스트를 갱신했다. 기존 파일 101개가 새 위치에 모두 있음을 대조했으며 API 라우트 93개는 주소를 유지한다.
 - `npm run build -- --webpack`: 성공(전체 라우트 컴파일·TypeScript·정적 페이지 생성). 기존 Next middleware 명칭/Edge Runtime 관련 경고는 남는다.
 - 핵심 변경 파일 ESLint: 오류·경고 없음. `git diff --check`: 통과.
 - 단위·회귀: 주소 매핑, OAuth 복귀, middleware의 307/쿼리/메서드 보존, 인증 세션 쿠키 전달, 공유 토큰 교환과 잘못된 토큰 거절, 기존 결과 토큰·쿠키 경로, PIN 보안, 프로젝트 목적지 확인.
 - Playwright 최종 실행: `entry-flow.spec.ts` 5개 모두 통과(53초). 브라우저 검증 범위: PC·모바일 랜딩/공통 로그인, 보호 경로, 기존 작업 링크의 쿼리·해시 유지, 새 주소 공간 전환·재로그인·기억 저장 실패 복구, 검색 제외 헤더. 로딩 중 화면 전환이 겹친 테스트는 서버 재시작 및 로그아웃 페이지 로드 대기 후 다시 검증했다.
 - 실제 Google/Kakao 동의 왕복, 실제 파일 업로드·다운로드 전체 과정, 배포된 서버에서의 기존 링크는 이번 작업에서 재검증하지 않았다. 운영 배포는 포함하지 않는다.
+
+### `/app` 접두사 제거 (2026-10-11 후속)
+
+- 소개 `/studio`, `/select`는 유지한다. 작가 작업은 `/studio/dashboard`, `/studio/projects/**` 등이며 내 사진 셀렉 목록은 소개와 겹치지 않게 `/select/projects`, 생성·개별 작업은 `/select/new/**`, `/select/[id]/**`, `/select/guest/**`를 사용한다.
+- `/app/studio/**`, `/app/select/**`와 원래 `/photographer/**`, `/customer-select/**` 모두 최종 주소로 직접 307 연결한다. 결과 공유 `/customer-select/result/**`는 계속 유지한다.
+- 작가 작업 레이아웃은 `studio/(workspace)` 라우트 그룹에만 적용해 소개 화면에 작업 메뉴·인증 보호가 섞이지 않게 한다.
+
+- 접두사 제거 후 검증: TypeScript, 핵심 ESLint, 주소·인증·공유 회귀 테스트 통과. Playwright `entry-flow.spec.ts` 5개 모두 통과(1.5분). 이 후속 변경에서는 production build와 실제 OAuth·파일 업로드 전체 과정을 재실행하지 않았다.

@@ -47,7 +47,7 @@ if (!process.argv.includes("--encode-only")) {
       await film.screenshot({ path: path.join(frames, `frame-${String(frame).padStart(5, "0")}.png`) });
       if (frame % 90 === 0) console.log(`Rendered ${frame}/${count}`);
     }
-    const serviceRequests = forbidden.filter(url => /\/api\/|supabase|\/c\/|\/app\/studio\//.test(url));
+    const serviceRequests = forbidden.filter(url => /\/api\/|supabase|\/c\/|\/studio\//.test(url));
     if (serviceRequests.length) throw new Error(`서비스 요청 시도 발견: ${serviceRequests.join(", ")}`);
     await writeFile(path.join(frames, "network.json"), JSON.stringify({ blockedNonAssetRequests: forbidden, serviceRequests }, null, 2));
   } finally { await browser.close(); }

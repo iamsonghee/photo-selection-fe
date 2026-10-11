@@ -34,7 +34,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 2. `signInWithOAuth({ provider: 'google' })` 호출 → Supabase가 구글 로그인 URL 반환
 3. 브라우저가 해당 URL로 이동 → 구글 로그인 화면 표시
 4. 로그인 후 Supabase가 `redirectTo`로 리다이렉트 → `/auth/callback?code=...`
-5. 콜백에서 `exchangeCodeForSession(code)` 후 저장한 목적지로 이동한다. 작업 주소는 `/app/studio/**`, `/app/select/**`이며 옛 목적지도 새 주소로 변환한다. 목적지가 없으면 `/workspaces`에서 마지막 공간 또는 공간 선택으로 복귀한다.
+5. 콜백에서 `exchangeCodeForSession(code)` 후 저장한 목적지로 이동한다. 작업 주소는 `/studio/**`, `/select/**`이며 옛 목적지도 새 주소로 변환한다. 목적지가 없으면 `/workspaces`에서 마지막 공간 또는 공간 선택으로 복귀한다.
 6. 작업 주소 이전과 관계없이 OAuth 복귀 주소는 `/auth/callback`을 유지한다.
 
 ## 4. RLS (Row Level Security) — 프로젝트 생성 실패 시

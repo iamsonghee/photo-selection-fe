@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 
 /** 작가 로그인 후 preparing 상태 프로젝트 ID 반환 (없으면 null) */
 export async function findPreparingProjectId(page: Page): Promise<string | null> {
-  await page.goto("/app/studio/projects");
+  await page.goto("/studio/projects");
   await page.waitForLoadState("networkidle");
   // URL에 프로젝트 ID가 포함된 upload 링크 탐색
   const links = await page.locator("a[href*='/upload']").all();
@@ -16,10 +16,10 @@ export async function findPreparingProjectId(page: Page): Promise<string | null>
 
 /** 작가 로그인 후 고객 접근 가능한 초대 토큰 반환 (없으면 null) */
 export async function findActiveProjectToken(page: Page): Promise<string | null> {
-  await page.goto("/app/studio/projects");
+  await page.goto("/studio/projects");
   await page.waitForLoadState("networkidle");
   // 프로젝트 상세 페이지를 순회하며 accessToken 탐색
-  const projectLinks = await page.locator("a[href*='/app/studio/projects/']").all();
+  const projectLinks = await page.locator("a[href*='/studio/projects/']").all();
   for (const link of projectLinks.slice(0, 5)) {
     const href = await link.getAttribute("href");
     if (!href || href.includes("/upload") || href.includes("/workflow") || href.includes("/assets/")) continue;
@@ -37,9 +37,9 @@ export async function findActiveProjectToken(page: Page): Promise<string | null>
 
 /** 첫 번째 프로젝트의 상세 URL 반환 */
 export async function findFirstProjectUrl(page: Page): Promise<string | null> {
-  await page.goto("/app/studio/projects");
+  await page.goto("/studio/projects");
   await page.waitForLoadState("networkidle");
-  const link = page.locator("a[href*='/app/studio/projects/']").first();
+  const link = page.locator("a[href*='/studio/projects/']").first();
   if (!(await link.isVisible({ timeout: 3000 }).catch(() => false))) return null;
   return link.getAttribute("href");
 }

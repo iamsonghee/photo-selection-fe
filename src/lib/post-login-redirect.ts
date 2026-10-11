@@ -20,7 +20,7 @@ export const POST_LOGIN_REDIRECT_COOKIE = "acut_post_login_redirect";
 export const DEFAULT_POST_LOGIN_PATH = "/workspaces";
 
 /** 셀프 고객 서비스의 로그인 착지. 이 경로로 시작한 로그인은 작가 가입·첫 로그인 지표를 남기지 않는다. */
-export const CUSTOMER_SELECT_POST_LOGIN_PATH = "/app/select";
+export const CUSTOMER_SELECT_POST_LOGIN_PATH = "/select/projects";
 
 /** OAuth 동의 화면에서 머무는 시간을 넉넉히 덮되, 취소한 시도가 오래 남지는 않게. */
 const POST_LOGIN_REDIRECT_MAX_AGE_SECONDS = 10 * 60;
@@ -44,14 +44,14 @@ export function resolvePostLoginPath(raw: string | null | undefined): string {
   const url = new URL(path, "https://acut.invalid");
   const pathname = migrateWorkspacePath(url.pathname);
   if (pathname.startsWith("//")) return DEFAULT_POST_LOGIN_PATH;
-  if (/^\/(?:api|auth|login)(?:\/|$)/.test(pathname) || pathname === "/app/select/login") return DEFAULT_POST_LOGIN_PATH;
+  if (/^\/(?:api|auth|login)(?:\/|$)/.test(pathname) || pathname === "/select/login") return DEFAULT_POST_LOGIN_PATH;
   return pathname + url.search + url.hash;
 }
 
 /** 셀프 고객 서비스에서 시작한 로그인인지 — 콜백이 작가 지표 기록을 건너뛰는 기준. */
 export function isCustomerSelectLogin(path: string): boolean {
   const pathname = migrateWorkspacePath(new URL(path, "https://acut.invalid").pathname);
-  return pathname === CUSTOMER_SELECT_POST_LOGIN_PATH || pathname.startsWith(`${CUSTOMER_SELECT_POST_LOGIN_PATH}/`);
+  return pathname.startsWith("/select/");
 }
 
 /** 로그인 시작 직전에 호출한다. 기본 목적지는 저장하지 않아도 되지만 저장해도 같은 곳으로 간다. */
@@ -74,5 +74,5 @@ function writePostLoginCookie(value: string, maxAge: number): void {
 /** 작가 이용 지표는 명시적인 스튜디오/베타 진입에만 기록한다. */
 export function isStudioLogin(path: string): boolean {
   const pathname = migrateWorkspacePath(new URL(path, "https://acut.invalid").pathname);
-  return pathname === "/app/studio" || pathname.startsWith("/app/studio/") || pathname === "/beta/apply";
+  return pathname.startsWith("/studio/") || pathname === "/beta/apply";
 }

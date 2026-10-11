@@ -25,7 +25,7 @@ for (const viewport of [
       return route.fulfill({ json: { uploaded: 2, rejected: [] } });
     });
 
-    await page.goto(`/app/select/${projectId}/retouch/upload`);
+    await page.goto(`/select/${projectId}/retouch/upload`);
     await expect(page.getByRole("button", { name: "받은 사진 선택하기" })).toBeVisible();
     await page.locator('input[type="file"]').setInputFiles([
       { name: "A001-final.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") },
@@ -52,7 +52,7 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await page.route(`**/api/customer-select/projects/${projectId}/retouch`, (route) =>
       route.fulfill({ status: 403, json: { error: "프로젝트 소유자만 이용할 수 있습니다." } }));
-    await page.goto(`/app/select/${projectId}/retouch/compare`);
+    await page.goto(`/select/${projectId}/retouch/compare`);
     await expect(page.getByText("프로젝트 소유자만 이용할 수 있습니다.")).toBeVisible();
   });
 }
@@ -62,7 +62,7 @@ test("partial upload keeps failed files linked, relinking is announced, wrong re
   await page.route("**/api/customer-upload/retouched", (route) =>
     route.fulfill({ json: { uploaded: 1, rejected: ["A001-final.jpg"], versions: [{ filename: "mystery.jpg" }] } }));
 
-  await page.goto(`/app/select/${projectId}/retouch/upload`);
+  await page.goto(`/select/${projectId}/retouch/upload`);
   await page.locator('input[type="file"]').setInputFiles([
     { name: "A001-final.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") },
     { name: "mystery.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") },
@@ -86,7 +86,7 @@ test("partial upload keeps failed files linked, relinking is announced, wrong re
 
   // BE 배포 전(삭제 API 없음)이면 FastAPI 기본 404 영어 문구 대신 안내를 보여 준다.
   await page.route("**/api/customer-upload/retouched/v2?*", (route) => route.fulfill({ status: 404, json: { detail: "Not Found" } }));
-  await page.goto(`/app/select/${projectId}/retouch/compare`);
+  await page.goto(`/select/${projectId}/retouch/compare`);
   await page.getByRole("button", { name: "A002.jpg 보정본 지우기" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "지우기" }).click();
   await expect(page.getByRole("dialog")).toContainText("지금은 보정본을 지울 수 없어요");
@@ -97,7 +97,7 @@ test("partial upload keeps failed files linked, relinking is announced, wrong re
     deleted = route.request().method();
     return route.fulfill({ json: { deleted: true } });
   });
-  await page.goto(`/app/select/${projectId}/retouch/compare`);
+  await page.goto(`/select/${projectId}/retouch/compare`);
   await page.getByRole("button", { name: "A001.jpg 보정본 지우기" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "지우기" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

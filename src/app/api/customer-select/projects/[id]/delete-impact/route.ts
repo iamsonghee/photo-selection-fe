@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
-import { CUSTOMER_PHOTO_LIMIT } from "@/app/app/select/_lib/upload-limit";
+import { CUSTOMER_PHOTO_LIMIT } from "@/app/select/_lib/upload-limit";
 
 // PostgREST는 `in.(...)` 목록을 URL에 싣는다 — ID 약 600개를 넘으면 400으로 거절해 전체 선택 삭제가 실패했다.
 // 목록 조회는 이 크기로 나눠 보내고 결과를 합친다.

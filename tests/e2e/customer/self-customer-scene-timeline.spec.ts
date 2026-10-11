@@ -54,7 +54,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await mock(page);
 
     // 장면 개요 없이, 아직 덜 고른 첫 장면에서 바로 시작한다(첫 장면은 목표 3장 중 2장만 고름).
-    await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready`);
+    await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready`);
     await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
     await expect(page.getByRole("heading", { name: "장면별로 골라볼까요?" })).toHaveCount(0);
 
@@ -88,7 +88,7 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const gallery = page.locator('[class*="selectGallery"]').first();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
@@ -122,7 +122,7 @@ test("desktop: pulling past the top of a scene moves to the end of the previous 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=2`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=2`);
   const gallery = page.locator('[class*="selectGallery"]').first();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await gallery.evaluate((element) => element.scrollTo({ top: 0 }));
@@ -153,7 +153,7 @@ test("desktop: sample photos shot in one burst are still split into scenes in mo
   await loginAsPhotographer(page);
   // 60장이 20초 간격으로 이어져 촬영 시각만으로는 장면이 하나뿐이다.
   await mock(page, project([[11, 0], [11, 10]]));
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
   await page.getByRole("button", { name: /^입장/ }).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/scene=1/);
@@ -165,7 +165,7 @@ test("desktop: one continuous scroll moves at most one scene", async ({ browser 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const gallery = page.locator('[class*="selectGallery"]').first();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
@@ -191,7 +191,7 @@ test("desktop: one continuous scroll moves at most one scene", async ({ browser 
     const paused = inScene.some((wheel, index) => index > 0 && wheel.t - inScene[index - 1].t >= 140);
     expect(paused, `장면 ${scene}에서 쉬지 않았는데 다음 장면으로 넘어감`).toBe(true);
   }
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
   await expect(page).toHaveURL(/scene=1/);
 
   // 한 번 쉬었다가 다시 장면 끝에서 당기면 그다음 장면으로 간다.
@@ -207,7 +207,7 @@ test("owner card: like is a secondary hover action on desktop and display-only o
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
   const card = page.locator('[data-photo-id="p43"]');
   const like = card.getByRole("button", { name: "찜하기" });
   await expect(card).toBeVisible();
@@ -228,7 +228,7 @@ test("owner card: like is a secondary hover action on desktop and display-only o
   const phone = await mobile.newPage();
   await loginAsPhotographer(phone);
   await mock(phone);
-  await phone.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  await phone.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
   await expect(phone.locator('[data-photo-id="p43"]')).toBeVisible();
   await expect(phone.locator('[data-photo-id="p43"]').getByRole("button", { name: "찜하기" })).toBeHidden();
   await mobile.close();
@@ -240,7 +240,7 @@ test("selecting a card pops only at the moment it turns on", async ({ browser })
   await loginAsPhotographer(page);
   await mock(page);
   // 이미 선택돼 있던 사진(p1·p2)이 있는 장면을 열어도 처음 그려질 때 튀지 않는다.
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.locator('.gl-photo-card[data-photo-id="p1"]').getByRole("img", { name: "2장 선택" })).toBeVisible();
   await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
 
@@ -261,7 +261,7 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.getByRole("button", { name: "보기 옵션" }).click();
   await expect(page.getByRole("switch", { name: /유사컷 묶기/ })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
@@ -305,7 +305,7 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   for (const eyes of await page.locator(".gl-quality-badge-eyes").all()) await expect(eyes).toBeHidden();
 
   // 정리 전(none)에는 가짜 결과가 붙지 않는다.
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=none`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=none`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await page.getByRole("button", { name: "보기 옵션" }).click();
   await expect(page.getByRole("switch", { name: /유사컷 묶기/ })).toHaveCount(0);
@@ -320,7 +320,7 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // 첫 장면 30장 중 유사컷 4묶음(각 3장)이 접혀 22칸. p8~p10은 표지(p8) 한 칸이다.
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
   await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
@@ -366,7 +366,7 @@ test("detail continues across scene boundaries in both directions", async ({ bro
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.locator('.gl-photo-card[data-photo-id="p29"]').click();
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/scene=1/);
@@ -385,7 +385,7 @@ test("detail skips scenes without photos in the current filter", async ({ browse
   const data = project();
   data.selectedIds.push("p60");
   await mock(page, data);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.getByRole("button", { name: "✓ 최종 선택" }).click();
   await page.locator('.gl-photo-card[data-photo-id="p1"]').click();
   await page.keyboard.press("ArrowRight");
@@ -404,7 +404,7 @@ test("review detail follows the displayed scene order", async ({ browser }) => {
   data.selectedIds = ["p29", "p30", "p60"];
   data.photos.unshift(data.photos.splice(60, 1)[0]); // 저장 배열 순서는 장면 순서와 다르다.
   await mock(page, data);
-  await page.goto(`/app/select/${PROJECT_ID}/review?mockAnalysis=ready`);
+  await page.goto(`/select/${PROJECT_ID}/review?mockAnalysis=ready`);
   await page.getByRole("button", { name: "S_29.jpg 크게 보기" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
@@ -421,7 +421,7 @@ test("a collapsed cover can be picked directly; the badge shows the group's pick
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1). 고른 장수는 ✓ 자리(왼쪽 위)에 `✓ 2`, 묶음 배지는 ⧉ 3 만.
   const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
   const picks = cover.getByRole("img", { name: "2장 선택" });
@@ -458,7 +458,7 @@ test("selected photos keep their original brightness", async ({ browser }) => {
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=none`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=none`);
   const card = page.locator('.gl-photo-card[data-photo-id="p1"]');
   await expect(card).toHaveClass(/gl-selected/);
   await expect(card.locator(".gl-card-media img")).toHaveCSS("filter", "none");
@@ -470,7 +470,7 @@ test("owner like sits bottom-left and quality flags stay at the top-right edge",
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // p5는 흔들림 의심. ♡는 왼쪽 아래라 오른쪽 위 표시는 찜해도 움직이지 않는다.
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
   const flag = card.locator(".gl-quality-badge");
@@ -491,7 +491,7 @@ test("set-aside never hides a photo that is already picked", async ({ browser })
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.getByRole("button", { name: "보기 옵션" }).click();
   await page.getByRole("switch", { name: /유사컷 묶기/ }).click();
   await page.keyboard.press("Escape");
@@ -511,7 +511,7 @@ test("only decided marks stay on cards: empty check shows on hover, my own like 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=none`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=none`);
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
   const check = card.getByRole("button", { name: "선택", exact: true });
   await page.mouse.move(0, 0);
@@ -534,7 +534,7 @@ test("likes show as one heart with a count; names on hover", async ({ browser })
   data.participantNicknames = { red: "소유자", blue: "엄마", green: "아빠", yellow: "언니" } as typeof data.participantNicknames;
   data.photoStates = { p5: { color: ["blue", "green", "yellow"] } } as typeof data.photoStates;
   await mock(page, data);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=none`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=none`);
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
   await page.mouse.move(0, 0);
   // 색 점 대신 왼쪽 아래 `♥ 3` — 찜이 있으면 마우스 없이도 보인다.
@@ -554,7 +554,7 @@ test("a single similar-cut group can be expanded from its badge", async ({ brows
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // p8~p10 묶음만 배지로 펼친다. 다른 묶음(p16~p18)은 그대로 접혀 있다.
   await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 펼치기" }).click();
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toBeVisible();
@@ -584,7 +584,7 @@ test("an expanded group sits on its own row inside one band", async ({ browser }
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 펼치기" }).click();
   // p8~p10은 같은 줄에 나란히, 앞(p7)·뒤(p11) 사진과는 다른 줄이다.
   const top = async (id: string) => (await page.locator(`.gl-photo-card[data-photo-id="${id}"]`).boundingBox())!.y;
@@ -605,7 +605,7 @@ test("an expanded group stays together even when its photos are not consecutive 
   const data = project();
   data.photos[8] = { ...data.photos[8], takenAt: "2026-10-03T11:04:05" };
   await mock(page, data);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const badge = page.getByRole("button", { name: "유사컷 3장 펼치기" }).nth(1);
   await badge.click();
   const top = async (id: string) => (await page.locator(`.gl-photo-card[data-photo-id="${id}"]`).boundingBox())!.y;
@@ -624,8 +624,8 @@ test("filter bar: scope segments without counts, liked view by heart count, and 
   data.participantNicknames = { red: "소유자", blue: "엄마" } as typeof data.participantNicknames;
   data.photoStates = { p3: { color: ["blue"] }, p4: { color: ["blue", "red"] }, p40: { color: ["red"] } } as typeof data.photoStates;
   await mock(page, data);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=none&scene=0`);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=none&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const scopes = page.getByRole("group", { name: "보기 범위" });
   // 보기 범위 칸에는 장수를 붙이지 않는다 — 걸러진 결과로 확인한다. 지금 장면: 누구든 찜 2장(p3·p4), 고른 사진 2장(p1·p2).
   await expect(scopes.getByRole("button", { name: "모두", exact: true })).toHaveText("모두");
@@ -664,7 +664,7 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
     }
     return route.fulfill({ json: { status: "completed" } });
   });
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=off`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=off`);
   const rail = page.getByRole("navigation", { name: "장면" }).first();
   await expect(rail.getByRole("button", { name: /^입장/ })).toBeVisible();
   await expect(rail.getByRole("button", { name: /^예식/ })).toBeVisible();
@@ -697,7 +697,7 @@ test("analysis banner shows each running step separately", async ({ browser }) =
     const kind = new URL(route.request().url()).pathname.split("/").pop()!;
     return route.fulfill({ json: { status: "processing", run: RUNNING[kind] } });
   });
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=off`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=off`);
   const banner = page.getByRole("status").filter({ hasText: "AI가 장면을 나누고 있어요" });
   await expect(banner).toContainText("장면 이름 붙이는 중 · 3 / 6");
   await expect(banner).toContainText("비슷한 사진 묶는 중 · 30 / 90장");
@@ -721,7 +721,7 @@ test("scenes show before similar-photo grouping finishes", async ({ browser }) =
     if (kind === "similarity") return route.fulfill({ json: { status: "processing", run: RUNNING.similarity } });
     return route.fulfill({ json: { status: "completed", run: { image_count: 2, processed_count: 2, failed_count: 0 } } });
   });
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=off`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=off`);
   const rail = page.getByRole("navigation", { name: "장면" }).first();
   await expect(rail.getByRole("button", { name: /^입장/ })).toBeVisible();
   await expect(rail.getByRole("status")).toHaveText("비슷한 사진 묶는 중 · 30 / 90장");
@@ -748,7 +748,7 @@ test("a step that fails to start is named, and runs that finish before the first
     }
     return route.fulfill({ json: started && kind !== "quality" ? { status: "completed", run: { image_count: 0, processed_count: 0, failed_count: 0 } } : { status: null } });
   });
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=off`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=off`);
   await page.getByRole("button", { name: "AI로 장면 정리" }).click();
   await page.getByRole("button", { name: "정리 시작" }).click();
   await expect(page.getByRole("dialog", { name: "AI로 사진 정리" }).getByRole("alert")).toContainText("흔들림·눈 감음 확인을(를) 시작하지 못했어요. 나머지는 진행 중이에요.");
@@ -762,7 +762,7 @@ test("detail: clicking the photo shows it alone, and it stays while moving; Esc 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
   const dialog = page.getByRole("dialog", { name: /상세 보기/ });
   await expect(dialog.getByRole("button", { name: "최종 선택" })).toBeVisible();
@@ -789,7 +789,7 @@ test("mobile: swiping goes through the similar photos first, then to the next st
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.locator('.gl-photo-card[data-photo-id="p8"] .gl-card-media').click();
   await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toBeVisible();
   const cdp = await context.newCDPSession(page);
@@ -819,7 +819,7 @@ test("detail keeps keyboard focus inside, and the photo-only view comes back by 
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/app/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
   const dialog = page.getByRole("dialog", { name: /상세 보기/ });
   await expect(dialog).toBeFocused();

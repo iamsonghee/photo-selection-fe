@@ -5,6 +5,8 @@ const NOINDEX_SOURCES = [
   "/c/:path*",
   "/g/:path*",
   "/app/:path*",
+  "/studio/:path*",
+  "/select/:path*",
   "/photographer/:path*",
   "/customer-select/:path*",
   "/admin/:path*",

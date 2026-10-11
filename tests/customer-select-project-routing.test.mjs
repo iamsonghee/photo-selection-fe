@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { customerProjectAction, customerProjectDestination, customerProjectSent, customerProjectStatus, filterCustomerProjects, selectionDeadlineBadge } from "../src/app/app/select/_lib/project-routing.ts";
+import { customerProjectAction, customerProjectDestination, customerProjectSent, customerProjectStatus, filterCustomerProjects, selectionDeadlineBadge } from "../src/app/select/_lib/project-routing.ts";
 
 const project = (overrides = {}) => ({
   id: "project-1",
@@ -25,12 +25,12 @@ const project = (overrides = {}) => ({
 assert.equal(customerProjectSent(project()), false);
 assert.equal(customerProjectSent(project({ exported: true })), true);
 assert.equal(customerProjectSent(project({ delivery_count: 1 })), true);
-assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 }), customerProjectSent(project({ exported: true }))), "/app/select/project-1/review");
-assert.equal(customerProjectDestination(project()), "/app/select/project-1/upload");
-assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/app/select/project-1/select");
-assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 })), "/app/select/project-1/select");
-assert.equal(customerProjectDestination(project({ photo_count: 10 }), true), "/app/select/project-1/review");
-assert.equal(customerProjectDestination(project({ retouch_done: true })), "/app/select/project-1/done");
+assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 }), customerProjectSent(project({ exported: true }))), "/select/project-1/review");
+assert.equal(customerProjectDestination(project()), "/select/project-1/upload");
+assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/select/project-1/select");
+assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 })), "/select/project-1/select");
+assert.equal(customerProjectDestination(project({ photo_count: 10 }), true), "/select/project-1/review");
+assert.equal(customerProjectDestination(project({ retouch_done: true })), "/select/project-1/done");
 assert.equal(customerProjectStatus(project({ retouch_done: true })), "완료");
 assert.equal(customerProjectStatus(project({ exported: true, photo_count: 10 })), "고르는 중");
 assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "고르는 중");
@@ -62,13 +62,13 @@ assert.deepEqual(selectionDeadlineBadge("2026-09-27", "2026-10-02"), { label: "�
 // Selection completion is independent of sharing; current retouches take priority on return.
 const completed = project({ photo_count: 12, selection_completed_at: "2026-10-07T00:00:00Z" });
 assert.equal(customerProjectSent(completed), false);
-assert.equal(customerProjectDestination(completed), "/app/select/project-1/review");
+assert.equal(customerProjectDestination(completed), "/select/project-1/review");
 assert.equal(customerProjectStatus(completed, 12), "셀렉 완료");
 assert.equal(customerProjectAction(completed, 12), "선택 결과 보기");
 for (const completedAt of [null, completed.selection_completed_at]) {
   const retouched = project({ photo_count: 12, selection_completed_at: completedAt, retouched_count: 2 });
-  assert.equal(customerProjectDestination(retouched), "/app/select/project-1/retouch/compare");
+  assert.equal(customerProjectDestination(retouched), "/select/project-1/retouch/compare");
   assert.equal(customerProjectStatus(retouched, 12), "보정본 2장");
   assert.equal(customerProjectAction(retouched, 12), "보정본 비교하기");
 }
-assert.equal(customerProjectDestination({ ...completed, retouched_count: null }), "/app/select/project-1/review");
+assert.equal(customerProjectDestination({ ...completed, retouched_count: null }), "/select/project-1/review");

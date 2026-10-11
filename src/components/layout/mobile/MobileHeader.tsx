@@ -88,7 +88,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
     return () => window.removeEventListener(PHOTOGRAPHER_MOBILE_PROJECT_CONTEXT_EVENT, sync);
   }, [pathname]);
 
-  const assetProjectBase = pathname.match(/^(\/app\/studio\/projects\/[^/]+)\/(?:assets|upload|workflow|results)(?:\/|$)/)?.[1];
+  const assetProjectBase = pathname.match(/^(\/studio\/projects\/[^/]+)\/(?:assets|upload|workflow|results)(?:\/|$)/)?.[1];
   const compactProjectHeader = Boolean(projectContext) && (Boolean(assetProjectBase) || compact || assetImmersive);
   const visuallyCompact = compact || assetImmersive;
 
@@ -101,7 +101,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
       data-project-context-visible={compactProjectHeader ? "true" : "false"}
       className={`${light ? lightThemeStyles.lightTheme : ""} photographer-mobile-header ${visuallyCompact ? "is-compact" : ""} ${assetImmersive ? "is-asset-immersive" : ""} fixed left-0 right-0 top-0 z-50 box-border flex items-center justify-between ${assetProjectBase ? "gap-1 px-2" : "gap-3 px-5"} border-b-0 bg-background/95 backdrop-blur-md md:hidden`}
     >
-      <Link href="/app/studio/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
+      <Link href="/studio/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
         <div className={`flex items-center justify-center bg-[#ff4d00] font-extrabold text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 rounded-[6px] text-xs" : "h-[26px] w-[26px] rounded-[7px] text-[13px]"}`}>
           A
         </div>
@@ -121,7 +121,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
 
       {projectContext ? (
         <Link
-          href={assetProjectBase ?? "/app/studio/projects"}
+          href={assetProjectBase ?? "/studio/projects"}
           data-mobile-project-header-context
           aria-label={`${projectContext.projectName} 프로젝트 상세로 이동`}
           aria-hidden={!compactProjectHeader}
@@ -150,12 +150,12 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
           </span>
         </summary>
         <div className="absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-xl border border-border-subtle bg-surface text-foreground">
-          <Link href="/app/studio/settings" onClick={() => { if (accountMenu.current) accountMenu.current.open = false; }} className="flex min-h-11 items-center gap-2 px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
+          <Link href="/studio/settings" onClick={() => { if (accountMenu.current) accountMenu.current.open = false; }} className="flex min-h-11 items-center gap-2 px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
             <Settings size={18} /> 설정
           </Link>
           {/* 전체 페이지 이동으로 업로드 중 beforeunload 보호를 유지한다. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/app/select" className="flex min-h-11 items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
+          <a href="/select/projects" className="flex min-h-11 items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
             <ArrowLeftRight size={18} /> 내 사진 셀렉으로 이동
           </a>
         </div>

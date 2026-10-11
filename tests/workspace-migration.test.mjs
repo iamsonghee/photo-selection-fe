@@ -9,17 +9,20 @@ const run = (path, method = "GET") => middleware(new NextRequest(origin + path, 
 
 for (const method of ["GET", "POST"]) {
   for (const [oldPath, newPath] of [
-    ["/photographer/projects/id/upload?resume=1", "/app/studio/projects/id/upload?resume=1"],
-    ["/customer-select/id/select?share_token=legacy&photo=2", "/app/select/id/select?share_token=legacy&photo=2"],
-    ["/customer-select/guest/id/download", "/app/select/guest/id/download"],
-    ["/customer-select/login?next=%2Fcustomer-select%2Fnew", "/app/select/login?next=%2Fcustomer-select%2Fnew"],
+    ["/app/studio/projects/id/upload?resume=1", "/studio/projects/id/upload?resume=1"],
+    ["/app/select?filter=all", "/select/projects?filter=all"],
+    ["/app/select/id/select?share_token=legacy", "/select/id/select?share_token=legacy"],
+    ["/photographer/projects/id/upload?resume=1", "/studio/projects/id/upload?resume=1"],
+    ["/customer-select/id/select?share_token=legacy&photo=2", "/select/id/select?share_token=legacy&photo=2"],
+    ["/customer-select/guest/id/download", "/select/guest/id/download"],
+    ["/customer-select/login?next=%2Fcustomer-select%2Fnew", "/select/login?next=%2Fcustomer-select%2Fnew"],
   ]) {
     const response = await run(oldPath, method);
     assert.equal(response.status, 307);
     assert.equal(response.headers.get("location"), origin + newPath);
   }
 }
-for (const path of ["/app/studio/projects?status=active", "/app/select", "/app/select/new/photos", "/app/select/guest/id/download", "/app/select/id/settings"]) {
+for (const path of ["/studio/projects?status=active", "/select/projects", "/select/new/photos", "/select/guest/id/download", "/select/id/settings"]) {
   const response = await run(path);
   const destination = new URL(response.headers.get("location"));
   assert.equal(destination.pathname, "/login");
@@ -27,10 +30,10 @@ for (const path of ["/app/studio/projects?status=active", "/app/select", "/app/s
   assert.equal(response.cookies.get("migration_refresh")?.value, "ok");
 }
 globalThis.__migrationUser = { id: "owner" };
-assert.equal((await run("/app/studio/projects")).headers.get("location"), null);
-assert.equal((await run("/app/select")).cookies.get("migration_refresh")?.value, "ok");
+assert.equal((await run("/studio/projects")).headers.get("location"), null);
+assert.equal((await run("/select/projects")).cookies.get("migration_refresh")?.value, "ok");
 globalThis.__migrationUser = null;
-for (const path of ["/app/select/id/select", "/customer-select/result/id", "/customer-select/result/id/access", "/g/token", "/api/customer-select/projects", "/api/photographer/quota"]) {
+for (const path of ["/studio", "/select", "/select/id/select", "/customer-select/result/id", "/customer-select/result/id/access", "/g/token", "/api/customer-select/projects", "/api/photographer/quota"]) {
   assert.equal((await run(path)).headers.get("location"), null);
 }
 // Legacy share links redirect first, then exchange their token on the new address.
@@ -40,12 +43,12 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-only";
 const originalFetch = globalThis.fetch;
 try {
   globalThis.fetch = async () => new Response(JSON.stringify([{ id }]));
-  const response = await run(`/app/select/${id}/select?share_token=legacy&photo=2`);
-  assert.equal(response.headers.get("location"), `${origin}/app/select/${id}/select?photo=2&invite=1`);
+  const response = await run(`/select/${id}/select?share_token=legacy&photo=2`);
+  assert.equal(response.headers.get("location"), `${origin}/select/${id}/select?photo=2&invite=1`);
   assert.equal(response.cookies.get(`customer_share_${id}`)?.value, "legacy");
   assert.equal(response.cookies.get(`customer_share_${id}`)?.path, "/");
   globalThis.fetch = async () => new Response("[]");
-  const invalid = await run(`/app/select/${id}/select?share_token=invalid`);
+  const invalid = await run(`/select/${id}/select?share_token=invalid`);
   assert.equal(invalid.cookies.get(`customer_share_${id}`), undefined);
 } finally {
   globalThis.fetch = originalFetch;

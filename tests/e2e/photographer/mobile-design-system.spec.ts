@@ -51,7 +51,7 @@ test("small mobile upload dialog has a usable scroll area and can be reopened", 
   await page.setViewportSize({ width: 320, height: 568 });
   const project = await createEditingProject(page);
   try {
-    await page.goto(`/app/studio/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/retouched`);
     const dialog = page.getByRole("dialog", { name: "보정본 업로드", exact: true });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("추가로 업로드할 파일을 선택해주세요.", { exact: true })).toBeHidden();
@@ -116,7 +116,7 @@ test("failed project query offers retry instead of empty onboarding", async ({ p
   await page.route("**/rest/v1/projects?**", (route) => fail
     ? route.fulfill({ status: 500, json: { message: "test failure" } })
     : route.continue());
-  await page.goto("/app/studio/projects");
+  await page.goto("/studio/projects");
   await expect(page.getByRole("alert").filter({ hasText: "프로젝트를 불러오지 못했습니다" })).toBeVisible();
   fail = false;
   await page.getByRole("button", { name: "다시 시도" }).tap();
@@ -126,7 +126,7 @@ test("failed project query offers retry instead of empty onboarding", async ({ p
 
 test("creation preserves original permission, pending width and visible failure; validation focuses input", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto("/app/studio/projects/new");
+  await page.goto("/studio/projects/new");
   const submit = page.getByRole("button", { name: "원본 올리기", exact: true });
   await submit.tap();
   const name = page.getByLabel("프로젝트명", { exact: false });
@@ -160,7 +160,7 @@ test("creation preserves original permission, pending width and visible failure;
 });
 
 test("mobile settings keeps destructive confirmation focus behavior", async ({ page }) => {
-  await page.goto("/app/studio/settings");
+  await page.goto("/studio/settings");
   const summary = page.locator("[data-settings-profile-summary]");
   await expect(summary).toBeVisible();
   await expect(summary.getByRole("link", { name: /사용 매뉴얼/ })).toHaveCount(0);
@@ -183,7 +183,7 @@ test("mobile settings keeps destructive confirmation focus behavior", async ({ p
 test("mobile asset sheet and photo viewer trap focus, restore background and survive viewport changes", async ({ page }) => {
   const project = await createFullProject(page);
   try {
-    await page.goto(`/app/studio/projects/${project.projectId}/assets/original`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/original`);
     await page.getByRole("button", { name: "검색 및 정렬 설정" }).filter({ visible: true }).tap();
     const sheet = page.locator("[data-mobile-asset-sheet]");
     await expect(sheet).toBeVisible();

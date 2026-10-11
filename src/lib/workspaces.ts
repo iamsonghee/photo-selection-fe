@@ -1,6 +1,6 @@
 export const WORKSPACES = {
-  studio: { label: "작가·스튜디오", path: "/app/studio/dashboard" },
-  select: { label: "내 사진 셀렉", path: "/app/select" },
+  studio: { label: "작가·스튜디오", path: "/studio/dashboard" },
+  select: { label: "내 사진 셀렉", path: "/select/projects" },
 } as const;
 
 export type Workspace = keyof typeof WORKSPACES;
@@ -14,9 +14,10 @@ export function lastWorkspacePath(value: unknown): string | null {
 
 /** 외부 결과 공유는 기존 주소·인증 쿠키 경로를 유지한다. */
 export function migrateWorkspacePath(pathname: string): string {
-  if (/^\/photographer(?:\/|$)/.test(pathname)) return pathname.replace("/photographer", "/app/studio");
-  if (/^\/customer-select(?:\/|$)/.test(pathname) && !/^\/customer-select\/result(?:\/|$)/.test(pathname)) {
-    return pathname.replace("/customer-select", "/app/select");
-  }
+  const studio = pathname.match(/^\/(?:photographer|app\/studio)(\/.*)?$/);
+  if (studio) return !studio[1] || studio[1] === "/" ? "/studio/dashboard" : `/studio${studio[1]}`;
+  if (/^\/customer-select\/result(?:\/|$)/.test(pathname)) return pathname;
+  const select = pathname.match(/^\/(?:customer-select|app\/select)(\/.*)?$/);
+  if (select) return !select[1] || select[1] === "/" ? "/select/projects" : `/select${select[1]}`;
   return pathname;
 }

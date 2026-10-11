@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AuthModal } from "@/components/AuthModal";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { clearPostLoginRedirect } from "@/lib/post-login-redirect";
-import "@/app/app/select/_lib/customer-select-auth.css";
+import "@/app/select/_lib/customer-select-auth.css";
 
 export function LoginPanel({ next, failed }: { next: string; failed: boolean }) {
   const [open, setOpen] = useState(!failed);
