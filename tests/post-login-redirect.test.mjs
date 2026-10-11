@@ -3,6 +3,7 @@ import {
   CUSTOMER_SELECT_POST_LOGIN_PATH,
   DEFAULT_POST_LOGIN_PATH,
   isCustomerSelectLogin,
+  isStudioLogin,
   resolvePostLoginPath,
 } from "../src/lib/post-login-redirect.ts";
 
@@ -12,7 +13,7 @@ assert.equal(resolvePostLoginPath(undefined), DEFAULT_POST_LOGIN_PATH);
 assert.equal(resolvePostLoginPath(""), DEFAULT_POST_LOGIN_PATH);
 assert.equal(resolvePostLoginPath("/customer-select"), "/customer-select");
 assert.equal(resolvePostLoginPath("/beta/apply"), "/beta/apply");
-assert.equal(resolvePostLoginPath("/photographer/dashboard"), DEFAULT_POST_LOGIN_PATH);
+assert.equal(resolvePostLoginPath("/photographer/dashboard"), "/photographer/dashboard");
 // setPostLoginRedirect()는 encodeURIComponent로 저장한다 — 인코딩된 값도 같은 경로로 푼다.
 assert.equal(resolvePostLoginPath(encodeURIComponent("/customer-select")), "/customer-select");
 assert.equal(resolvePostLoginPath("%2Fcustomer-select%2Fnew"), "/customer-select/new");
@@ -37,3 +38,12 @@ assert.equal(isCustomerSelectLogin("/beta/apply"), false);
 assert.equal(isCustomerSelectLogin(DEFAULT_POST_LOGIN_PATH), false);
 
 console.log("post-login-redirect: ok");
+
+for (const path of ["/login", "/login?next=/login", "/auth/callback", "/api/auth/test-login", "/customer-select/login", "/a/../login", "/%5cevil.example"]) {
+  assert.equal(resolvePostLoginPath(path), DEFAULT_POST_LOGIN_PATH);
+}
+assert.equal(resolvePostLoginPath("/c/token/review?photo=1"), "/c/token/review?photo=1");
+assert.equal(isStudioLogin("/workspaces"), false);
+assert.equal(isStudioLogin("/customer-select"), false);
+assert.equal(isStudioLogin("/photographer/dashboard?tab=all"), true);
+assert.equal(isStudioLogin("/beta/apply"), true);

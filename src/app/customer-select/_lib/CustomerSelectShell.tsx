@@ -1,3 +1,4 @@
+import { WorkspaceMemory } from "@/components/WorkspaceMemory";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
@@ -25,6 +26,7 @@ export function CustomerSelectShell({ children, navigation = false, viewportLock
           </div> : null}
         </div>
       </header>
+      {account && <WorkspaceMemory workspace="select" />}
       {children}
     </div>
   );

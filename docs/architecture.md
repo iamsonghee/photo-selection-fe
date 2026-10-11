@@ -1,5 +1,17 @@
 # 시스템 아키텍처
 
+## 공통 진입 구조 (2026-10-11, feat/landing-entry-flow)
+
+- 임시 소개: `/`, `/studio`, `/select` → 공통 `/login` → 기존 작업 공간(`/photographer/dashboard`, `/customer-select`). 일반 복귀 `/workspaces`는 검증된 현재 사용자의 `user_metadata.acut_last_workspace`만 읽어 공간을 결정한다. 기억 값이 없거나 잘못됐으면 선택 화면을 표시한다.
+- `src/lib/workspaces.ts`는 두 공간의 명칭·착지 경로와 기억 키를 정의한다. `WorkspaceMemory`는 인증된 공간 진입 시 기존 Supabase `auth.updateUser`로 해당 설정만 갱신한다. 새 DB 테이블·Next API·결제 의존성은 추가하지 않는다. 사용자 메타데이터는 사용자 수정 가능하므로 프로젝트 권한·과금에 절대로 사용하지 않는다.
+- OAuth 목적지는 기존 `acut_post_login_redirect` 쿠키(10분)를 재사용한다. 기본값은 `/workspaces`이며 쿠키가 없을 때 쿼리 `next`를 보조로 사용한다. 외부 주소·제어 문자·로그인/API/콜백 복귀 경로를 거절한다. 인증 실패/취소도 쿠키를 지우고 원래 목적지를 지정한 `/login?error=oauth`로 재시도한다.
+- 기존 공통 `photographers` 행 생성·베타 초대 처리·신청 매칭은 유지한다. 작가 이용 지표는 명시적인 `/photographer/**`·`/beta/apply` 로그인에만 기록하고 일반 로그인·개인 셀렉·공유 링크를 작가 지표에 섞지 않는다. 일반 로그인 후 스튜디오를 선택하는 동작 자체는 OAuth 지표 이벤트를 새로 만들지 않는다.
+- middleware는 작가 영역과 기존 개인 소유자 전용 진입점에서 `auth.getUser()`로 확인하며 세션 갱신 쿠키를 전달한다. 미인증이면 원래 경로와 쿼리를 `/login?next=...`에 보존한다. 프로젝트 소유권·PIN·공유 토큰 검사는 각 기존 서버 경계에 남는다.
+- 저장 실패는 계정별 `acut_workspace_save_failed_<auth user id>` 쿠키(30일, SameSite=Lax, HTTPS에서 Secure)로 같은 브라우저에 기억한다. `/workspaces`는 이 경우 서비스 선택을 보여준다. 실패 쿠키도 이동 힌트일 뿐 권한이 아니다.
+- 기존 스튜디오 `getPolicyForPhotographer` 기반 프로젝트·사진 한도와 개인 `customerPhotoLimit`/BE `customer_upload`의 계정별 한도는 변경하지 않았다. 정식 공간별 상품·결제·차감 모델은 아직 구현하지 않았다.
+- `/login`, `/workspaces`는 X-Robots-Tag 및 metadata로 noindex 처리한다. 임시 `/studio`, `/select`도 metadata noindex이며 sitemap에 추가하지 않는다. 홈의 기존 인증 메타 태그는 보존하고 표시하지 않는 FAQ 구조화 데이터는 홈에서 제외했다.
+
+
 ## 초대 고객 셀렉 협업 (2026-10-10)
 
 2026-10-11 별점 기본값 보정: 실제 `selections.rating`의 미평가 값 0을 별점 사용 이력으로 세지 않는다. 백필과 트리거는 1~5점만 인정하고, 트리거는 값이 실제로 바뀐 경우에만 표시 플래그를 켠다. 이미 최초 마이그레이션을 적용했다면 `20261011000000_ignore_unrated_selection_defaults.sql`을 추가 적용한다. 이 보정은 요청받은 프로젝트의 표시 플래그만 되돌리며 기존 별점·찜·메모·선택은 보존한다. 다른 프로젝트의 과거 별점 삭제 여부는 현재 0점만으로 판별할 수 없으므로 플래그를 일괄 초기화하지 않는다.
@@ -392,7 +404,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 가입(`/photographer/dashboard` 등 기존 서비스 이용)과는 별개의 개념이다 — 신청 화면에 진입하는 것 자체는 가입의 필수 관문이 아니며, 승인/거절과 무관하게 누구나 기존처럼 즉시 가입해 "일반(Trial)" 등급으로 서비스를 쓸 수 있다(§6.3의 베타 등급 시스템과는 목적이 다른 별도 테이블, 상세는 아래 §6.3 안 "베타 신청서" 항목 참고). 다만 **"베타 신청서 제출" 그 자체는 2026-07-27부터 로그인이 선행 조건**이다 — 이메일을 신청자가 직접 입력하거나 관리자가 나중에 수동으로 매칭해야 하는 번거로움·오류 위험을 없애기 위해서다.
 
-**OAuth 로그인 후 원래 페이지로 복귀시키는 방법(2026-07-27 추가, 2026-10-06 쿠키 방식으로 교체, `src/lib/post-login-redirect.ts`)**: `/beta/apply`나 `/customer-select/login`에서 로그인하면 완료 후 그 화면으로 돌아와야 하는데, Supabase의 `redirectTo` URL에 `?next=...` 쿼리스트링을 붙이는 방식은 **Supabase 프로젝트의 Redirect URLs 허용 목록과 정확히 일치해야 하므로 위험하다**(로컬 테스트에서 실제로 OAuth 콜백이 거부되고 에러 쿼리와 함께 `/`로 리다이렉트되는 문제가 발생함). 대신 로그인 시작 직전에 돌아갈 경로를 쿠키 `acut_post_login_redirect`(Path=/, Max-Age 10분, SameSite=Lax, https에서만 Secure)에 적어 두고(`setPostLoginRedirect()`), `redirectTo` URL 자체는 항상 기존과 동일하게 유지한다. `/auth/callback`이 그 쿠키를 읽어(`resolvePostLoginPath()` — 같은 출처의 절대 경로만 통과, `//host`·제어 문자·512자 초과는 기본 목적지 `/photographer/dashboard`로. 쿼리 `next`는 쿠키가 없을 때의 보조 경로이며 같은 검증을 거친다) 세션 교환 뒤 바로 그 경로로 리다이렉트하고 쿠키를 지운다. 쿠키는 Supabase의 PKCE code verifier 쿠키와 같은 경로(최상위 이동)로 콜백에 도착하므로 로그인이 되는 환경이면 늘 함께 온다. `AuthModal`은 `redirectPath?: string` prop을 받으며, 생략 시 기본 목적지로 간다(이전 시도의 쿠키는 비운다). **셀프 고객 로그인 분기**: 복귀 경로가 `/customer-select`(하위 포함)이면 콜백은 `photographers` 행은 그대로 만들되(한 계정으로 작가·셀프 고객 화면을 모두 쓸 수 있고 작가 화면이 행을 기대한다) `signup_completed`/`first_login` 지표는 기록하지 않는다(`isCustomerSelectLogin()`). 이력: 2026-07-27~10-06에는 sessionStorage에 남겨 두고 로그인을 항상 `/photographer/dashboard`로 완료한 뒤 그 페이지의 `useEffect`가 `consumePostLoginRedirect()`로 한 번 더 이동시켰다(대시보드 깜빡임 방지용 `peekPostLoginRedirect()` 포함). 셀프 고객이 로그인마다 작가 대시보드를 거치고 sessionStorage가 막힌 환경에서는 거기 남는 문제, 콜백이 로그인 출처를 몰라 셀프 고객에게도 작가 지표가 쌓이는 문제로 교체했다.
+**OAuth 로그인 후 복귀(2026-10-11)**: `redirectTo`는 쿼리 없는 `/auth/callback`을 유지하고 목적지는 `acut_post_login_redirect` 쿠키(10분, Path=/, SameSite=Lax, HTTPS에서 Secure)에 저장한다. `AuthModal`은 명시적 `redirectPath` 또는 기본 `/workspaces`를 매 로그인 시 덮어쓴다. 콜백은 쿠키 우선, 없으면 쿼리 `next`를 검사한다. 외부 주소·제어 문자·512자 초과·로그인/API/콜백 목적지는 `/workspaces`로 보낸다. 성공과 실패 모두 목적지 쿠키를 지우며 실패는 같은 목적지의 공통 로그인에서 재시도한다. `photographers` 계정 행은 기존대로 생성하되 `isStudioLogin()`으로 명시적 스튜디오/베타 로그인의 지표만 기록한다. 일반 로그인·개인 셀렉·초대는 작가 가입/첫 로그인 지표에서 제외한다. `/workspaces`는 계정의 마지막 공간을 확인하거나 공간 선택을 제공한다. Supabase 허용 URL 설정은 이번 변경에서 수정하지 않았다. 과거 sessionStorage → 작가 대시보드 경유 방식은 현재 사용하지 않는다.
 
 ### 6.1b 베타 설문(별도 라우트 아님, `/photographer/dashboard`에 조건부 임베드)
 

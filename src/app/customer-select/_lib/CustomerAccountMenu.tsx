@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { ArrowLeftRight, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export type CustomerAccountSummary = {
@@ -15,7 +15,7 @@ export type CustomerAccountSummary = {
 export function CustomerAccountMenu({ account }: { account: CustomerAccountSummary }) {
   async function signOut() {
     await createClient().auth.signOut();
-    window.location.assign("/customer-select/login");
+    window.location.assign("/select");
   }
 
   const initial = account.displayName.trim().charAt(0).toLocaleUpperCase("ko") || "A";
@@ -39,10 +39,11 @@ export function CustomerAccountMenu({ account }: { account: CustomerAccountSumma
       </div>
       <div className="border-t border-border-subtle px-4 py-3">
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-muted-foreground">전체 사진 이용량</span>
+          <span className="text-muted-foreground">내 사진 셀렉 이용량</span>
           <strong className="text-foreground">{account.photoCount.toLocaleString()} / {account.photoLimit === null ? "무제한" : `${account.photoLimit.toLocaleString()}장`}</strong>
         </div>
       </div>
+      <a href="/photographer/dashboard" className="flex min-h-11 items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent"><ArrowLeftRight size={16} />스튜디오로 이동</a>
       <button type="button" onClick={signOut} className="flex min-h-11 w-full items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold text-muted-foreground hover:bg-surface-raised hover:text-foreground"><LogOut size={16} />로그아웃</button>
     </div>
   </details>;

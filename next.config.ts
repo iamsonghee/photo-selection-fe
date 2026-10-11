@@ -8,6 +8,8 @@ const NOINDEX_SOURCES = [
   "/customer-select/:path*",
   "/admin/:path*",
   "/auth/:path*",
+  "/login",
+  "/workspaces",
   "/api/:path*",
   "/beta/apply/complete",
 ];

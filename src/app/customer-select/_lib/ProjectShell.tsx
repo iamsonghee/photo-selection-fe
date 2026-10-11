@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceMemory } from "@/components/WorkspaceMemory";
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { Plus, Users } from "lucide-react";
@@ -102,6 +103,7 @@ export function ProjectShellProvider({ children }: { children: ReactNode }) {
             </div>
           </header>
         )}
+        {hydrated && isOwner && !accessDenied && <WorkspaceMemory workspace="select" />}
         {children}
         {joining && <ParticipantJoinScreen registrationOnly onCancel={cancelJoin} />}
         {inviteOpen && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setInviteOpen(false)} />}

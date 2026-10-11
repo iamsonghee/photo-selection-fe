@@ -1,15 +1,7 @@
 import { redirect } from "next/navigation";
-import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
-import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
-import { CustomerSelectLoginModal } from "../_lib/CustomerSelectLoginModal";
+import { resolvePostLoginPath } from "@/lib/post-login-redirect";
 
-export default async function CustomerSelectLoginPage() {
-  if (await getCurrentCustomerAuthId()) redirect("/customer-select");
-
-  return (
-    <CustomerSelectShell navigation={false}>
-      <main className="min-h-[calc(100dvh-56px)]" />
-      <CustomerSelectLoginModal />
-    </CustomerSelectShell>
-  );
+export default async function CustomerSelectLoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const { next } = await searchParams;
+  redirect(`/login?next=${encodeURIComponent(resolvePostLoginPath(typeof next === "string" ? next : "/customer-select"))}`);
 }

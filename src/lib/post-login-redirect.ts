@@ -15,7 +15,7 @@
 export const POST_LOGIN_REDIRECT_COOKIE = "acut_post_login_redirect";
 
 /** 복귀 경로가 없거나 신뢰할 수 없을 때 도착하는 기본 경로. */
-export const DEFAULT_POST_LOGIN_PATH = "/photographer/dashboard";
+export const DEFAULT_POST_LOGIN_PATH = "/workspaces";
 
 /** 셀프 고객 서비스의 로그인 착지. 이 경로로 시작한 로그인은 작가 가입·첫 로그인 지표를 남기지 않는다. */
 export const CUSTOMER_SELECT_POST_LOGIN_PATH = "/customer-select";
@@ -37,8 +37,10 @@ export function resolvePostLoginPath(raw: string | null | undefined): string {
   }
   if (path.length > 512) return DEFAULT_POST_LOGIN_PATH;
   // `//host`·`/\host`는 브라우저가 다른 출처로 해석한다. 공백·제어 문자는 헤더 주입 여지가 있다.
-  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return DEFAULT_POST_LOGIN_PATH;
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return DEFAULT_POST_LOGIN_PATH;
   if (/[\s\u0000-\u001f\u007f]/.test(path)) return DEFAULT_POST_LOGIN_PATH;
+  const pathname = new URL(path, "https://acut.invalid").pathname;
+  if (/^\/(?:api|auth|login)(?:\/|$)/.test(pathname) || pathname === "/customer-select/login") return DEFAULT_POST_LOGIN_PATH;
   return path;
 }
 
@@ -62,4 +64,10 @@ function writePostLoginCookie(value: string, maxAge: number): void {
   // http://localhost에서는 Secure 쿠키가 무시되므로 https일 때만 붙인다(supabase/client.ts와 같은 규칙).
   const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${POST_LOGIN_REDIRECT_COOKIE}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+}
+
+/** 작가 이용 지표는 명시적인 스튜디오/베타 진입에만 기록한다. */
+export function isStudioLogin(path: string): boolean {
+  const pathname = new URL(path, "https://acut.invalid").pathname;
+  return pathname === "/photographer" || pathname.startsWith("/photographer/") || pathname === "/beta/apply";
 }

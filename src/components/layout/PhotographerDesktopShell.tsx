@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceMemory } from "@/components/WorkspaceMemory";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -66,6 +67,7 @@ export function PhotographerDesktopShell({
 
   return (
     <>
+      <WorkspaceMemory workspace="studio" />
       {/* z-20: main(z-10)보다 위에 두어 사이드바 밖으로 나온 토글이 가려지지 않게 함 */}
       <div className="relative z-20 hidden md:block">
         <Sidebar collapsed={collapsed} sidebarToggle={{ onToggle: toggleSidebar }} />

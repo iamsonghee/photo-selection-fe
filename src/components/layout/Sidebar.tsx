@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -270,7 +270,7 @@ export function Sidebar({
                     className="mt-0.5 flex items-center gap-1 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
                     style={{ fontFamily: "inherit" }}
                   >
-                    {tierLabel && <span>{tierLabel}</span>}
+                    {tierLabel && <span>스튜디오 · {tierLabel}</span>}
                     {tierLabel && profileIncomplete && <span aria-hidden>·</span>}
                     {profileIncomplete && <span style={{ color: "var(--accent)", fontWeight: 600 }}>프로필 미완성</span>}
                   </p>
@@ -303,6 +303,11 @@ export function Sidebar({
             >
               <Settings size={18} strokeWidth={2} /> 설정
             </Link>
+            {/* 전체 페이지 이동으로 업로드 중 beforeunload 보호를 유지한다. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a href="/customer-select" role="menuitem" className={styles.profileMenuItem}>
+              <ArrowLeftRight size={18} /> 내 사진 셀렉으로 이동
+            </a>
             <FeedbackButton
               triggerRole="menuitem"
               triggerClassName={styles.profileMenuItem}

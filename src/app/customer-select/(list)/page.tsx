@@ -92,7 +92,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           <div>
             <p className="text-[14px] font-semibold text-muted-foreground">{displayName}님, 안녕하세요</p>
             <h1 className="mt-1 flex items-baseline gap-2.5 whitespace-nowrap text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">
-              내 프로젝트
+              내 사진 셀렉
               <span className="text-[16px] font-semibold tracking-normal text-subtle-foreground md:text-[18px]">{totalCount.toLocaleString()}</span>
             </h1>
           </div>
@@ -100,11 +100,11 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           {!error ? (
             <div className="flex flex-wrap items-center gap-3 md:justify-end">
             {/* 태블릿 폭(768~1023px)에서는 이용량·새 프로젝트가 한 줄에 다 안 들어가 제목을 밀어 줄바꿈시키므로 오른쪽 묶음이 줄바꿈한다. */}
-            <section className="flex flex-1 items-center gap-3 rounded-lg border border-border-subtle bg-surface py-2 pl-4 pr-3 md:min-w-[240px] lg:min-w-[320px]" aria-label="전체 사진 이용량">
+            <section className="flex flex-1 items-center gap-3 rounded-lg border border-border-subtle bg-surface py-2 pl-4 pr-3 md:min-w-[240px] lg:min-w-[320px]" aria-label="내 사진 셀렉 사진 이용량">
               <p className="shrink-0 text-[13px] font-semibold text-muted-foreground">사진 <strong className="font-bold text-foreground">{accountPhotoCount.toLocaleString()}</strong> / {photoLimit === null ? "무제한" : `${photoLimit.toLocaleString()}장`}</p>
               {photoLimit !== null && remainingPhotoCount !== null ? (
                 <>
-                  <div className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={photoLimit} aria-valuenow={Math.min(accountPhotoCount, photoLimit)}>
+                  <div className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="내 사진 셀렉 사진 이용량" aria-valuemin={0} aria-valuemax={photoLimit} aria-valuenow={Math.min(accountPhotoCount, photoLimit)}>
                     <div className={`h-full min-w-1.5 rounded-full ${accountPhotoCount >= photoLimit ? "bg-danger" : accountPhotoCount / photoLimit >= 0.8 ? "bg-accent" : "bg-foreground/60"}`} style={{ width: `${Math.min(100, accountPhotoCount / photoLimit * 100)}%` }} />
                   </div>
                   <p className={`shrink-0 text-[12px] font-bold ${accountPhotoCount >= photoLimit ? "text-danger" : accountPhotoCount / photoLimit >= 0.8 ? "text-accent" : "text-muted-foreground"}`}>{remainingPhotoCount.toLocaleString()}장 남음</p>

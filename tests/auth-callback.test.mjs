@@ -96,13 +96,13 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
   assert.deepEqual(events(state), []);
 }
 
-// 3) 작가 로그인(쿠키 없음, 신규 계정): 대시보드로, 가입·첫 로그인 지표 모두 기록
+// 3) 공통 로그인: 공간 선택으로, 작가 지표 없음
 {
   const state = setup();
   const r = await callback({});
-  assert.equal(r.location, `${ORIGIN}/photographer/dashboard`);
+  assert.equal(r.location, `${ORIGIN}/workspaces`);
   assert.equal(photographerInserts(state).length, 1);
-  assert.deepEqual(events(state), ["signup_completed", "first_login"]);
+  assert.deepEqual(events(state), []);
 }
 
 // 4) 작가 로그인(기존 계정, /beta/apply에서 시작): 그곳으로 바로, first_login만 시도
@@ -117,9 +117,9 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
 // 5) 신뢰할 수 없는 복귀 경로(다른 출처)는 대시보드로 — 쿠키·쿼리 모두
 {
   setup({ existingPhotographer: { id: "p-1" } });
-  assert.equal((await callback({ cookie: "https://evil.example/" })).location, `${ORIGIN}/photographer/dashboard`);
-  assert.equal((await callback({ cookie: "//evil.example/" })).location, `${ORIGIN}/photographer/dashboard`);
-  assert.equal((await callback({ query: "https://evil.example/" })).location, `${ORIGIN}/photographer/dashboard`);
+  assert.equal((await callback({ cookie: "https://evil.example/" })).location, `${ORIGIN}/workspaces`);
+  assert.equal((await callback({ cookie: "//evil.example/" })).location, `${ORIGIN}/workspaces`);
+  assert.equal((await callback({ query: "https://evil.example/" })).location, `${ORIGIN}/workspaces`);
 }
 
 // 6) 쿠키가 없으면 쿼리 next를 보조로 쓴다(같은 출처 경로만)
@@ -133,11 +133,28 @@ const photographerInserts = (state) => state.inserts.filter((i) => i.table === "
 // 7) code 없음 → 홈, 세션 교환 실패 → 오류 쿼리와 함께 홈. DB는 건드리지 않음
 {
   const state = setup();
-  assert.equal((await callback({ code: null, cookie: "/customer-select" })).location, `${ORIGIN}/`);
+  assert.equal(new URL((await callback({ code: null, cookie: "/customer-select" })).location).pathname, "/login");
   const failed = await callback({ code: "bad", cookie: "/customer-select" });
-  assert.equal(new URL(failed.location).pathname, "/");
-  assert.equal(new URL(failed.location).searchParams.get("error"), "bad code");
+  assert.equal(new URL(failed.location).pathname, "/login");
+  assert.equal(new URL(failed.location).searchParams.get("error"), "oauth");
+  assert.equal(new URL(failed.location).searchParams.get("next"), "/customer-select");
+  assert.match(failed.setCookie, /[Mm]ax-[Aa]ge=0/);
   assert.equal(state.inserts.length, 0);
 }
 
 console.log("auth-callback: ok");
+
+// 명시적 스튜디오 진입은 기존 작가 지표를 유지한다.
+{
+  const state = setup();
+  const r = await callback({ cookie: "/photographer/dashboard" });
+  assert.equal(r.location, `${ORIGIN}/photographer/dashboard`);
+  assert.deepEqual(events(state), ["signup_completed", "first_login"]);
+}
+// 초대 링크와 일반 로그인은 작가 이용 지표에 섞지 않는다.
+{
+  const state = setup();
+  const r = await callback({ cookie: "/c/example/review", query: "/photographer/dashboard" });
+  assert.equal(r.location, `${ORIGIN}/c/example/review`);
+  assert.deepEqual(events(state), []);
+}

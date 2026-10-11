@@ -115,6 +115,10 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
         </Link>
       ) : null}
 
+      {/* 전체 페이지 이동으로 업로드 중 beforeunload 보호를 유지한다. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      {!compactProjectHeader && <a href="/customer-select" className="ml-auto inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-accent">내 사진 셀렉으로 이동</a>}
+
       <Link
         href="/photographer/settings"
         aria-label="설정"

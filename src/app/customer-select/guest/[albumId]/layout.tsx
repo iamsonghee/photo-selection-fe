@@ -1,3 +1,4 @@
+import { WorkspaceMemory } from "@/components/WorkspaceMemory";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
@@ -18,6 +19,7 @@ export default async function GuestAlbumLayout({ children, params }: { children:
 
   return (
     <CustomerSelectShell compactTitle={<strong className="block truncate text-[15px] font-bold">{row.name}</strong>}>
+      <WorkspaceMemory workspace="select" />
       <GuestAlbumProvider initialAlbum={toGuestAlbumInfo(row)} media={media} guests={guests} limits={limits}>{children}</GuestAlbumProvider>
     </CustomerSelectShell>
   );

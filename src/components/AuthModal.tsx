@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useOAuthLogin } from "@/hooks/useOAuthLogin";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import {
-  clearPostLoginRedirect,
   DEFAULT_POST_LOGIN_PATH,
   setPostLoginRedirect,
 } from "@/lib/post-login-redirect";
@@ -12,7 +11,7 @@ import {
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** 로그인 완료 후 돌아올 경로. 생략 시 기존과 동일하게 /photographer/dashboard로 이동. */
+  /** 로그인 완료 후 돌아올 경로. 생략 시 마지막 사용 공간 또는 공간 선택으로 이동. */
   redirectPath?: string;
   /** 제목 아래 짧은 안내(선택). 셀프 고객 로그인의 베타 안내처럼 화면별 설명이 필요할 때만 넘긴다. */
   notice?: ReactNode;
@@ -24,6 +23,7 @@ function isKakaoInAppBrowser(): boolean {
 }
 
 export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const { loading, error, login, reset: resetOAuth } = useOAuthLogin();
   const [closing, setClosing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 600);
@@ -68,6 +68,28 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, handleClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
+    function trapFocus(event: KeyboardEvent) {
+      if (event.key !== "Tab" || !dialog) return;
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]'))
+        .filter((item) => item.getClientRects().length > 0);
+      const first = items[0];
+      const last = items.at(-1);
+      if (!first) { event.preventDefault(); dialog.focus(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    }
+    document.addEventListener("keydown", trapFocus);
+    return () => { document.removeEventListener("keydown", trapFocus); previous?.focus(); };
+  }, [isOpen]);
+
   // Body scroll lock
   useEffect(() => {
     if (isOpen) {
@@ -85,12 +107,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
   // 목록과 정확히 일치해야 하므로, "로그인 후 어디로 갈지"는 쿠키에 남겨두고 콜백이 서버에서
   // 읽어 바로 그곳으로 보낸다(post-login-redirect.ts).
   function preparePostLoginRedirect(): void {
-    if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
-      setPostLoginRedirect(redirectPath);
-      return;
-    }
-    // 기본 로그인에서는 취소된 이전 시도의 복귀 경로가 재사용되지 않게 비운다.
-    clearPostLoginRedirect();
+    setPostLoginRedirect(redirectPath ?? DEFAULT_POST_LOGIN_PATH);
   }
 
   const handleGoogleLogin = () => {
@@ -110,7 +127,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
       className={`auth-modal-backdrop${closing ? " auth-modal-closing" : ""}`}
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className={`auth-modal-container${closing && isMobile ? " auth-modal-slide-out" : ""}`}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" tabIndex={-1} className={`auth-modal-container${closing && isMobile ? " auth-modal-slide-out" : ""}`}>
         {/* Corner brackets */}
         <div className="auth-modal-bracket auth-modal-bracket-tl" />
         <div className="auth-modal-bracket auth-modal-bracket-tr" />
@@ -130,7 +147,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
             <button
               type="button"
               className="auth-modal-close-btn"
-              aria-label="Close"
+              aria-label="로그인 닫기"
               onClick={handleClose}
             >
               ×
@@ -148,7 +165,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
               <span className="auth-modal-sys-label">OAUTH_READY</span>
             </div>
 
-            <h1 className="auth-modal-headline">3초면 시작할 수 있어요</h1>
+            <h2 id="auth-modal-title" className="auth-modal-headline">로그인하고 시작하세요</h2>
             {notice ? <div className="auth-modal-notice">{notice}</div> : null}
 
             {error && (
