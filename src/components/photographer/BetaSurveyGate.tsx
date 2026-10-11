@@ -8,7 +8,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import type { SurveyType } from "@/lib/beta-survey";
 
 /**
- * /photographer/* 전 화면 공통 설문 게이트 — 대시보드 전용이던 노출 체크를 레이아웃
+ * /app/studio/* 전 화면 공통 설문 게이트 — 대시보드 전용이던 노출 체크를 레이아웃
  * 레벨로 옮겨 페이지 이동(pathname 변화)마다 재조회한다. 예전에는 대시보드를 다시
  * 방문해야만 트리거가 재평가됐지만, 이제는 업로드/워크플로우 등 다른 작가 화면으로
  * 넘어가기만 해도 그 시점에 다시 확인한다(운영 QA에서 발견된 "완료 직후 안 뜸" 문제 대응).

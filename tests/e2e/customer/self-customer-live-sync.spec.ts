@@ -58,8 +58,8 @@ test("selection and participant completion sync between sessions without a reloa
   await mock(owner, true);
   await mock(participant, false);
 
-  await owner.goto("/customer-select/live-sync/select");
-  await participant.goto("/customer-select/live-sync/select");
+  await owner.goto("/app/select/live-sync/select");
+  await participant.goto("/app/select/live-sync/select");
   await expect(participant.getByRole("button", { name: "함께 2", exact: true })).toBeVisible();
   await owner.getByRole("button", { name: "함께 2", exact: true }).click();
   const ownerSeesParticipant = owner.getByRole("group", { name: "함께 고르는 사람" }).locator('[aria-label^="동행"]');
@@ -124,7 +124,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
     await route.fulfill({ json: { url: "/customer-select/result/delivery-sync/access?result_token=fake" } });
   });
 
-  await page.goto("/customer-select/delivery-sync/export");
+  await page.goto("/app/select/delivery-sync/export");
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole("button", { name: "내 이름 소유자 수정", exact: true })).toHaveText("소유자");

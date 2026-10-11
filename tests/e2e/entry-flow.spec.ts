@@ -11,32 +11,32 @@ test("세 랜딩과 명시적 로그인 목적지 · 모바일 표시", async ({
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("사진을 고르고");
     await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
-    await page.getByRole("link", { name: "스튜디오 알아보기", exact: true }).click();
+    await page.getByRole("link", { name: "작가·스튜디오 알아보기", exact: true }).click();
     await expect(page).toHaveURL(/\/studio$/);
     await page.getByRole("link", { name: "고객 프로젝트 시작하기", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("next")).toBe("/photographer/dashboard");
+    expect(new URL(page.url()).searchParams.get("next")).toBe("/app/studio/dashboard");
     await page.getByRole("button", { name: "로그인 닫기" }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await page.goto("/select");
     await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("next")).toBe("/customer-select");
+    expect(new URL(page.url()).searchParams.get("next")).toBe("/app/select");
     await page.screenshot({ path: testInfo.outputPath(`login-${width}.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
 });
 
 test("보호된 주소와 기존 로그인 링크의 복귀 목적지 보존", async ({ request, page }) => {
-  for (const destination of ["/photographer/projects?status=active", "/customer-select/new/photos", "/customer-select/guest/example/download", "/customer-select/example/settings"]) {
+  for (const destination of ["/app/studio/projects?status=active", "/app/select/new/photos", "/app/select/guest/example/download", "/app/select/example/settings"]) {
     const result = await request.get(destination, { maxRedirects: 0 });
     expect(result.status()).toBe(307);
     const login = new URL(result.headers().location, result.url());
     expect(login.pathname).toBe("/login");
     expect(login.searchParams.get("next")).toBe(destination);
   }
-  await page.goto("/customer-select/login");
-  await expect(page).toHaveURL(/\/login\?next=%2Fcustomer-select$/);
+  await page.goto("/app/select/login");
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp%2Fselect$/);
 });
 
 test("공통 로그인은 공간 선택으로, OAuth 실패는 목적지를 유지하며 재시도", async ({ page, request }) => {
@@ -74,33 +74,44 @@ test("같은 계정의 공간 선택·전환·재로그인, 저장 실패 시 �
     await page.goto("/workspaces");
     await expect(page.getByRole("heading", { name: "어떤 작업을 시작할까요?" })).toBeVisible();
     await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).click();
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     await expect.poll(storedSpace).toBe("select");
     await page.getByLabel("계정 메뉴", { exact: true }).click();
-    await page.getByRole("link", { name: "스튜디오로 이동" }).click();
-    await expect(page).toHaveURL(/\/photographer\/dashboard$/);
+    await page.getByRole("link", { name: "작가·스튜디오로 이동" }).click();
+    await expect(page).toHaveURL(/\/app\/studio\/dashboard$/);
     await expect.poll(storedSpace).toBe("studio");
+    await page.goto("/photographer/projects?status=active#filters");
+    await expect(page).toHaveURL(/\/app\/studio\/projects\?status=active#filters$/);
+    await expect(page.getByRole("heading", { name: "프로젝트", exact: true })).toBeVisible();
+
     await page.setViewportSize({ width: 390, height: 850 });
-    await page.goto("/photographer/projects");
+    await page.goto("/app/studio/projects");
+    await expect(page.getByRole("link", { name: "내 사진 셀렉으로 이동", exact: true })).toBeHidden();
+    await page.getByLabel("계정 메뉴", { exact: true }).click();
+    await expect(page.getByRole("link", { name: "설정", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("link", { name: "내 사진 셀렉으로 이동", exact: true })).toBeHidden();
+    await page.getByLabel("계정 메뉴", { exact: true }).click();
     await expect(page.getByRole("link", { name: "내 사진 셀렉으로 이동", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole("link", { name: "내 사진 셀렉으로 이동", exact: true }).click();
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     await page.setViewportSize({ width: 1280, height: 850 });
     await setSpace("studio");
     await page.goto("/select");
     await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).click();
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     await expect.poll(storedSpace).toBe("select");
     await page.getByLabel("계정 메뉴", { exact: true }).click();
     await page.getByRole("button", { name: "로그아웃", exact: true }).click();
     await expect(page).toHaveURL(/\/select$/);
+    await page.waitForLoadState("load");
     await loginAsPhotographer(page);
     await page.goto("/login");
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     await page.context().addCookies([{ name: "acut_workspace_save_failed_another-user", value: "1", url: new URL(page.url()).origin }]);
     await page.goto("/workspaces");
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     const quotaAfter = await (await page.request.get("/api/photographer/quota")).json();
     expect(quotaAfter).toEqual(quotaBefore);
     await setSpace("studio");
@@ -108,13 +119,28 @@ test("같은 계정의 공간 선택·전환·재로그인, 저장 실패 시 �
       if (route.request().method() === "PUT") return route.fulfill({ status: 503, contentType: "application/json", body: '{"message":"test unavailable"}' });
       await route.continue();
     });
-    await page.goto("/customer-select");
+    await page.goto("/app/select");
     await expect(page.getByRole("status")).toContainText("마지막 사용 공간을 저장하지 못했어요");
-    await expect(page).toHaveURL(/\/customer-select$/);
+    await expect(page).toHaveURL(/\/app\/select$/);
     await page.goto("/workspaces");
     await expect(page.getByRole("heading", { name: "어떤 작업을 시작할까요?" })).toBeVisible();
   } finally {
     await page.close();
     await setSpace(previous);
   }
+});
+
+
+test("기존 작업 주소는 쿼리를 보존하고 새 작업 화면은 검색 제외", async ({ request }) => {
+  for (const [oldPath, destination] of [
+    ["/photographer/projects/id/assets/original?photo=2", "/app/studio/projects/id/assets/original?photo=2"],
+    ["/customer-select/id/select?share_token=test&invite=1", "/app/select/id/select?share_token=test&invite=1"],
+    ["/customer-select/guest/id/download", "/app/select/guest/id/download"],
+  ]) {
+    const response = await request.get(oldPath, { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(new URL(response.headers().location, response.url()).pathname + new URL(response.headers().location, response.url()).search).toBe(destination);
+  }
+  const response = await request.get("/app/studio/projects", { maxRedirects: 0 });
+  expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
 });

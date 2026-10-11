@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 const NOINDEX_SOURCES = [
   "/c/:path*",
   "/g/:path*",
+  "/app/:path*",
   "/photographer/:path*",
   "/customer-select/:path*",
   "/admin/:path*",

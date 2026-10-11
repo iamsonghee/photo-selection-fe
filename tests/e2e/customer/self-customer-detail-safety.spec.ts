@@ -45,7 +45,7 @@ test("next photo: until its thumbnail or full image arrives, name, state and but
   await page.setViewportSize({ width: 1440, height: 900 });
   const images = await setup(page, { holdThumbs: true });
   // 썸네일 요청을 일부러 붙잡아 두므로 load 이벤트까지 기다리면 영영 끝나지 않는다.
-  await page.goto("/customer-select/detail-safety/select", { waitUntil: "domcontentloaded" });
+  await page.goto("/app/select/detail-safety/select", { waitUntil: "domcontentloaded" });
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   const pick = page.getByRole("button", { name: "최종 선택", exact: true });
   await expect(pick).toBeEnabled();
@@ -69,7 +69,7 @@ test("full image that fails to load stays on the thumbnail and offers a retry", 
   await page.setViewportSize({ width: 1440, height: 900 });
   const images = await setup(page);
   images.fail(["d2"]);
-  await page.goto("/customer-select/detail-safety/select");
+  await page.goto("/app/select/detail-safety/select");
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   await page.keyboard.press("ArrowRight");
   const error = page.getByRole("alert").filter({ hasText: "불러오지 못했어요" });
@@ -96,7 +96,7 @@ test("memo that fails to save stays after closing the detail and can be saved ag
     saved.push(body);
     await route.fulfill({ json: { ok: true } });
   });
-  await page.goto("/customer-select/detail-safety/select");
+  await page.goto("/app/select/detail-safety/select");
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
   await memo.fill("배경 사람 지워주세요");
@@ -122,7 +122,7 @@ test("mobile: dragging down moves the photo with the finger, springs back when s
   await context.addInitScript(() => { try { localStorage.setItem("ps:self-select-swipe-hint", "1"); } catch {} });
   const page = await context.newPage();
   await setup(page);
-  await page.goto("/customer-select/detail-safety/select");
+  await page.goto("/app/select/detail-safety/select");
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   const dialog = page.getByRole("dialog", { name: "D1.jpg 상세 보기" });
   await expect(dialog).toBeVisible();

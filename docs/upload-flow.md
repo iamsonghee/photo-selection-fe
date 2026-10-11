@@ -22,7 +22,7 @@
 쓰지 않는다(`scene_taken_at`/`sceneTime`). 그 전 사진은 출처가 NULL이고 기존처럼 그대로 쓴다.
 
 작가 업로드 촬영 시각(2026-10-05, 저장만): 나중에 이미지 분석(장면 나누기 등)에 쓰려고 작가 업로드에서도 같은 값을 모은다.
-작가 업로드 화면(`/photographer/projects/[id]/upload`)이 묶음을 보내기 직전에 원본에서 같은 `readTakenAt`으로 읽어, 파일마다
+작가 업로드 화면(`/app/studio/projects/[id]/upload`)이 묶음을 보내기 직전에 원본에서 같은 `readTakenAt`으로 읽어, 파일마다
 `taken_ats`·`taken_at_sources` 폼 필드(다른 `original_*` 필드처럼 파일 수만큼 반복, 값이 없으면 빈 문자열)로 보낸다.
 BE `POST /api/upload/photos`는 형식이 맞는 값만 `photos.taken_at`·`photos.taken_at_source`에 저장한다(`_parse_taken_at`, 틀리면 버릴 뿐 업로드는 계속).
 DB 마이그레이션 `20261005100000_add_photos_taken_at.sql`이 두 칸을 만들고 `insert_photos_with_numbers`가 채우도록 바꾼다 — 이전 함수는
@@ -64,7 +64,7 @@ DB의 `customer_photos_lock_owner_quota`가 같은 소유자의 동시 INSERT를
 
 이 둘은 같은 파일 선택에서 **동시에** 발생한다 — `include_original=true`이면 압축본은 FastAPI로, 압축하지 않은 원본은 R2로, 같은 사진이 두 경로로 각각 전송된다.
 
-화면 책임은 프로젝트 상태로 분리한다. `/photographer/projects/[id]/upload`는 `preparing` 동안의 업로드·선택·삭제·유사도 분석 전용이다. 초대 링크가 활성화된 뒤 직접 재진입하면 `/photographer/projects/[id]/assets/original`로 이동하며, 여기서는 업로드 화면과 같은 가상화 `PhotographerPhotoGallery` 구현을 읽기 전용으로 사용한다. 확정 이후의 원본·셀렉·보정본은 각각 `/assets/original`, `/assets/selected`, `/assets/retouched`로 분리하되 공용 `ProjectAssetTabs`로 탐색한다. 원본/셀렉 화면은 동일한 grid/list media geometry와 상세 뷰어 shell을 공유하고, 원본 메타데이터와 셀렉 코멘트만 variant slot으로 나눈다.
+화면 책임은 프로젝트 상태로 분리한다. `/app/studio/projects/[id]/upload`는 `preparing` 동안의 업로드·선택·삭제·유사도 분석 전용이다. 초대 링크가 활성화된 뒤 직접 재진입하면 `/app/studio/projects/[id]/assets/original`로 이동하며, 여기서는 업로드 화면과 같은 가상화 `PhotographerPhotoGallery` 구현을 읽기 전용으로 사용한다. 확정 이후의 원본·셀렉·보정본은 각각 `/assets/original`, `/assets/selected`, `/assets/retouched`로 분리하되 공용 `ProjectAssetTabs`로 탐색한다. 원본/셀렉 화면은 동일한 grid/list media geometry와 상세 뷰어 shell을 공유하고, 원본 메타데이터와 셀렉 코멘트만 variant slot으로 나눈다.
 
 ---
 

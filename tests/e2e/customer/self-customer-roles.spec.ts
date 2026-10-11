@@ -29,7 +29,7 @@ test("shared participant can leave opinions but cannot change the final selectio
 
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/customer-select/role-check/select");
+    await page.goto("/app/select/role-check/select");
     // 참여자의 메인 동작은 찜(왼쪽 아래 ♥)이다. 최종 선택 체크(누르기)와 보내기 행동은 보이지 않는다.
     await expect(page.getByRole("button", { name: "다 골랐어요" })).toBeVisible();
     await expect(page.getByRole("button", { name: /선택 완료/ })).toHaveCount(0);
@@ -82,7 +82,7 @@ test("first-time participant browses before registration and resumes the first l
     selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false }, participantNicknames: { blue: "신랑" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
 
-  await page.goto("/customer-select/join-check/select");
+  await page.goto("/app/select/join-check/select");
   // 이름 없이 탐색한 뒤 첫 찜에서 등록한다. 취소한 찜은 저장하지 않는다.
   // 소유자 이름이 없는 프로젝트라 제목은 "함께 사진을 골라 주세요".
   await expect(page.getByRole("heading", { name: /함께 사진을\s*골라 주세요/ })).toBeVisible();
@@ -136,7 +136,7 @@ test("participant can continue the same identity on another device", async ({ pa
     selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: false }, participantNicknames: { red: "소유자", blue: "신랑" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
 
-  await page.goto("/customer-select/resume-check/select");
+  await page.goto("/app/select/resume-check/select");
   await page.getByRole("button", { name: "전에 참여했나요? 이어서 하기" }).click();
   await page.getByRole("button", { name: "신랑", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -170,7 +170,7 @@ for (const action of ["comment", "done"] as const) {
       writes.push(route.request().postDataJSON());
       return route.fulfill({ json: { ok: true } });
     });
-    await page.goto("/customer-select/late-join/select");
+    await page.goto("/app/select/late-join/select");
     await page.getByRole("button", { name: "사진 둘러보기" }).click();
     await expect(page.getByRole("button", { name: "참여하기", exact: true })).toBeVisible();
     if (action === "comment") {
@@ -198,7 +198,7 @@ test("stopped or replaced invite shows an access-ended screen", async ({ page })
   await page.route("**/api/customer-select/projects/stopped-share", async (route) => {
     await route.fulfill({ status: 403, json: { error: "이 프로젝트에 접근할 권한이 없습니다." } });
   });
-  await page.goto("/customer-select/stopped-share/select");
+  await page.goto("/app/select/stopped-share/select");
   await expect(page.getByRole("heading", { name: /더 이상 사용할 수 없어요/ })).toBeVisible();
   await expect(page.getByText("새로운 초대 링크를 요청해 주세요", { exact: false })).toBeVisible();
 });

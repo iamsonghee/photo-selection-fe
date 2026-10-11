@@ -49,28 +49,28 @@ export function ProjectAssetTabs({
       key: "original",
       label: "원본",
       count: originalCount,
-      href: `/photographer/projects/${projectId}/assets/original`,
+      href: `/app/studio/projects/${projectId}/assets/original`,
     },
     ...(hasSelectedAssetTab(status)
       ? [{
           key: "selected" as const,
           label: "셀렉",
           count: selectedCount,
-          href: `/photographer/projects/${projectId}/assets/selected`,
+          href: `/app/studio/projects/${projectId}/assets/selected`,
         }]
       : []),
     ...(hasRetouchedAssetTab(status)
       ? [{
           key: "retouched" as const,
           label: "보정본",
-          href: `/photographer/projects/${projectId}/assets/retouched`,
+          href: `/app/studio/projects/${projectId}/assets/retouched`,
         }]
       : []),
     ...(hasFinalAssetTab(status)
       ? [{
           key: "final" as const,
           label: "최종 보정본",
-          href: `/photographer/projects/${projectId}/assets/final`,
+          href: `/app/studio/projects/${projectId}/assets/final`,
         }]
       : []),
   ];

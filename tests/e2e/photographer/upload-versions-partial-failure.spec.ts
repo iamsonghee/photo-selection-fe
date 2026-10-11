@@ -41,7 +41,7 @@ test.afterAll(async ({ browser }) => {
 test.describe("작가 — 보정본 업로드 부분 실패 처리 (BUG-05 회귀)", () => {
   test("빈 파일을 업로드하면 조용히 성공 처리되지 않고 실패가 표시된다", async ({ page }) => {
     await loginAsPhotographer(page);
-    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/app/studio/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
 
     const uploadDialog = page.getByRole("dialog", { name: "보정본 업로드" });

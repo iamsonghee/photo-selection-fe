@@ -4,7 +4,7 @@ import { loginAsPhotographer } from "../../helpers/auth";
 /** reviewing_v1/v2 상태 프로젝트의 토큰 찾기 */
 async function findReviewToken(page: Page): Promise<string | null> {
   await loginAsPhotographer(page);
-  await page.goto("/photographer/projects");
+  await page.goto("/app/studio/projects");
   await page.waitForLoadState("networkidle");
   const content = await page.content();
   // 검토중 상태 프로젝트에서 토큰 탐색

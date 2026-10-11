@@ -15,7 +15,7 @@ export default async function AdminLayout({
   const result = await getAdminUser();
 
   if (result.status === "unauthenticated") redirect("/");
-  if (result.status === "forbidden") redirect("/photographer/dashboard");
+  if (result.status === "forbidden") redirect("/app/studio/dashboard");
 
   return <AdminShell email={result.email}>{children}</AdminShell>;
 }

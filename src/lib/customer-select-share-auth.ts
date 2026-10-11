@@ -5,5 +5,5 @@ export function customerShareCookieName(projectId: string): string {
 }
 
 export function customerProjectIdFromPath(pathname: string): string | null {
-  return pathname.match(/^\/customer-select\/([^/]+)(?:\/|$)/)?.[1] ?? null;
+  return pathname.match(/^\/app\/select\/([^/]+)(?:\/|$)/)?.[1] ?? null;
 }

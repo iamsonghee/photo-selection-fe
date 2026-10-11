@@ -4,7 +4,7 @@ import { loginAsPhotographer } from "../../helpers/auth";
 test.describe("작가 — 대시보드", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsPhotographer(page);
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
   });
 
@@ -23,14 +23,14 @@ test.describe("작가 — 대시보드", () => {
       { name: "acut_post_login_redirect", value: encodeURIComponent("/beta/apply"), url: new URL(page.url()).origin },
     ]);
 
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
 
     await expect(
       page.getByText("전체 프로젝트")
         .or(page.getByText("첫 프로젝트를"))
         .or(page.getByText("만들어보세요"))
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
+    await expect(page).toHaveURL(/\/app\/studio\/dashboard/);
     await expect(page.getByText("불러오는 중")).toHaveCount(0);
   });
 
@@ -45,7 +45,7 @@ test.describe("작가 — 대시보드", () => {
     const allProjects = page.getByRole("link", { name: "전체 프로젝트" }).first();
     await expect(allProjects).toBeVisible({ timeout: 10_000 });
     await allProjects.click();
-    await expect(page).toHaveURL(/\/photographer\/projects$/);
+    await expect(page).toHaveURL(/\/app\/studio\/projects$/);
   });
 
   test("D4: 프로젝트 사용량을 숫자와 함께 보여준다", async ({ page }) => {
@@ -59,8 +59,8 @@ test.describe("작가 — 대시보드", () => {
 
     for (const width of [375, 390, 430]) {
       await page.setViewportSize({ width, height: 844 });
-      await page.goto("/photographer/dashboard");
-      await expect(page).toHaveURL(/\/photographer\/projects$/);
+      await page.goto("/app/studio/dashboard");
+      await expect(page).toHaveURL(/\/app\/studio\/projects$/);
 
       const globalHeader = page.locator(".photographer-mobile-header");
       const pageHeader = page.locator("[data-photographer-mobile-page-header]");

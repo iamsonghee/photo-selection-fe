@@ -72,14 +72,14 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
 
   test("BS1: 첫 프로젝트가 delivered 아니면 모달 미노출", async ({ page }) => {
     await setProjectStatus(page, projectId!, "editing");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     await expect(page.getByText(MODAL_TITLE)).not.toBeVisible({ timeout: 5000 });
   });
 
   test("BS2: delivered로 바뀌면 모달 노출 + 문항 렌더", async ({ page }) => {
     await setProjectStatus(page, projectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
@@ -92,7 +92,7 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
 
   test("BS3: '나중에' → 즉시 재방문 시 미노출 → 쿨다운 경과 후 재노출", async ({ page }) => {
     await setProjectStatus(page, projectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     let dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
@@ -113,7 +113,7 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
 
   test("BS4: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
     await setProjectStatus(page, projectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
@@ -123,7 +123,7 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
 
   test("BS5: 문항 응답 후 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
     await setProjectStatus(page, projectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
@@ -208,14 +208,14 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
 
   test("CS1: 두 번째 프로젝트가 delivered 아니면 모달 미노출", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "editing");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     await expect(page.getByText(MODAL_TITLE_2)).not.toBeVisible({ timeout: 5000 });
   });
 
   test("CS2: delivered로 바뀌면 모달 노출 + 문항 렌더", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
@@ -231,7 +231,7 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
 
   test("CS3: '나중에' → 즉시 재방문 시 미노출 → 쿨다운 경과 후 재노출", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     let dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
@@ -252,7 +252,7 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
 
   test("CS4: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
@@ -262,7 +262,7 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
 
   test("CS5: 문항 응답(NPS·가격 구간·체크박스 포함) 후 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "delivered");
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
@@ -308,7 +308,7 @@ test.describe("작가 — 베타 설문(생성 후 마이크로 설문)", () => 
   });
 
   test("PS1: 노출 + 문항 렌더 + 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
@@ -340,7 +340,7 @@ test.describe("작가 — 베타 설문(원본 업로드 후 마이크로 설문
   });
 
   test("US1: 노출 + 문항 렌더 + 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
@@ -361,7 +361,7 @@ test.describe("작가 — 베타 설문(원본 업로드 후 마이크로 설문
   });
 
   test("US2: '나중에' → 즉시 재방문 시 미노출 → 쿨다운 경과 후 재노출", async ({ page }) => {
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
@@ -394,7 +394,7 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
   });
 
   test("SS1: 노출 + 문항 렌더 + 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
@@ -415,7 +415,7 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
   });
 
   test("SS2: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
-    await page.goto("/photographer/dashboard");
+    await page.goto("/app/studio/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });

@@ -9,13 +9,13 @@ export async function EntryPage({ space, choose = false, login = false, children
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const title = login ? "로그인하고 작업을 이어가세요." : choose ? "어떤 작업을 시작할까요?" : space === "studio" ? "원본 전달부터 고객 셀렉, 보정본 검토까지." : space === "select" ? "받은 사진, 한 장면씩 셀렉하세요." : "사진을 고르고, 함께 작업하는 곳.";
-  const description = login ? "스튜디오와 내 사진 셀렉을 같은 계정으로 이용해요." : choose ? "같은 계정으로 두 공간을 이용할 수 있어요. 작업 중에도 공간을 바꿀 수 있어요." : space === "studio" ? "고객에게 사진을 전달하고, 셀렉 결과와 보정 요청을 촬영 건마다 관리하세요." : space === "select" ? "작가님께 받은 사진을 직접 올리고, 비슷한 컷을 비교하며 마음에 드는 사진을 골라보세요." : "내 사진을 직접 셀렉하거나, 고객과 사진·보정 요청을 주고받으세요.";
+  const description = login ? "작가·스튜디오와 내 사진 셀렉을 같은 계정으로 이용해요." : choose ? "같은 계정으로 두 공간을 이용할 수 있어요. 작업 중에도 공간을 바꿀 수 있어요." : space === "studio" ? "고객에게 사진을 전달하고, 셀렉 결과와 보정 요청을 촬영 건마다 관리하세요." : space === "select" ? "작가님께 받은 사진을 직접 올리고, 비슷한 컷을 비교하며 마음에 드는 사진을 골라보세요." : "내 사진을 직접 셀렉하거나, 고객과 사진·보정 요청을 주고받으세요.";
   return <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground`}>
     <header className="border-b border-border-subtle bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-4 md:px-8">
         <BrandLogoBar href="/" size="md" />
         <nav aria-label="서비스 메뉴" className="flex flex-wrap items-center gap-2 text-sm sm:gap-5">
-          <Link href="/studio" aria-current={space === "studio" ? "page" : undefined} className="inline-flex min-h-11 items-center rounded-lg px-2 hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">스튜디오</Link>
+          <Link href="/studio" aria-current={space === "studio" ? "page" : undefined} className="inline-flex min-h-11 items-center rounded-lg px-2 hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">작가·스튜디오</Link>
           <Link href="/select" aria-current={space === "select" ? "page" : undefined} className="inline-flex min-h-11 items-center rounded-lg px-2 hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">내 사진 셀렉</Link>
           <PhotographerLightLinkButton href={user ? "/workspaces" : "/login"} variant="outline" size="toolbar">{user ? "내 작업으로 이동" : "로그인"}</PhotographerLightLinkButton>
         </nav>

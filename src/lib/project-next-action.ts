@@ -9,7 +9,7 @@ export type DesktopNextAction =
   | { kind: "none" };
 
 export function getDesktopNextAction(project: Project): DesktopNextAction {
-  const base = `/photographer/projects/${project.id}`;
+  const base = `/app/studio/projects/${project.id}`;
   switch (project.status) {
     case "preparing":    return { kind: "link",    label: "원본 업로드",   href: `${base}/upload` };
     case "selecting":    return { kind: "waiting" };

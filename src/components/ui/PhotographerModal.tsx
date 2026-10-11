@@ -38,7 +38,7 @@ export function PhotographerModal({
 }) {
   const registerOpen = usePhotographerModalRegister();
   const pathname = usePathname();
-  const isLightRoute = isPhotographerLightRoute(pathname) || pathname?.startsWith("/customer-select") || pathname?.startsWith("/c/");
+  const isLightRoute = isPhotographerLightRoute(pathname) || pathname?.startsWith("/app/select") || pathname?.startsWith("/c/");
   const portalThemeClass = isLightRoute ? lightThemeStyles.lightTheme : "";
 
   useLayoutEffect(() => {

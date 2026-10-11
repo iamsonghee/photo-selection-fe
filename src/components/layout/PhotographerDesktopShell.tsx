@@ -21,7 +21,7 @@ import {
 } from "@/lib/photographer-sidebar-routes";
 
 /**
- * 작가 영역(/photographer/*) 공통 셸.
+ * 작가 영역(/app/studio/*) 공통 셸.
  * 사이드바 너비(narrow)는 여기서만 관리 — 페이지 컴포넌트마다 별도 사이드바 없음.
  */
 export function PhotographerDesktopShell({
@@ -51,9 +51,9 @@ export function PhotographerDesktopShell({
     const redirectMobileUtilityRoute = () => {
       if (
         mobileViewport.matches &&
-        pathname === "/photographer/dashboard"
+        pathname === "/app/studio/dashboard"
       ) {
-        router.replace("/photographer/projects");
+        router.replace("/app/studio/projects");
       }
     };
 

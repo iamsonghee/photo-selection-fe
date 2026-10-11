@@ -55,7 +55,7 @@ for (const browserName of ["chromium", "webkit"] as const) {
             { ...target, name: "탭 진입 검증 프로젝트" },
           ] });
         });
-        await page.goto("/photographer/projects");
+        await page.goto("/app/studio/projects");
         const targetCard = page.locator("[data-mobile-project-card]").filter({ hasText: "탭 진입 검증 프로젝트" });
         const uploadEntry = targetCard.getByRole("button", { name: "보정본 업로드", exact: true });
         await expect(uploadEntry).toBeAttached({ timeout: 20_000 });
@@ -461,7 +461,7 @@ for (const browserName of ["chromium", "webkit"] as const) {
         reviewStatus = "revision_requested";
         fixtureStatus = "editing_v2";
         await page.setViewportSize({ width: 402, height: 874 });
-        await page.goto(`/photographer/projects/${project.projectId}/assets/retouched?round=v1`);
+        await page.goto(`/app/studio/projects/${project.projectId}/assets/retouched?round=v1`);
         const roundTrigger = page.locator('[data-mobile-retouch-stage-trigger]');
         await expect(roundTrigger).toContainText('1/2 1차 보정');
         await expect(retouchedGridCard).not.toContainText(retouchComment);
@@ -498,14 +498,14 @@ for (const browserName of ["chromium", "webkit"] as const) {
         fixtureStatus = "delivered";
         await setProjectStatus(page, project.projectId, "delivered");
         await page.setViewportSize({ width: 402, height: 874 });
-        await page.goto(`/photographer/projects/${project.projectId}/assets/selected`);
+        await page.goto(`/app/studio/projects/${project.projectId}/assets/selected`);
         const deliveredActionBar = page.locator('[data-photographer-page-action-bar]');
         await expect(deliveredActionBar).toBeHidden();
         await page.setViewportSize({ width: 1440, height: 1000 });
         await expect(deliveredActionBar).toBeVisible();
         await expect(deliveredActionBar).toContainText('납품 완료');
         await expect(deliveredActionBar.getByText('보정 작업 보기', { exact: true })).toHaveCount(0);
-        await page.goto(`/photographer/projects/${project.projectId}/assets/final`, { waitUntil: "domcontentloaded", timeout: 15_000 });
+        await page.goto(`/app/studio/projects/${project.projectId}/assets/final`, { waitUntil: "domcontentloaded", timeout: 15_000 });
         await expect(page.getByRole('tab', { name: '최종 보정본', exact: true })).toHaveAttribute('aria-selected', 'true');
         await expect(page.getByText('재보정 요청', { exact: true }).filter({ visible: true })).toHaveCount(0);
         await expect(page.getByRole('region', { name: '최종 보정본 작업 도구' })).toContainText('최종 확정본');

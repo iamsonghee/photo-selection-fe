@@ -19,7 +19,7 @@ export async function createTestProject(page: Page): Promise<TestProject> {
   });
   if (!res.ok()) throw new Error(`createTestProject failed (${res.status()}): ${await res.text()}`);
   const { projectId, accessToken } = await res.json() as { projectId: string; accessToken: string };
-  return { projectId, accessToken, uploadUrl: `/photographer/projects/${projectId}/upload`, galleryUrl: `/c/${accessToken}/gallery` };
+  return { projectId, accessToken, uploadUrl: `/app/studio/projects/${projectId}/upload`, galleryUrl: `/c/${accessToken}/gallery` };
 }
 
 /**
@@ -43,7 +43,7 @@ export async function createFullProject(page: Page, photoCount = 5): Promise<Tes
     projectId: data.projectId,
     projectName: data.projectName,
     accessToken: data.accessToken,
-    uploadUrl: `/photographer/projects/${data.projectId}/upload`,
+    uploadUrl: `/app/studio/projects/${data.projectId}/upload`,
     galleryUrl: `/c/${data.accessToken}/gallery`,
     photoCount: data.photoCount,
     requiredCount: data.requiredCount,
@@ -65,7 +65,7 @@ export async function createEditingProject(
   return {
     projectId: data.projectId,
     accessToken: data.accessToken,
-    uploadUrl: `/photographer/projects/${data.projectId}/upload`,
+    uploadUrl: `/app/studio/projects/${data.projectId}/upload`,
     galleryUrl: `/c/${data.accessToken}/gallery`,
     photoCount: data.photoCount,
     requiredCount: data.requiredCount,

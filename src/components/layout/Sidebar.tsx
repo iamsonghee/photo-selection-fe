@@ -16,7 +16,7 @@ import styles from "@/components/layout/Sidebar.module.css";
 /**
  * quota.tier → 사용자에게 보여줄 짧은 plan 표기. 실제 tier 값(beta/general/admin)만 사용 —
  * 하드코딩된 "Basic" 등은 쓰지 않는다. Dashboard의 사용량 패널도 이 값을 그대로 재사용한다
- * (같은 정보에 서로 다른 plan 이름이 생기지 않도록 — src/app/photographer/dashboard/DashboardOverview.tsx 참고).
+ * (같은 정보에 서로 다른 plan 이름이 생기지 않도록 — src/app/app/studio/dashboard/DashboardOverview.tsx 참고).
  */
 export const TIER_LABEL: Record<string, string> = {
   admin: "관리자",
@@ -35,7 +35,7 @@ export type SidebarToggleProps = {
 function navIsActive(pathname: string, href: string, comingSoon: boolean): boolean {
   if (comingSoon || href === "#") return false;
   if (pathname === href) return true;
-  if (href === "/photographer/projects") return pathname.startsWith("/photographer/projects");
+  if (href === "/app/studio/projects") return pathname.startsWith("/app/studio/projects");
   return pathname.startsWith(href);
 }
 
@@ -169,7 +169,7 @@ export function Sidebar({
 
       <div className={styles.brandHeader}>
         <Link
-          href="/photographer/dashboard"
+          href="/app/studio/dashboard"
           title="A-CUT."
           className={[
             styles.brandLink,
@@ -200,7 +200,7 @@ export function Sidebar({
       <div className={styles.sidebarFooter} data-sidebar-footer>
         {/* 대시보드는 본문에 상세 도표를 제공하므로 중복 사용량을 숨긴다. 다른 화면에서는 작업 중에도
             한도를 확인할 수 있도록 작은 진행 막대를 유지한다. */}
-        {!collapsed && pathname !== "/photographer/dashboard" && quota && quota.max !== null && (
+        {!collapsed && pathname !== "/app/studio/dashboard" && quota && quota.max !== null && (
           <div className={styles.usageCard}>
             <div className="flex items-end justify-between">
               <span
@@ -270,7 +270,7 @@ export function Sidebar({
                     className="mt-0.5 flex items-center gap-1 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
                     style={{ fontFamily: "inherit" }}
                   >
-                    {tierLabel && <span>스튜디오 · {tierLabel}</span>}
+                    {tierLabel && <span>작가·스튜디오 · {tierLabel}</span>}
                     {tierLabel && profileIncomplete && <span aria-hidden>·</span>}
                     {profileIncomplete && <span style={{ color: "var(--accent)", fontWeight: 600 }}>프로필 미완성</span>}
                   </p>
@@ -297,7 +297,7 @@ export function Sidebar({
               </div>
             )}
             <Link
-              href="/photographer/settings"
+              href="/app/studio/settings"
               role="menuitem"
               className={styles.profileMenuItem}
             >
@@ -305,7 +305,7 @@ export function Sidebar({
             </Link>
             {/* 전체 페이지 이동으로 업로드 중 beforeunload 보호를 유지한다. */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/customer-select" role="menuitem" className={styles.profileMenuItem}>
+            <a href="/app/select" role="menuitem" className={styles.profileMenuItem}>
               <ArrowLeftRight size={18} /> 내 사진 셀렉으로 이동
             </a>
             <FeedbackButton

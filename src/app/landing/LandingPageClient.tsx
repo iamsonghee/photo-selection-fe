@@ -26,7 +26,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
     try {
       const { data: { session } } = await createClient().auth.getSession();
       if (session) {
-        router.push("/photographer/dashboard");
+        router.push("/app/studio/dashboard");
         return;
       }
     } catch {
@@ -60,7 +60,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
           </section>
           <LandingStory limits={limits} onStart={handleStart} />
         </main>
-        {authOpen && <AuthModal isOpen onClose={() => setAuthOpen(false)} redirectPath="/photographer/dashboard" />}
+        {authOpen && <AuthModal isOpen onClose={() => setAuthOpen(false)} redirectPath="/app/studio/dashboard" />}
         <footer className="ac-footer">
           <div className="ac-container ac-footer-inner">
             <div className="ac-footer-main">

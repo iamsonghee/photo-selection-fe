@@ -3,7 +3,7 @@ import { EntryPage } from "@/components/entry/EntryPage";
 import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
 import { OG_MAIN_IMAGE, SITE_NAME, SITE_URL } from "@/lib/site-metadata";
 
-const title = "A-CUT | 스튜디오 · 내 사진 셀렉";
+const title = "A-CUT | 작가·스튜디오 · 내 사진 셀렉";
 const description = "받은 사진을 직접 셀렉하거나, 고객과 사진·보정 요청을 주고받으세요.";
 
 export const metadata: Metadata = {

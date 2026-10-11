@@ -30,11 +30,11 @@ test("owner can stop and replace a self-customer invite link", async ({ page, br
     participantContexts.push(oldContext);
     const oldParticipant = await oldContext.newPage();
     const coverResponse = oldParticipant.waitForResponse((response) => response.url().includes(`/api/customer-select/projects/${projectId}/invite-cover`));
-    await oldParticipant.goto(`${origin}/customer-select/${projectId}/select?share_token=${oldToken}`);
+    await oldParticipant.goto(`${origin}/app/select/${projectId}/select?share_token=${oldToken}`);
     expect((await coverResponse).status()).toBe(200);
     await expect(oldParticipant.getByRole("button", { name: "사진 둘러보기" })).toBeVisible();
 
-    await page.goto(`/customer-select/${projectId}/settings#sharing`);
+    await page.goto(`/app/select/${projectId}/settings#sharing`);
     await expect(page.getByRole("heading", { name: "함께 고르는 사람" })).toBeVisible();
     await page.getByRole("button", { name: "공유 중지", exact: true }).first().click();
     const stopDialog = page.getByRole("dialog");
@@ -58,7 +58,7 @@ test("owner can stop and replace a self-customer invite link", async ({ page, br
     const newContext = await browser.newContext();
     participantContexts.push(newContext);
     const newParticipant = await newContext.newPage();
-    await newParticipant.goto(`${origin}/customer-select/${projectId}/select?share_token=${newToken}`);
+    await newParticipant.goto(`${origin}/app/select/${projectId}/select?share_token=${newToken}`);
     await expect(newParticipant.getByRole("button", { name: "사진 둘러보기" })).toBeVisible();
   } finally {
     await Promise.all(participantContexts.map((context) => context.close()));

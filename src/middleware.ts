@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { migrateWorkspacePath } from "@/lib/workspaces";
 import { isAdminEmail } from "@/lib/admin-emails";
 import {
   CUSTOMER_SHARE_COOKIE_MAX_AGE,
@@ -78,7 +79,7 @@ async function handleAdminGate(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL("/", req.url));
   }
   if (!isAdminEmail(user.email)) {
-    return NextResponse.redirect(new URL("/photographer/dashboard", req.url));
+    return NextResponse.redirect(new URL("/app/studio/dashboard", req.url));
   }
 
   return response;
@@ -238,6 +239,14 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(url, 308);
   }
 
+  const migratedPath = migrateWorkspacePath(pathname);
+  if (migratedPath !== pathname) {
+    const destination = req.nextUrl.clone();
+    destination.pathname = migratedPath;
+    // 307은 메서드·쿼리를 보존하고 브라우저에 영구 캐시되지 않는다.
+    return NextResponse.redirect(destination, 307);
+  }
+
   const customerProjectId = customerProjectIdFromPath(pathname);
   const customerShareToken = req.nextUrl.searchParams.get("share_token");
   if (customerProjectId && customerShareToken) {
@@ -254,9 +263,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   }
 
   // 소유자 전용 화면만 보호한다. 공유 셀렉·작가 초대·하객 링크의 인증은 기존대로 유지한다.
-  if (pathname === "/photographer" || pathname.startsWith("/photographer/") ||
-      pathname === "/customer-select" || /^\/customer-select\/(?:new|guest)(?:\/|$)/.test(pathname) ||
-      /^\/customer-select\/[^/]+\/settings$/.test(pathname)) {
+  if (pathname === "/app/studio" || pathname.startsWith("/app/studio/") ||
+      pathname === "/app/select" || /^\/app\/select\/(?:new|guest)(?:\/|$)/.test(pathname) ||
+      /^\/app\/select\/[^/]+\/settings$/.test(pathname)) {
     return handleWorkspaceGate(req);
   }
 
