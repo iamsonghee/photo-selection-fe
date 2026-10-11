@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import { loginAsPhotographer } from "./auth";
 
 export interface TestProject {
@@ -173,4 +173,27 @@ export async function insertProjectLog(page: Page, projectId: string, logAction:
 /** 설문 "다시 묻지 않기"(영구 건너뛰기) — 다른 survey_type을 미리 억제해 특정 타입만 노출시킬 때 사용 */
 export async function skipBetaSurvey(page: Page, surveyType: string): Promise<void> {
   await page.request.post("/api/photographer/beta-survey/skip", { data: { surveyType } });
+}
+
+/** 셀렉 회귀 테스트의 기존 참여자. 이름 등록 자체는 invited-selection-simplified에서 검증한다. */
+export async function registerTestParticipant(context: BrowserContext, project: TestProject, color = "red", nickname = "테스트 고객") {
+  await context.request.get(project.galleryUrl);
+  const response = await context.request.post("/api/c/participants", {
+    data: { token: project.accessToken, project_id: project.projectId, color, nickname },
+  });
+  if (!response.ok()) throw new Error(`registerTestParticipant failed: ${await response.text()}`);
+  await context.addInitScript(({ token, color, nickname }) => {
+    localStorage.setItem(`ps:c-participant:v1:${token}`, JSON.stringify({ color, initial: nickname }));
+  }, { token: project.accessToken, color, nickname });
+}
+
+/** 마이그레이션 후에도 별점 편집을 검증할 기존 프로젝트 픽스처. */
+export async function seedLegacyRatings(page: Page, project: TestProject) {
+  await page.request.get(project.galleryUrl);
+  for (const rating of [3, null]) {
+    const response = await page.request.post("/api/c/selections", { data: {
+      token: project.accessToken, project_id: project.projectId, photo_id: project.photoIds![0], rating,
+    } });
+    if (!response.ok()) throw new Error(`seedLegacyRatings failed: ${await response.text()}`);
+  }
 }

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { confirmProjectAdmin } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 
@@ -49,34 +48,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "프로젝트에 속하지 않은 사진이 포함되어 있습니다." }, { status: 400 });
     }
 
-    // in-flight DELETE race condition 방지:
-    // DB에 남아 있는 항목 중 UI 확정 목록에 없는 것만 제거 (별점·태그·코멘트 보존)
-    const { data: existing } = await admin
-      .from("selections")
-      .select("photo_id")
-      .eq("project_id", project_id);
-
-    const confirmedSet = new Set<string>(selected_photo_ids);
-    const toDelete = (existing ?? [])
-      .map((r: { photo_id: string }) => r.photo_id)
-      .filter((id: string) => !confirmedSet.has(id));
-
-    if (toDelete.length > 0) {
-      await admin.from("selections").delete().eq("project_id", project_id).in("photo_id", toDelete);
-    }
-
-    const { error: selectionError } = await admin.from("selections").upsert(
-      uniquePhotoIds.map((photoId) => ({ project_id, photo_id: photoId, is_selected: true })),
-      { onConflict: "project_id,photo_id" },
-    );
-    if (selectionError) throw new Error(selectionError.message);
-
-    await confirmProjectAdmin(admin, project_id);
-    await admin.from("project_logs").insert({
-      project_id,
-      photographer_id: project.photographerId,
-      action: "confirmed",
+    const { data: result, error: confirmError } = await admin.rpc("confirm_customer_selection", {
+      p_project_id: project_id,
+      p_photo_ids: uniquePhotoIds,
     });
+    if (confirmError) throw new Error(confirmError.message);
+    if (result !== "saved") return NextResponse.json({ error: "프로젝트 상태나 선택 장수가 바뀌었어요. 새로 확인해 주세요." }, { status: 409 });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/c/confirm]", e);

@@ -51,23 +51,6 @@ export async function POST(req: NextRequest) {
       validation.reviews,
       project.status,
     );
-    /* 제출된 판단은 version_reviews로 옮겨졌으니 초안은 비운다 — 남겨두면 다음 회차 화면에서
-     * 지난 회차 판단이 되살아난다. 실패해도 제출 자체는 이미 성공이므로 막지 않는다. */
-    const { error: draftClearError } = await admin
-      .from("version_review_drafts")
-      .delete()
-      .eq("project_id", project.id);
-    if (draftClearError) {
-      console.error("[POST /api/c/review/submit] draft cleanup failed", draftClearError);
-    }
-
-    const { error: archiveError } = await admin.rpc("resolve_retouch_delivery_archive", {
-      p_project_id: project.id,
-      p_delivered: status === "delivered",
-    });
-    if (archiveError) {
-      console.error("[POST /api/c/review/submit] final delivery archive resolve failed", archiveError);
-    }
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

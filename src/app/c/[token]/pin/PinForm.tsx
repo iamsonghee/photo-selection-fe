@@ -1,5 +1,6 @@
 "use client";
 
+import { customerReturnPath } from "@/lib/customer-return-path";
 import { useCallback, useEffect, useState } from "react";
 import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/CustomerEntryShell";
 import styles from "../customer-entry.module.css";
@@ -27,18 +28,18 @@ export default function PinForm({ token, from }: { token: string; from: string }
       });
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         // 이동이 끝날 때까지 submitting을 유지 — 풀면 4자리 pin이 남아 자동 제출 effect가 재요청을 반복해 잠금에 걸린다.
         navigating = true;
         // 전체 이동 — PIN 전에 미리 불러온 /c/[token]이 "PIN으로 보내기(307)"로 라우터 캐시에 남아 있어
         // router.replace는 다시 이 화면으로 돌아온다. replace라 뒤로가기로 PIN 화면에 돌아오지 않는다.
-        window.location.replace(from);
-      } else if (data.locked) {
+        window.location.replace(customerReturnPath(token, from));
+      } else if (res.status === 429 && data.locked) {
         setLocked(true);
         setRetryAfter(data.retryAfterSeconds ?? 60);
         setPin("");
       } else {
-        setError("비밀번호가 올바르지 않습니다");
+        setError(res.status === 401 ? "비밀번호가 올바르지 않습니다" : "오류가 발생했습니다. 다시 시도해 주세요.");
         setPin("");
       }
     } catch {

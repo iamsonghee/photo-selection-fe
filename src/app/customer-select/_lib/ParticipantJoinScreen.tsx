@@ -6,7 +6,7 @@ import { ko } from "date-fns/locale";
 import { CalendarDays } from "lucide-react";
 import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/CustomerEntryShell";
 import { CustomerInviteIntro } from "@/components/customer/CustomerInviteIntro";
-import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Badge } from "@/components/ui/Badge";
 import { customerDDay } from "@/lib/customer-dday";
@@ -26,7 +26,7 @@ const OWNER_COLOR: ColorTag = "red";
  * 이미 참여한 사람이 초대 링크로 다시 오면 같은 화면에서 `OO님으로 이어서 고르기`(작가 고객 초대의 "이어서 선택하기"와 같은 흐름).
  * `onEnter`: 입장(새로 참여·이어서 하기·이어서 고르기)을 마치면 부른다 — 고르기 화면이 초대 화면을 닫는다.
  */
-export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
+export function ParticipantJoinScreen({ onEnter, registrationOnly = false, onCancel }: { onEnter?: () => void; registrationOnly?: boolean; onCancel?: () => void }) {
   const { project, participantReady, currentIdentity, joinParticipant, resumeParticipant } = useCustomerSelectStore();
   const returning = participantReady && currentIdentity !== OWNER_COLOR ? project.participantNicknames[currentIdentity]?.trim() : undefined;
   const myLikes = returning ? likedBy(project, currentIdentity).length : 0;
@@ -35,13 +35,14 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
     const name = project.participantNicknames[item.id]?.trim();
     return item.id !== OWNER_COLOR && name ? [{ ...item, name }] : [];
   }), [project.participantNicknames]);
-  const [sheet, setSheet] = useState<"name" | "resume" | null>(null);
+  const [sheet, setSheet] = useState<"name" | "resume" | null>(registrationOnly ? available.length ? "name" : "resume" : null);
   const [nickname, setNickname] = useState("");
   const [color, setColor] = useState<ColorTag | null>(null);
   const [colorsOpen, setColorsOpen] = useState(false);
   const [resumeColor, setResumeColor] = useState<ColorTag | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const close = () => { if (saving) return; if (registrationOnly) onCancel?.(); else setSheet(null); };
   // 다른 사람이 먼저 색을 가져가도 남은 색 중 하나로 자연스럽게 넘어간다.
   const myColor = available.find(({ id }) => id === color) ?? available[0];
   const ownerName = project.participantNicknames[OWNER_COLOR]?.trim();
@@ -63,7 +64,7 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
   }
 
   return <>
-    <CustomerInviteIntro
+    {!registrationOnly && <CustomerInviteIntro
       href="/"
       variant="selection"
       heroUrl={cover ? cover.previewUrl || cover.url : null}
@@ -74,10 +75,10 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
         <button type="button" className={entry.entryPrimary} onClick={() => onEnter?.()}>{returning}님으로 이어서 고르기</button>
         <button type="button" className={entry.entrySecondary} onClick={() => setSheet("resume")}>{returning}님이 아니에요</button>
       </> : myColor ? <>
-        <button type="button" className={entry.entryPrimary} onClick={() => { setError(null); setSheet("name"); }}>함께 고르기 시작</button>
+        <button type="button" className={entry.entryPrimary} onClick={() => onEnter?.()}>사진 둘러보기</button>
         {existing.length > 0 && <button type="button" className={entry.entrySecondary} onClick={() => setSheet("resume")}>전에 참여했나요? 이어서 하기</button>}
       </> : <>
-        <button type="button" className={entry.entryPrimary} disabled>참여 인원이 모두 찼어요</button>
+        <button type="button" className={entry.entryPrimary} onClick={() => onEnter?.()}>사진 둘러보기</button>
         {existing.length > 0 && <button type="button" className={entry.entrySecondary} onClick={() => setSheet("resume")}>전에 참여했나요? 이어서 하기</button>}
       </>}
     >
@@ -100,12 +101,13 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
           {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}
         </div>
       ) : null}
-    </CustomerInviteIntro>
+    </CustomerInviteIntro>}
 
     {sheet === "name" && myColor && (
-      <Sheet title="이름을 알려 주세요" onClose={() => setSheet(null)}>
+      <Sheet title="이름을 알려 주세요" onClose={close}>
         <form className={s.form} onSubmit={submit}>
           <p>함께 고르는 사람에게 이 이름으로 보여요.</p>
+          {existing.length > 0 && <button type="button" className={s.textButton} onClick={() => setSheet("resume")}>전에 참여했나요? 이어서 하기</button>}
           <label className={s.field}>
             <span>이름</span>
             <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="예: 엄마, 신랑, 지우" maxLength={20} autoFocus enterKeyHint="go" />
@@ -131,9 +133,10 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
       </Sheet>
     )}
 
-    {sheet === "resume" && (
-      <Sheet title="누구로 이어서 할까요?" onClose={() => setSheet(null)}>
+    {(sheet === "resume" || (sheet === "name" && !myColor)) && (
+      <Sheet title="누구로 이어서 할까요?" onClose={close}>
         <p>이 기기에서도 남겨둔 찜과 메모를 그대로 이어서 볼 수 있어요.{myColor ? " 처음이면 새로 참여해 주세요." : ""}</p>
+        {error && <p className={s.error} role="alert">{error}</p>}
         <div className={s.resumeList}>
           {existing.map((person) => (
             <button key={person.id} type="button" onClick={() => setResumeColor(person.id)}>
@@ -145,15 +148,14 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
       </Sheet>
     )}
 
-    {resumeColor && <SelectionConfirmDialog
+    {resumeColor && <PhotographerModal
+      open
       title={`${project.participantNicknames[resumeColor]}님으로 이어서 할까요?`}
       description="본인 이름이 맞는지 확인해 주세요."
-      confirmLabel="이어서 하기"
-      busyLabel="처리 중…"
-      confirming={false}
-      onCancel={() => setResumeColor(null)}
-      onConfirm={() => { resumeParticipant(resumeColor); onEnter?.(); }}
-    />}
+      onClose={() => setResumeColor(null)}
+    >
+      <PhotographerLightButton onClick={() => { resumeParticipant(resumeColor); onEnter?.(); }}>이어서 하기</PhotographerLightButton>
+    </PhotographerModal>}
   </>;
 }
 

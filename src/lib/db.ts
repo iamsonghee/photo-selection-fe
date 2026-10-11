@@ -621,7 +621,7 @@ export async function upsertVersionReview(params: {
   if (error) throw error;
 }
 
-/** 고객 검토 최종 제출: version_reviews 일괄 INSERT 후 project status 업데이트 (admin 클라이언트 사용) */
+/** 고객 검토 최종 제출: 프로젝트 잠금 안에서 검토와 상태를 원자적으로 저장 */
 export async function submitVersionReviews(
   admin: SupabaseClient,
   projectId: string,
@@ -633,60 +633,12 @@ export async function submitVersionReviews(
   }>,
   expectedStatus: "reviewing_v1" | "reviewing_v2",
 ): Promise<{ status: ProjectStatus }> {
-  // 프로젝트의 재보정 설정 조회
-  const { data: projData } = await admin
-    .from("projects")
-    .select("status, max_revision_count, revision_round")
-    .eq("id", projectId)
-    .single();
-  if (!projData || (projData as { status?: string }).status !== expectedStatus) {
-    throw new Error("현재 프로젝트는 보정본 검토를 제출할 수 있는 상태가 아닙니다.");
-  }
-  const maxRevisionCount: number = (projData as { max_revision_count?: number } | null)?.max_revision_count ?? 0;
-  const currentRound: number = (projData as { revision_round?: number } | null)?.revision_round ?? 0;
-
-  const now = new Date().toISOString();
-  const rows = reviews.map((r) => ({
-    photo_version_id: r.photo_version_id,
-    photo_id: r.photo_id,
-    status: r.status,
-    customer_comment: r.customer_comment ?? null,
-    reviewed_at: now,
-  }));
-  const { error: insertError } = await admin.from("version_reviews").upsert(rows, {
-    onConflict: "photo_version_id",
+  const { data, error } = await admin.rpc("submit_customer_version_reviews", {
+    p_project_id: projectId,
+    p_expected_status: expectedStatus,
+    p_reviews: reviews,
   });
-  if (insertError) {
-    console.error("[submitVersionReviews] version_reviews upsert", insertError);
-    throw new Error(`검토 저장 실패: ${insertError.message}`);
-  }
-
-  const hasRevision = reviews.some((r) => r.status === "revision_requested");
-  // 재보정 가능 여부: maxRevisionCount > 0 이고 현재 라운드가 한도 미만
-  const canRevise = hasRevision && maxRevisionCount > 0 && currentRound < maxRevisionCount;
-  const newStatus: ProjectStatus = canRevise ? "editing_v2" : "delivered";
-  const updatePayload: Record<string, unknown> = {
-    status: newStatus,
-    updated_at: now,
-  };
-  // 재보정 진행 시 revision_round 증가
-  if (newStatus === "editing_v2") updatePayload.revision_round = currentRound + 1;
-  if (newStatus === "delivered") updatePayload.delivered_at = now;
-
-  const { data: updatedProject, error: updateError } = await admin
-    .from("projects")
-    .update(updatePayload)
-    .eq("id", projectId)
-    .eq("status", expectedStatus)
-    .select("id")
-    .maybeSingle();
-
-  if (updateError) {
-    console.error("[submitVersionReviews] projects update", updateError);
-    throw new Error(`프로젝트 상태 변경 실패: ${updateError.message}`);
-  }
-  if (!updatedProject) {
-    throw new Error("검토 상태가 이미 변경되었습니다. 페이지를 새로고침해 주세요.");
-  }
-  return { status: newStatus };
+  if (error) throw new Error(`검토 저장 실패: ${error.message}`);
+  if (data !== "editing_v2" && data !== "delivered") throw new Error("검토 저장 결과를 확인하지 못했습니다.");
+  return { status: data };
 }

@@ -9,6 +9,7 @@ interface GalleryMobileFilterSheetProps {
   open: boolean;
   onClose: () => void;
   onReset: () => void;
+  showRatings?: boolean;
   starFilter: number;
   onStarFilterChange: (value: number) => void;
   colorFilter: ColorTag[];
@@ -26,6 +27,7 @@ export function GalleryMobileFilterSheet({
   open,
   onClose,
   onReset,
+  showRatings = true,
   starFilter,
   onStarFilterChange,
   colorFilter,
@@ -49,7 +51,7 @@ export function GalleryMobileFilterSheet({
           <button type="button" className="gmf-close" aria-label="필터 닫기" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="gmf-body">
-          <div className="gmf-section">
+          {showRatings && <div className="gmf-section">
             <h3>별점</h3>
             <div className="gmf-stars">
               <span style={{ color: starFilter > 0 ? "var(--accent)" : undefined }}>≥</span>
@@ -59,7 +61,7 @@ export function GalleryMobileFilterSheet({
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           <div className="gmf-section">
             <h3>찜</h3>
             <div className="gmf-options">
@@ -87,7 +89,7 @@ export function GalleryMobileFilterSheet({
         .gmf-sheet{position:fixed;left:50%;bottom:0;z-index:81;width:min(100%,375px);transform:translateX(-50%);border-radius:8px 8px 0 0;background:var(--surface);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 30px rgba(0,0,0,.12);color:var(--foreground)}
         .gmf-header{height:58px;padding:20px 20px 0;display:flex;align-items:center;gap:12px}.gmf-header h2{margin:0;margin-right:auto;font-size:18px;line-height:30px;font-weight:700;letter-spacing:-.6px}.gmf-reset{border:0;background:transparent;color:#838b94;font:12px/24px Pretendard,sans-serif;text-decoration:underline;padding:0}.gmf-close{display:none;border:0;background:transparent;padding:4px;color:var(--muted-foreground)}
         .gmf-body{padding:20px}.gmf-section+.gmf-section{margin-top:20px;padding-top:20px;border-top:1px solid #eef0f2}.gmf-section h3{margin:0 0 10px;font-size:14px;line-height:24px;font-weight:500}.gmf-stars{display:flex;align-items:center;gap:4px;padding:2px 0}.gmf-stars>span{margin-right:4px;color:#aab0b8;font-weight:700}.gmf-stars button{padding:4px;border:0;background:transparent;display:inline-flex}
-        .gmf-options{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.gmf-option{height:39px;min-width:0;padding:0 4px;border:1px solid #c6cbd0;border-radius:4px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:4px;font:12px/19px Pretendard,sans-serif}.gmf-option>span{width:10px;height:10px;border-radius:50%;flex:none}.gmf-option-active{border-color:var(--accent);background:#fff0e8}.gmf-empty{grid-column:1/-1;margin:0;color:#6f747b;font-size:12px}
+        .gmf-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.gmf-option{min-height:44px;min-width:0;padding:0 4px;border:1px solid #c6cbd0;border-radius:4px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:4px;font:12px/19px Pretendard,sans-serif}.gmf-option>span{width:10px;height:10px;border-radius:50%;flex:none}.gmf-option-active{border-color:var(--accent);background:#fff0e8}.gmf-empty{grid-column:1/-1;margin:0;color:#6f747b;font-size:12px}
         .gmf-mode,.gmf-quality{margin-top:10px;display:flex;gap:6px}.gmf-mode button,.gmf-quality button{flex:1;min-height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted-foreground);font:500 13px/18px Pretendard,sans-serif}.gmf-mode-active,.gmf-quality button[aria-pressed=true]{border-color:var(--accent)!important;background:#fff5f0!important;color:var(--foreground)!important;font-weight:600!important}
         @media(min-width:768px){.gmf-backdrop,.gmf-sheet{display:none}}
       `}</style>

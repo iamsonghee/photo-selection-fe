@@ -2,14 +2,14 @@
 
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import theme from "@/styles/AcutLightTheme.module.css";
-import { InviteSheet } from "../[projectId]/select/Sheets";
+import { InviteSheet, Sheet } from "../[projectId]/select/Sheets";
 import { NicknamePrompt } from "./NicknamePrompt";
+import { ParticipantJoinScreen } from "./ParticipantJoinScreen";
 import { ProjectStepHeader, type ProjectStep } from "./ProjectStepHeader";
 import { activeParticipants, useCustomerSelectStore } from "./real-store";
-import ui from "./ui.module.css";
 import s from "./ProjectShell.module.css";
 
 export type ProjectShellOptions = {
@@ -21,7 +21,7 @@ export type ProjectShellOptions = {
   hidden?: boolean;
   /** 헤더 오른쪽 PC 전용 보조 정보(업로드의 전체 이용량). */
   headerMeta?: ReactNode;
-  /** 참여자가 보는 사진을 열 수 있는 화면(고르기)이 등록한다 — 헤더 아바타를 누르면 그 사진을 연다. */
+  /** 고르기 화면이 등록한다 — 참여 패널에서 다른 사람이 보는 사진을 연다. */
   onOpenParticipantPhoto?: (photoId: string) => void;
 };
 
@@ -47,8 +47,9 @@ export function ProjectShellProvider({ children }: { children: ReactNode }) {
   const projectId = useParams().projectId as string;
   const [options, setOptions] = useState<ProjectShellOptions>({});
   const set = useCallback((next: ProjectShellOptions) => setOptions(next), []);
-  const { project, hydrated, isOwner, currentIdentity: me, accessDenied } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity: me, accessDenied, participantReady, joining, requestParticipation, cancelJoin } = useCustomerSelectStore();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const people = useMemo(() => activeParticipants(project), [project]);
   const online = useMemo(() => new Set<string>(project.onlineParticipants ?? []), [project.onlineParticipants]);
   const photoIds = useMemo(() => new Set(project.photos.map((photo) => photo.id)), [project.photos]);
@@ -73,26 +74,27 @@ export function ProjectShellProvider({ children }: { children: ReactNode }) {
               <div className="ml-auto flex min-w-0 items-center gap-2">
                 {options.headerMeta ? <div className="hidden md:block">{options.headerMeta}</div> : null}
                 {hydrated && !accessDenied && (
-                  // 참여자: 색 아바타(이름 첫 글자)만 겹쳐 놓는다. 온라인은 초록 점, 다 골랐으면 ✓, 이름·상태는 마우스를 올리면 보인다.
-                  // 보는 사진이 있는 참여자는 눌러서 같은 사진을 연다(고르기 화면이 등록했을 때). 혼자일 때는 아바타 없이 초대 버튼만.
                   <div className={s.people}>
-                    {people.length > 1 && (
-                      <span className={ui.avatars} role="group" aria-label="함께 고르는 사람">
+                    {!isOwner && !participantReady ? <button type="button" className={s.peopleButton} onClick={requestParticipation}>참여하기</button> : people.length > 1
+                      ? <button type="button" className={s.peopleButton} onClick={() => setPeopleOpen(true)}><Users size={16} aria-hidden /><span>함께 {people.length}</span></button>
+                      : <NicknamePrompt hex={people.find((person) => person.id === me)?.hex ?? "#999"} isDone={myDone} />}
+                    {peopleOpen && <Sheet title="함께 고르기" onClose={() => setPeopleOpen(false)}>
+                      <div className={s.peopleList} role="group" aria-label="함께 고르는 사람">
                         {people.map((person) => {
                           const isOnline = online.has(person.id);
-                          if (person.id === me) return <NicknamePrompt key={person.id} hex={person.hex} isDone={myDone} online={isOnline} />;
+                          if (person.id === me) return <div className={s.personRow} key={person.id}><NicknamePrompt hex={person.hex} isDone={myDone} /><span>{[isOnline ? "온라인" : "자리 비움", myDone ? "다 골랐어요" : null].filter(Boolean).join(" · ")}</span></div>;
                           const done = project.participantDone[person.id];
                           const viewingId = project.participantViews?.[person.id];
                           const viewing = openPhoto && viewingId && isOnline && photoIds.has(viewingId) ? viewingId : null;
                           const label = [person.name, done ? "다 골랐어요" : null, viewing ? "보는 사진 열기" : isOnline ? "온라인" : null].filter(Boolean).join(" · ");
-                          const className = `${ui.avatar} ${isOnline ? ui.avatarOnline : ""} ${viewing ? ui.avatarViewing : ""}`;
-                          const content = <>{person.name.slice(0, 1)}{done ? <span className={ui.avatarDone} aria-hidden>✓</span> : null}</>;
+                          const className = s.personRow;
+                          const content = <><i style={{ background: person.hex }} aria-hidden /><strong>{person.name}</strong><span>{[isOnline ? "온라인" : "자리 비움", done ? "다 골랐어요" : null, viewing ? "보는 사진 열기" : null].filter(Boolean).join(" · ")}</span></>;
                           return viewing
-                            ? <button key={person.id} type="button" className={className} style={{ background: person.hex }} title={label} aria-label={label} onClick={() => openPhoto?.(viewing)}>{content}</button>
-                            : <span key={person.id} role="img" className={className} style={{ background: person.hex }} title={label} aria-label={label}>{content}</span>;
+                            ? <button key={person.id} type="button" className={className} title={label} aria-label={label} onClick={() => { setPeopleOpen(false); openPhoto?.(viewing); }}>{content}</button>
+                            : <span key={person.id} className={className} title={label} aria-label={label}>{content}</span>;
                         })}
-                      </span>
-                    )}
+                      </div>
+                    </Sheet>}
                     {isOwner && <button type="button" className={s.inviteButton} aria-label="초대" onClick={() => setInviteOpen(true)}><Plus size={14} /><span className={s.inviteLabel}>초대</span></button>}
                   </div>
                 )}
@@ -101,6 +103,7 @@ export function ProjectShellProvider({ children }: { children: ReactNode }) {
           </header>
         )}
         {children}
+        {joining && <ParticipantJoinScreen registrationOnly onCancel={cancelJoin} />}
         {inviteOpen && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setInviteOpen(false)} />}
       </div>
     </ShellContext.Provider>

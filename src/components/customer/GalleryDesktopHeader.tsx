@@ -8,7 +8,7 @@ import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { COLOR_OPTIONS } from "@/lib/gallery-filter";
 import type { ColorTag, SortOrder } from "@/types";
 
-type TabFilter = "all" | "selected" | "recommended";
+type TabFilter = "all" | "selected" | "recommended" | "liked";
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "filename", label: "파일명순" },
@@ -30,6 +30,8 @@ interface GalleryDesktopHeaderProps {
   recommendedCount: number;
   tabFilter: TabFilter;
   onTabFilterChange: (value: TabFilter) => void;
+  showRatings?: boolean;
+  peopleContent?: ReactNode;
   starFilter: number;
   hoverStar: number;
   onStarFilterChange: (value: number) => void;
@@ -82,6 +84,8 @@ export function GalleryDesktopHeader({
   recommendedCount,
   tabFilter,
   onTabFilterChange,
+  showRatings = true,
+  peopleContent,
   starFilter,
   hoverStar,
   onStarFilterChange,
@@ -138,7 +142,8 @@ export function GalleryDesktopHeader({
   const visibleTabs = tabs ?? [
     { value: "all", label: "전체 사진" },
     ...(recommendedCount > 0 ? [{ value: "recommended", label: `작가 추천 ${recommendedCount}` }] : []),
-    { value: "selected", label: "내가 선택한 사진" },
+    { value: "liked", label: "찜" },
+    { value: "selected", label: "최종 선택" },
   ];
   const selectedTab = activeTab ?? tabFilter;
   const panelFilterCount = (starFilter > 0 ? 1 : 0) + colorFilter.length + qualityFilter.size;
@@ -164,6 +169,7 @@ export function GalleryDesktopHeader({
         </div>
 
         <div className="gld-summary-group">
+          {peopleContent}
           {summaryContent ?? <>
           {photographerName && (
             <>
@@ -212,7 +218,7 @@ export function GalleryDesktopHeader({
                 <SlidersHorizontal size={15} strokeWidth={1.8} aria-hidden />필터{panelFilterCount > 0 ? <span className="gld-filter-count">{panelFilterCount}</span> : null}
               </button>
               {filterOpen && <div id="gld-filter-panel" className="gld-filter-panel" role="dialog" aria-label="필터와 정렬">
-                <section className="gld-panel-section">
+                {showRatings && <section className="gld-panel-section">
                   <h3>별점</h3>
               <div className="gld-stars" aria-label="별점 필터">
                 <span className="gld-stars-op" style={{ color: starFilter > 0 ? "var(--customer-ink)" : undefined }}>≥</span>
@@ -227,7 +233,7 @@ export function GalleryDesktopHeader({
                   </button>;
                 })}
               </div>
-                </section>
+                </section>}
                 {usedColors.length > 0 && <section className="gld-panel-section">
                   <h3>찜</h3>
                   <div className="gld-panel-row">

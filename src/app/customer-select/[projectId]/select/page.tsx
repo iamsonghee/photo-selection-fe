@@ -118,7 +118,7 @@ function SelectScreen() {
     step: "select",
     viewportLocked: true,
     // 채워지기 전에는 숨기지 않는다 — 소유자도 isOwner가 아직 false라 헤더가 사라졌다 다시 생긴다.
-    hidden: hydrated && (accessDenied || (!isOwner && (!participantReady || (searchParams.get("invite") === "1" && !inviteSeen)))),
+    hidden: hydrated && (accessDenied || (!isOwner && ((!participantReady || searchParams.get("invite") === "1") && !inviteSeen))),
     onOpenParticipantPhoto: setOpenPhotoId,
   });
   const [sceneNotice, setSceneNotice] = useState<string | null>(null);
@@ -163,7 +163,7 @@ function SelectScreen() {
   if (analysis.status === "analyzing" && !holdAll) setHoldAll(true);
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const likesOf = useCallback((photoId: string) => project.photoStates[photoId]?.color ?? [], [project.photoStates]);
-  const myLikes = useMemo(() => new Set(photos.filter((photo) => likesOf(photo.id).includes(me)).map((photo) => photo.id)), [likesOf, me, photos]);
+  const myLikes = useMemo(() => new Set(photos.filter((photo) => participantReady && likesOf(photo.id).includes(me)).map((photo) => photo.id)), [likesOf, me, photos, participantReady]);
   // 역할별 "고른 사진": 소유자는 최종 선택, 참여자는 내 찜.
   const picked = isOwner ? selectedIds : myLikes;
   const people = useMemo(() => activeParticipants(project), [project]);
@@ -306,7 +306,7 @@ function SelectScreen() {
 
   if (!hydrated) return <ProjectBodySkeleton variant="gallery" label="사진을 불러오고 있어요" />;
   if (accessDenied) return <ParticipantAccessEndedScreen />;
-  if (!isOwner && (!participantReady || (searchParams.get("invite") === "1" && !inviteSeen))) return <ParticipantJoinScreen onEnter={enterFromInvite} />;
+  if (!isOwner && ((!participantReady || searchParams.get("invite") === "1") && !inviteSeen)) return <ParticipantJoinScreen onEnter={enterFromInvite} />;
 
   const target = project.target;
   const pickedTotal = picked.size;
@@ -319,7 +319,7 @@ function SelectScreen() {
       {peopleLabel(kind, project.shootType)}
     </button>
   )) : null;
-  const myDone = Boolean(project.participantDone[me]);
+  const myDone = participantReady && Boolean(project.participantDone[me]);
   const toReview = async () => {
     if (completing) return;
     setCompleting(true);
@@ -446,7 +446,7 @@ function SelectScreen() {
         // 찜(왼쪽 아래 `♥ N`): 누구에게나 같은 자리·모양. 접힌 묶음도 ✓처럼 표지(대표 사진) 한 장의 찜이다.
         liked={myLikes.has(photo.id)}
         likeCount={likesOf(photo.id).length}
-        likeNames={likesOf(photo.id).map((color) => color === me ? "나" : project.participantNicknames[color] || "참가자").join(", ")}
+        likeNames={likesOf(photo.id).map((color) => participantReady && color === me ? "나" : project.participantNicknames[color] || "참가자").join(", ")}
         likePrimary={!isOwner}
         hasComment={Boolean(project.photoStates[photo.id]?.comment)}
         showGroupBadge={isCover}
@@ -692,7 +692,7 @@ function SelectScreen() {
             setSceneNotice(null);
           }}
           isOwner={isOwner}
-          myColor={me}
+          myColor={participantReady ? me : null}
           people={people}
           selectedIds={selectedIds}
           likesOf={likesOf}

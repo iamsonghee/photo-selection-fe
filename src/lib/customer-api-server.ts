@@ -33,6 +33,7 @@ export function mapProjectRow(row: ProjectsRow): Project {
     shootDate: row.shoot_date,
     deadline: row.deadline,
     requiredCount: row.required_count,
+    selectionUsesRatings: (row as ProjectsRow & { selection_uses_ratings?: boolean }).selection_uses_ratings ?? false,
     photoCount: row.photo_count ?? 0,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
@@ -387,7 +388,8 @@ export async function getReviewDataByToken(
   const { data: selections } = await admin
     .from("selections")
     .select("photo_id")
-    .eq("project_id", project.id);
+    .eq("project_id", project.id)
+    .eq("is_selected", true);
   const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
   if (photoIds.length === 0) return { project, photos: [] };
 

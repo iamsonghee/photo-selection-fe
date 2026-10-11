@@ -1,9 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { setupFullProject, deleteTestProject, mockCustomerThumbPresigning, type TestProject } from "../../helpers/setup";
+import { registerTestParticipant, setupFullProject, deleteTestProject, mockCustomerThumbPresigning, type TestProject } from "../../helpers/setup";
 
 let project: TestProject;
 test.beforeEach(async ({ page }) => {
   project = await setupFullProject(page, 5);
+  await registerTestParticipant(page.context(), project);
   await mockCustomerThumbPresigning(page);
 });
 test.afterEach(async ({ page }) => {

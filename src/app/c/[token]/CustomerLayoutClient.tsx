@@ -4,6 +4,7 @@ import { useParams, usePathname } from "next/navigation";
 import { SelectionProvider } from "@/contexts/SelectionContext";
 import { ReviewProvider } from "@/contexts/ReviewContext";
 import { CustomerImageCacheProvider } from "@/contexts/CustomerImageCacheContext";
+import { CustomerCollaborationProvider } from "@/components/customer/CustomerCollaboration";
 import { isCustomerLightRoute } from "@/lib/customer-light-routes";
 import lightTheme from "@/styles/PhotographerLightTheme.module.css";
 
@@ -21,6 +22,7 @@ export default function CustomerLayoutClient({
 
   return (
     <SelectionProvider>
+      <CustomerCollaborationProvider key={token}>
       <CustomerImageCacheProvider key={token}>
         <ReviewProvider>
           <div className={`customer-app-shell relative min-h-[100dvh] bg-background text-foreground${isLight ? ` customer-light-shell ${lightTheme.lightTheme}` : ""}`}>
@@ -28,6 +30,7 @@ export default function CustomerLayoutClient({
           </div>
         </ReviewProvider>
       </CustomerImageCacheProvider>
+      </CustomerCollaborationProvider>
     </SelectionProvider>
   );
 }

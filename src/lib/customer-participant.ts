@@ -1,16 +1,9 @@
 import type { ColorTag } from "@/types";
 
-/**
- * 고객 셀렉은 링크 + PIN을 여러 사람이 함께 쓰는 구조라 서버가 "지금 요청한 사람"을 구분하지 못한다.
- * 그래서 기존 사진 태그의 색(`ColorTag`)을 참가자 슬롯으로 재해석해 "누가 찜했는지"를 표현한다.
- *
- * - 어떤 색이 쓰이고 있는지(=명단)는 사진 태그에서 역산하므로 별도 저장이 필요 없다.
- * - "이 기기가 그중 누구인지"만 localStorage에 남긴다. 기기를 바꾸거나 저장소가 비워지면
- *   진입 시 "누구세요?" 시트에서 기존 색을 한 번 탭해 되찾는다.
- */
+/** 공유 링크 안의 참여 색·이름은 서버 명단에, 이 기기의 참여 색은 localStorage에 보관한다. */
 export type Participant = {
   color: ColorTag;
-  /** 본인 화면에서 자기 마크를 구분하기 위한 1~2글자. 기기에만 저장돼 다른 참가자에게는 보이지 않는다. */
+  /** 기존 저장 키와 호환되는 표시 이름. 서버 명단과 함께 최대 20글자를 보관한다. */
   initial: string;
 };
 
@@ -24,8 +17,8 @@ export function readParticipant(token: string): Participant | null {
     const raw = window.localStorage.getItem(storageKey(token));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Participant>;
-    if (!parsed || typeof parsed.color !== "string") return null;
-    return { color: parsed.color as ColorTag, initial: (parsed.initial ?? "").slice(0, 2) };
+    if (!parsed || !["red", "yellow", "green", "blue", "purple"].includes(parsed.color ?? "")) return null;
+    return { color: parsed.color as ColorTag, initial: typeof parsed.initial === "string" ? parsed.initial.slice(0, 20) : "" };
   } catch {
     return null;
   }
@@ -60,14 +53,15 @@ export async function saveRosterName(
   color: ColorTag,
   nickname: string,
 ): Promise<void> {
-  await fetch("/api/c/participants", {
+  const response = await fetch("/api/c/participants", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, project_id: projectId, color, nickname }),
   });
+  if (!response.ok) throw new Error("이름을 저장하지 못했어요. 다시 시도해 주세요.");
 }
 
-/** 프로젝트 안에서 실제로 쓰인 색 = 현재 참여 중인 사람들. 별도 명단 저장 없이 사진 태그에서 역산한다. */
+/** 사진에 찜을 남긴 색. 아직 찜하지 않은 참여자는 서버 명단에서 별도로 합친다. */
 export function getUsedColors(
   photoStates: Record<string, { color?: ColorTag[] } | undefined>,
 ): ColorTag[] {

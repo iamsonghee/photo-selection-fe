@@ -17,13 +17,8 @@ import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader
 import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
 import { GalleryMobileToolbar } from "@/components/customer/GalleryMobileToolbar";
 import { RecommendationMark } from "@/components/RecommendationMark";
-import {
-  fetchRoster,
-  getUsedColors,
-  readParticipant,
-  type Participant,
-  type ParticipantRoster,
-} from "@/lib/customer-participant";
+import { getUsedColors } from "@/lib/customer-participant";
+import { CustomerPeople, useCustomerCollaboration } from "@/components/customer/CustomerCollaboration";
 import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
@@ -52,7 +47,7 @@ import { customerDDay } from "@/lib/customer-dday";
 import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-type TabFilter = "all" | "selected" | "recommended";
+type TabFilter = "all" | "selected" | "recommended" | "liked";
 
 function CustomerGalleryHomeMark({ token, compact = false }: { token: string; compact?: boolean }) {
   return (
@@ -103,6 +98,10 @@ export default function GalleryPageClient() {
   const token        = (params?.token as string) ?? "";
 
   const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState, includeRecommendations, selectionSaving, saveError, reloadProject } = useSelection();
+  const team = useCustomerCollaboration();
+  const participant = team?.participant ?? null;
+  const roster = useMemo(() => team?.roster ?? {}, [team?.roster]);
+  const showRatings = project?.selectionUsesRatings === true;
   const { thumbQueue } = useCustomerImageCache();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
@@ -112,14 +111,11 @@ export default function GalleryPageClient() {
   const [initialFilterState] = useState(() => parseFilterFromSearchParams(searchParams));
 
   const [tabFilter,     setTabFilter]     = useState<TabFilter>(initialFilterState.selectedFilter);
-  const [starFilter,    setStarFilter]    = useState<number>(initialFilterState.starFilter === "all" ? 0 : initialFilterState.starFilter);
+  const [storedStarFilter, setStarFilter]    = useState<number>(initialFilterState.starFilter === "all" ? 0 : initialFilterState.starFilter);
   const [colorFilter,   setColorFilter]   = useState<ColorTag[]>(Array.isArray(initialFilterState.colorFilter) ? initialFilterState.colorFilter : []);
   /** 두 명 이상을 고를 때 "한 명이라도 찜"(any) / "모두 찜"(all) 중 무엇으로 볼지 */
   const [colorFilterMode, setColorFilterMode] = useState<"any" | "all">(initialFilterState.colorFilterMode);
-  /** 색 = 참가자 슬롯. 실제 쓰인 색만 필터에 노출한다. */
-  const [participant, setParticipant] = useState<Participant | null>(null);
-  /** 서버에 저장된 (색 → 표시 이름). 이름이 있으면 "빨강 찜" 대신 그 이름으로 부른다. */
-  const [roster, setRoster] = useState<ParticipantRoster>({});
+  const starFilter = showRatings ? storedStarFilter : 0;
   const [sortOrder,     setSortOrder]     = useState<SortOrder>(initialFilterState.sortOrder);
   const [hoverStar,     setHoverStar]     = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -141,18 +137,6 @@ export default function GalleryPageClient() {
   const [similarityHintVisible, setSimilarityHintVisible] = useState(false);
   const [selectionLimitNoticeKey, setSelectionLimitNoticeKey] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!token) return;
-    setParticipant(readParticipant(token));
-  }, [token]);
-
-  useEffect(() => {
-    if (!token || !project?.id) return;
-    let alive = true;
-    void fetchRoster(token, project.id).then((next) => { if (alive) setRoster(next); });
-    return () => { alive = false; };
-  }, [token, project?.id]);
-
   /** 필터·칩에서 색을 부르는 이름. 본인도 닉네임을 보여주되 "(나)"로 구분한다. */
   const colorLabel = useCallback(
     (key: ColorTag) => {
@@ -163,8 +147,8 @@ export default function GalleryPageClient() {
     [participant, roster],
   );
 
-  /** 프로젝트에서 실제로 쓰인 색 = 참여 중인 사람. 안 쓰인 색은 필터에 띄워봐야 결과가 0장이라 감춘다. */
-  const usedColors = useMemo(() => getUsedColors(photoStates), [photoStates]);
+  /** 찜을 남긴 기존 색과 이름을 등록한 참여자를 함께 필터에 표시한다. */
+  const usedColors = useMemo(() => Array.from(new Set([...getUsedColors(photoStates), ...Object.keys(roster) as ColorTag[]])), [photoStates, roster]);
   const colorFilterOptions = useMemo(
     () =>
       COLOR_OPTIONS.filter((option) => usedColors.includes(option.key)).map((option) => ({
@@ -934,12 +918,14 @@ export default function GalleryPageClient() {
           <div className="gl-mobile-appbar">
             <div className="gl-mobile-title">
               {!mobileHeaderCompact && <CustomerGalleryHomeMark token={token} />}
-              <strong>사진 셀렉</strong>
+              <div><strong>사진 셀렉</strong>
+                <div className="gl-mobile-deadline">
+                  <span>{deadlineLabel}</span>
+                  {dDayLabel && <Badge tone={dDayTone} theme="customerLight" className="font-mono">{dDayLabel}</Badge>}
+                </div>
+              </div>
             </div>
-            <div className="gl-mobile-deadline">
-              <span>{deadlineLabel}</span>
-              {dDayLabel && <Badge tone={dDayTone} theme="customerLight" className="font-mono">{dDayLabel}</Badge>}
-            </div>
+            <CustomerPeople />
           </div>
           <GalleryMobileToolbar
             leading={mobileHeaderCompact ? <CustomerGalleryHomeMark token={token} compact /> : undefined}
@@ -947,7 +933,8 @@ export default function GalleryPageClient() {
             scopeOptions={[
               { value: "all", label: "전체 사진", count: photos.length },
               ...(recommendedCount > 0 ? [{ value: "recommended", label: "작가 추천", count: recommendedCount, icon: <RecommendationMark key="recommendation" size={12} aria-hidden /> }] : []),
-              { value: "selected", label: "내가 선택한 사진", count: Y },
+              { value: "liked", label: "찜", count: photos.filter((photo) => photoStates[photo.id]?.color?.length).length },
+              { value: "selected", label: "최종 선택", count: Y },
             ]}
             scopeValue={tabFilter}
             scopeOpen={mobileScopeOpen}
@@ -975,6 +962,8 @@ export default function GalleryPageClient() {
         </header>
 
         <GalleryDesktopHeader
+          showRatings={showRatings}
+          peopleContent={<CustomerPeople />}
           token={token}
           projectName={project.name}
           photographerName={photographer?.name ?? null}
@@ -1014,6 +1003,7 @@ export default function GalleryPageClient() {
         />
 
         <GalleryMobileFilterSheet
+          showRatings={showRatings}
           open={mobileFiltersOpen}
           onClose={() => setMobileFiltersOpen(false)}
           onReset={clearMobileFilters}
@@ -1066,8 +1056,18 @@ export default function GalleryPageClient() {
                     selected={selected}
                     checkDisabled={applyingRecommendations || confirming}
                     recommended={photo.photographerRecommended}
+                    showRating={showRatings}
                     rating={rating}
-                    colorTags={colorTags}
+                    liked={Boolean(participant && colorTags?.includes(participant.color))}
+                    likePrimary={!showRatings}
+                    likeCount={showRatings ? undefined : colorTags?.length ?? 0}
+                    likeNames={colorTags?.map((color) => roster[color] || COLOR_LABELS[color]).join(", ")}
+                    onLikeClick={showRatings ? undefined : (event) => {
+                      event.preventDefault(); event.stopPropagation();
+                      team?.toggleLike(photo.id);
+                    }}
+                    popOnSelect
+                    colorTags={showRatings ? colorTags : undefined}
                     colorLabel={colorLabel}
                     hasComment={Boolean(state?.comment?.trim())}
                     showGroupBadge={showGroupBadge}

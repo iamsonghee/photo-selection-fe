@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
     const { data: selections } = await admin
       .from("selections")
       .select("photo_id")
-      .eq("project_id", project.id);
+      .eq("project_id", project.id)
+      .eq("is_selected", true);
     const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
     if (!photoIds.length) return NextResponse.json({ photos: [] });
 

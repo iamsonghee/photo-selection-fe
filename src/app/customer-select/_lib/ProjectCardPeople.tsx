@@ -37,7 +37,7 @@ export function ProjectCardPeople({ projectId, participants, shareToken, shareEn
         {people.length > 4 ? <span className="grid size-8 place-items-center rounded-full border-2 border-surface bg-surface-raised text-xs font-bold text-muted-foreground">+{people.length - 4}</span> : null}
       </span>
       <span className="min-w-0 flex-1 text-[13px]">
-        <strong className="font-bold">함께 고르기 {people.length}명</strong>
+        <strong className="block truncate font-bold">{people.length > 1 ? `함께 ${people.length}` : participants[0]?.nickname || "내 이름"}</strong>
         <span className="line-clamp-2 break-keep text-muted-foreground">{people.length > 1 ? doneCount ? `${doneCount}명 다 골랐어요` : "고르는 중이에요" : "가족·친구를 초대해 함께 골라보세요"}</span>
       </span>
       <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-border px-3.5 text-[13px] font-bold transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Plus size={14} />초대</button>

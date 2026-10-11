@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
+  registerTestParticipant,
+  seedLegacyRatings,
   setupFullProject,
   deleteTestProject,
   mockCustomerThumbPresigning,
@@ -11,7 +13,8 @@ let project: TestProject;
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
-  project = await setupFullProject(page, 5); // 사진 5장 + selecting 상태
+  project = await setupFullProject(page, 5);
+  await seedLegacyRatings(page, project); // 사진 5장 + selecting 상태
   const groupResponse = await page.request.post("/api/auth/test-setup", {
     data: {
       action: "seed_photo_group",
@@ -33,6 +36,7 @@ test.afterAll(async ({ browser }) => {
 
 test.describe("고객 — 갤러리 (사진 선택)", () => {
   async function openGallery(page: import("@playwright/test").Page) {
+    await registerTestParticipant(page.context(), project);
     await mockCustomerThumbPresigning(page);
     await page.goto(project.galleryUrl);
     await page.waitForLoadState("networkidle");
@@ -279,7 +283,7 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
 
   test("S4: 필터 탭 — '선택됨' 전환", async ({ page }) => {
     await openGallery(page);
-    const selectedTab = page.getByRole("button", { name: "내가 선택한 사진" });
+    const selectedTab = page.getByRole("button", { name: "최종 선택" });
     await expect(selectedTab).toBeVisible({ timeout: 5000 });
     await selectedTab.click();
     await page.waitForTimeout(300);
@@ -367,6 +371,6 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
 
     await page.getByRole("button", { name: "선택한 사진 보기", exact: true }).click();
     await expect(page).toHaveURL(/selected=selected/);
-    await expect(page.getByRole("button", { name: new RegExp(`내가 선택한 사진 ${requiredCount}장`) })).toBeVisible();
+    await expect(page.getByRole("button", { name: new RegExp(`최종 선택 ${requiredCount}장`) })).toBeVisible();
   });
 });

@@ -101,7 +101,7 @@ export async function DELETE(
       const backendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
       const storageResponse = await fetch(`${backendUrl}/api/storage/delete`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.INTERNAL_PRESIGN_SECRET ?? ""}` },
         body: JSON.stringify({ keys }),
       });
       if (!storageResponse.ok) {

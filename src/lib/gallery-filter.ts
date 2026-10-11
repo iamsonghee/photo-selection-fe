@@ -165,7 +165,7 @@ export type GalleryFilterState = {
    * 색이 1개 이하면 두 모드의 결과가 같다.
    */
   colorFilterMode: "any" | "all";
-  selectedFilter: "all" | "selected" | "recommended";
+  selectedFilter: "all" | "selected" | "recommended" | "liked";
   sortOrder: SortOrder;
   /** 파일명 검색(쉼표/공백으로 구분한 여러 파일명, LIKE OR) — 원문 그대로 보관, 매칭 시 split */
   nameFilter: string;
@@ -210,8 +210,8 @@ export function parseFilterFromSearchParams(
   })();
   const sortOrder: SortOrder =
     sort === "oldest" ? "oldest" : sort === "newest" ? "newest" : "filename";
-  const selectedFilter: "all" | "selected" | "recommended" =
-    selected === "selected" || selected === "recommended" ? selected : "all";
+  const selectedFilter: "all" | "selected" | "recommended" | "liked" =
+    selected === "selected" || selected === "recommended" || selected === "liked" ? selected : "all";
   const nameFilter = name ?? "";
   const qualityFilter: QualityFilterFlag[] = (quality ?? "")
     .split(",")
@@ -300,6 +300,7 @@ export function getFilteredPhotos(
   } else if (state.selectedFilter === "recommended") {
     list = list.filter((p) => p.photographerRecommended);
   }
+  if (state.selectedFilter === "liked") list = list.filter((photo) => photoStates[photo.id]?.color?.length);
   if (state.starFilter !== "all") {
     list = list.filter((p) => (photoStates[p.id]?.rating ?? 0) >= (state.starFilter as number));
   }
@@ -333,5 +334,6 @@ export function getFilteredPhotos(
   } else {
     list = list.sort((a, b) => b.orderIndex - a.orderIndex);
   }
+  if (state.selectedFilter === "liked") list.sort((a, b) => (photoStates[b.id]?.color?.length ?? 0) - (photoStates[a.id]?.color?.length ?? 0));
   return list;
 }

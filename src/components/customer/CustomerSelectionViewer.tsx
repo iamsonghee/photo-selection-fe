@@ -9,6 +9,7 @@ import { CommentSaveIndicator } from "@/components/customer/CommentSaveIndicator
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { RecommendationMark } from "@/components/RecommendationMark";
 import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
+import { CustomerPeople, useCustomerCollaboration } from "@/components/customer/CustomerCollaboration";
 import { ParticipantSheet } from "@/components/customer/ParticipantSheet";
 import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
@@ -87,6 +88,10 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const photoId = adapter?.photoId ?? (params?.photoId as string) ?? "";
   const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates, selectionSaving, saveError, loading } = useSelection();
 
+  const team = useCustomerCollaboration();
+  const teamRoster = team?.roster;
+  const showRatings = Boolean(adapter || project?.selectionUsesRatings);
+
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
   const [selectionFeedback, setSelectionFeedback] = useState<{ photoId: string; key: number } | null>(null);
@@ -111,7 +116,10 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     }
   }, [token, activePhotoId]);
 
-  const filterState = useMemo(() => parseFilterFromSearchParams(searchParams), [searchParams]);
+  const filterState = useMemo(() => {
+    const state = parseFilterFromSearchParams(searchParams);
+    return showRatings ? state : { ...state, starFilter: "all" as const };
+  }, [searchParams, showRatings]);
   const filteredPhotosRaw = useMemo(
     () => getFilteredPhotos(contextPhotos ?? [], selectedIds, photoStates, filterState),
     [contextPhotos, selectedIds, photoStates, filterState]
@@ -405,13 +413,13 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   // ── Actions ──────────────────────────────────────────────────────────────
 
   const setStar = useCallback((s: StarRating) => {
-    if (!current) return;
+    if (!current || !showRatings) return;
     const raw = photoStates[current.id]?.rating;
     const cur = raw != null ? (Number(raw) as StarRating) : undefined;
     updatePhotoState(current.id, { rating: cur === s ? undefined : s });
     setHoverStar(0);
     window.setTimeout(() => setHoverStar(0), 0);
-  }, [current, photoStates, updatePhotoState]);
+  }, [current, photoStates, updatePhotoState, showRatings]);
 
   const setColor = useCallback((c: ColorTag) => {
     if (!current) return;
@@ -425,8 +433,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       return;
     }
     if (!token) return;
-    setParticipant(readParticipant(token));
-  }, [adapter, token]);
+    setParticipant(team?.participant ?? readParticipant(token));
+  }, [adapter, token, team?.participant]);
 
   /* 공유 명단(색 → 이름)은 진입 시와 다른 탭에서 돌아올 때 갱신한다.
    * 사진을 넘길 때마다 재조회하지 않으면서도 다른 기기의 변경을 반영할 수 있다. */
@@ -435,6 +443,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       setRoster(adapter.roster);
       return;
     }
+    if (teamRoster) { setRoster(teamRoster); return; }
     if (!token || !project?.id) return;
     let alive = true;
     const refresh = () => {
@@ -451,7 +460,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       alive = false;
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [adapter, token, project?.id]);
+  }, [adapter, token, project?.id, teamRoster]);
 
   /** 프로젝트에서 이미 쓰인 색 = 참여 중인 사람들(별도 명단 저장 없이 태그에서 역산) */
   const usedColors = useMemo(() => getUsedColors(photoStates), [photoStates]);
@@ -500,19 +509,21 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
 
   /** 찜 토글 — 아직 내 색을 안 정했으면 먼저 "누구세요?" 시트를 연다. */
   const toggleMyMark = useCallback(() => {
+    if (team && !adapter && current) { team.toggleLike(current.id); return; }
     if (!myColor) {
       setParticipantSheetIntent("mark");
       setParticipantSheetOpen(true);
       return;
     }
     setColor(myColor);
-  }, [myColor, setColor]);
+  }, [myColor, setColor, team, adapter, current]);
 
   /** 내 표시(이름·색) 고치기 — 찜 상태는 건드리지 않는다. */
   const editMyIdentity = useCallback(() => {
+    if (team && !adapter) { team.openPeople(); return; }
     setParticipantSheetIntent("edit");
     setParticipantSheetOpen(true);
-  }, []);
+  }, [team, adapter]);
 
   const saveComment = useCallback(() => {
     if (!current) return;
@@ -668,7 +679,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (focusOpen) return;
+    if (focusOpen || document.querySelector("[data-modal-variant]")) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
     if (showShortcuts) {
@@ -687,7 +698,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     /* Cmd/Ctrl+1~9(브라우저 탭 전환), Cmd/Ctrl+F(페이지 찾기), 윈도우 Alt+←/→(뒤로/앞으로
      * 가기)와 겹치지 않게 막는다 — 숫자키는 별점, F는 찜, 방향키는 사진 이동이라 조합키까지
      * 그대로 반응하면 브라우저 기능이 씹히고 엉뚱한 곳에서 별점·찜이 바뀐다. */
-    if (hasShortcutModifier(e)) return;
+    if (hasShortcutModifier(e) || (!showRatings && /^Digit[1-5]$/.test(e.code))) return;
     switch (e.code) {
       case "Digit1": setStar(1); setStarPressRing(1); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit2": setStar(2); setStarPressRing(2); setTimeout(() => setStarPressRing(null), 200); break;
@@ -701,11 +712,11 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [adapter, canEditFinalSelection, focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showShortcuts, router, token, searchParams, activePhotoId]);
+  }, [adapter, canEditFinalSelection, focusOpen, showRatings, setStar, toggleMyMark, goPrevWrap, goNextWrap, showShortcuts, router, token, searchParams, activePhotoId]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (focusOpen) return;
+      if (focusOpen || document.querySelector("[data-modal-variant]")) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       // keyup은 브라우저가 repeat을 설정하지 않지만(누르고 있는 동안은 keydown만 반복),
@@ -1229,7 +1240,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
 
 
             {/* 신원 칩 — 모바일 앱바와 같은 자리·같은 규칙(이름·색은 세션 단위 정보) */}
-            {myColor && (
+            {!adapter && team && <CustomerPeople />}
+            {myColor && (adapter || !team) && (
               <button
                 type="button"
                 onClick={editMyIdentity}
@@ -1370,9 +1382,9 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               width: "100%",
             }}
           >
-            <span className="fs-panel-label">별점 · 찜</span>
+            <span className="fs-panel-label">{showRatings ? "별점 · 찜" : "찜"}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, padding: "4px 0" }}>
+              {showRatings && <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, padding: "4px 0" }}>
                 {([1, 2, 3, 4, 5] as const).map((s) => {
                   const filled = s <= displayRating;
                   const previewing = hoverStar > 0;
@@ -1399,7 +1411,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     </button>
                   );
                 })}
-              </div>
+              </div>}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                 {/* 다른 참가자가 찜한 표시 — 읽기 전용. 이름 미등록은 점선 테두리 + `?`로 구분한다 */}
                 {otherMarkChips.map((mark) => (
@@ -1723,7 +1735,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               {/* 이름·색은 "이 세션에서 내가 누구인가"라 사진마다 바뀌는 값이 아니다 —
                 * 사진별 컨트롤 행이 아니라 앱바에 두고, 아래 찜 버튼은 순수 토글로 남긴다.
                 * (파일명·진행 바를 걷어내 이 자리가 비어 있다) */}
-              {myColor && (
+              {!adapter && team && <CustomerPeople />}
+              {myColor && (adapter || !team) && (
                 <button
                   type="button"
                   className={`fv-identity${participant?.initial ? "" : " fv-identity-unnamed"}`}
@@ -1803,7 +1816,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             {/* 알약이 나란히 4개면 둥근 테두리가 4겹으로 반복돼 격자처럼 읽혔다 —
               * 껍데기는 이 바 하나가 갖고 내부 컨트롤은 무테로 둔다. */}
             <div className="fv-bar">
-            <div className="fv-stars" aria-label="별점">
+            {showRatings && <div className="fv-stars" aria-label="별점">
               {([1, 2, 3, 4, 5] as const).map((value) => {
                 const filled = value <= (hoverStar || star || 0);
                 const previewing = hoverStar > 0;
@@ -1825,7 +1838,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                   </button>
                 );
               })}
-            </div>
+            </div>}
             <div className="fv-bar-right">
             <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
             {showGroupHint && currentGroup && (
@@ -1967,7 +1980,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             setParticipantSheetOpen(false);
             /* 이름은 다른 참가자에게도 보여야 하므로 공유 명단에 저장한다 */
             setRoster((prev) => ({ ...prev, [next.color]: next.initial }));
-            if (!adapter && project?.id) void saveRosterName(token, project.id, next.color, next.initial);
+            if (!adapter && project?.id) void saveRosterName(token, project.id, next.color, next.initial).catch(() => setParticipantSheetOpen(true));
             /* 찜하려다 열린 경우에만 그 찜을 이어서 적용한다(이름만 고치러 온 경우엔 사진을 건드리지 않는다) */
             if (participantSheetIntent === "mark" && current) toggleColor(current.id, next.color);
           }}
@@ -1981,7 +1994,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             <h3>단축키</h3>
             <dl>
               <div><dt><kbd>Space</kbd></dt><dd>사진 선택 · 선택 해제</dd></div>
-              <div><dt><kbd>1–5</kbd></dt><dd>별점 설정</dd></div>
+              {showRatings && <div><dt><kbd>1–5</kbd></dt><dd>별점 설정</dd></div>}
               <div><dt><kbd>F</kbd></dt><dd>내 찜 표시 · 해제</dd></div>
               <div><dt><kbd>←</kbd><kbd>→</kbd></dt><dd>이전 · 다음 사진</dd></div>
               <div><dt><kbd>Esc</kbd></dt><dd>갤러리로 돌아가기</dd></div>

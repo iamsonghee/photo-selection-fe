@@ -1,5 +1,6 @@
 import { test, expect, devices } from "@playwright/test";
 import {
+  registerTestParticipant,
   setupFullProject,
   deleteTestProject,
   mockCustomerThumbPresigning,
@@ -38,6 +39,7 @@ test.afterAll(async ({ browser }) => {
 
 test.describe("고객 — 초대 링크", () => {
   test("I1: 유효한 초대 링크 → 안내 화면에서 갤러리 진입", async ({ page }) => {
+    await registerTestParticipant(page.context(), project);
     await mockCustomerThumbPresigning(page);
     const coverRequest = page.waitForRequest((request) => request.url().includes("/api/c/presign-preview?") && request.url().includes("cover=1"));
     await page.goto(`/c/${project.accessToken}`);
@@ -97,6 +99,7 @@ test.describe("고객 — 초대 링크", () => {
   });
 
   test("I3: 갤러리 직접 접근 → 사진 목록", async ({ page }) => {
+    await registerTestParticipant(page.context(), project);
     await mockCustomerThumbPresigning(page);
     await page.goto(`/c/${project.accessToken}/gallery`);
     await page.waitForLoadState("networkidle");

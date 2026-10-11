@@ -1,5 +1,18 @@
 # 시스템 아키텍처
 
+## 초대 고객 셀렉 협업 (2026-10-10)
+
+2026-10-11 별점 기본값 보정: 실제 `selections.rating`의 미평가 값 0을 별점 사용 이력으로 세지 않는다. 백필과 트리거는 1~5점만 인정하고, 트리거는 값이 실제로 바뀐 경우에만 표시 플래그를 켠다. 이미 최초 마이그레이션을 적용했다면 `20261011000000_ignore_unrated_selection_defaults.sql`을 추가 적용한다. 이 보정은 요청받은 프로젝트의 표시 플래그만 되돌리며 기존 별점·찜·메모·선택은 보존한다. 다른 프로젝트의 과거 별점 삭제 여부는 현재 0점만으로 판별할 수 없으므로 플래그를 일괄 초기화하지 않는다.
+
+2026-10-11 지연 참여 등록: 초대 고객은 갤러리 진입 시 이름 모달을 강제하지 않는다. `CustomerCollaborationProvider`가 첫 찜의 사진을 보관하고 이름 등록·복귀 성공 후 찜을 적용한다. 셀프 고객은 `real-store`가 첫 찜·메모·개인 완료를 대기시키고, `ProjectShell`의 등록 시트에서 참여 색을 확정한 뒤 한 번 실행한다. 취소하면 대기 동작을 폐기한다. 이미 찜한 사진을 복귀하며 누르면 기존 찜을 유지한다. 미등록 셀프 고객의 presence 쓰기와 소유자 색을 내 찜으로 표시하는 동작을 차단한다. API·DB 스키마 변경은 없다.
+
+`/c/[token]`은 기존 링크+PIN 인증과 공동 최종 선택 권한을 유지한다. `CustomerCollaborationProvider`는 selecting 상태 갤러리·뷰어에서 이름 등록, 기존 참여자 이어하기, 초대 복사, 개인 완료를 제공한다. 색 슬롯은 최대 5개이며 신규 등록은 충돌 시 다른 슬롯으로 재시도한다. 참여 색은 기존 localStorage 키를 이어 쓴다. 서버 명단은 5초 조회, 보이는 탭은 10초마다 heartbeat하며 최근 30초 활동을 온라인으로 표시한다. `/api/c/participants`는 PIN 검증 후 이름·done·last_seen_at을 저장한다. done은 표시용이며 최종 선택이나 확정을 잠그지 않는다.
+
+`20261010000000_simplify_invited_customer_selection.sql`을 **앱 배포 전에 적용**해야 한다. `projects.selection_uses_ratings`는 기존 저장 별점으로 백필하며, 별점 쓰기 트리거가 true로만 바꾼다. 마지막 별점 삭제로 기존 UI가 사라지지 않는다. 기존 color_tags 슬롯도 명단에 예약한다. 신규 프로젝트의 별점 UI·필터·단축키는 숨기되 기존 데이터는 삭제하지 않는다.
+
+확정 API는 service_role 전용 `confirm_customer_selection` RPC로 프로젝트 행을 잠그고 상태·장수·중복·사진 소유 프로젝트를 다시 검사한다. 최종 선택 변경·프로젝트 confirmed 전환·로그는 한 트랜잭션이다. 미선택 후보 행은 삭제하지 않고 is_selected만 해제하여 찜·별점·메모를 보존한다. FastAPI, R2, 업로드 처리와 AI 분석 파이프라인은 변경하지 않는다.
+
+
 ## 작가 고객 데이터
 
 고객관리 첫 목록은 인증된 서버 페이지에서 `getCustomerList()`로 조회해 HTML에 포함하며, 검색·필터·페이지 이동 API도 같은 조회 함수를 사용한다. 최초 목록 API를 브라우저에서 중복 호출하지 않는다. `CustomerCacheProvider`는 작가 레이아웃에서 고객 목록·상세를 각각 최대 50건(`CUSTOMER_CACHE_MAX_ENTRIES`), 60초(`CUSTOMER_CACHE_STALE_MS`) 동안 메모리에서 재사용한다. 다른 작가 페이지로 이동해도 유지하며, 로그아웃·계정 변경 시 폐기하고 새 인증 페이지를 연다. 작가 ID가 다른 서버 응답도 캐시를 분리한다. 고객 선택은 History API로 URL만 갱신하여 서버 목록을 다시 조회하지 않는다. 오래된 데이터는 화면을 유지하며 갱신하고 검색 입력에만 250ms 대기를 적용한다. 저장 성공 시 현재 고객 정보를 캐시에 반영하고 목록을 갱신한다. DB 구조와 FastAPI·R2 흐름은 변경하지 않는다.
@@ -346,7 +359,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `reviewing_v2` | 고객 V2 검토 중 | `delivered`, `editing_v2`(라운드 한도 이내 재요청 시) |
 | `delivered` | 납품 완료, 종료 상태 | (없음) |
 
-재보정 가능 여부는 `max_revision_count`(0~2)와 `revision_round`로 판단하며, 실제 상태 전이는 `submitVersionReviews()`(`src/lib/db.ts`)에서 `hasRevision && maxRevisionCount > 0 && currentRound < maxRevisionCount` 조건으로 계산됩니다.
+재보정 가능 여부는 `max_revision_count`(0~2)와 `revision_round`로 판단하며, 실제 상태 전이는 `submitVersionReviews()`가 호출하는 `submit_customer_version_reviews` RPC에서 `hasRevision && maxRevisionCount > 0 && currentRound < maxRevisionCount` 조건으로 계산됩니다.
 
 `delivered` 전환 시 애플리케이션은 `status`, `delivered_at`, `updated_at`을 같은 시각으로 갱신한다. DB의 `projects_ensure_delivered_at` BEFORE 트리거도 모든 쓰기 경로에서 누락된 시각을 채우고, `projects_delivered_at_required` CHECK 제약이 `status='delivered' AND delivered_at IS NULL`인 행을 거부한다. 마이그레이션 이전 완료 데이터는 당시 상태 갱신 시각인 `updated_at`으로 백필한다.
 
@@ -658,7 +671,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | POST | `/api/guest-upload/presign-put` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | 하객 앨범 키(`guest-albums/…/(original\|thumb\|preview)`)만, Content-Type·크기를 서명에 포함한 PUT URL(최대 30개) |
 | POST | `/api/guest-upload/head` | 정적 시크릿 | 하객 앨범 키의 R2 크기(없으면 null) |
 | POST | `/api/guest-upload/delete` | 정적 시크릿 | 하객 앨범 키 삭제 |
-| POST | `/api/storage/delete` | **없음** | R2 키 목록 삭제 — §12 위험 항목 |
+| POST | `/api/storage/delete` | `INTERNAL_PRESIGN_SECRET` Bearer | 서버 전용 R2 키 목록 삭제. 미설정 503, 인증 불일치 403 |
 | POST | `/api/storage/presign` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | R2 키 목록 presigned GET URL 발급. `dispositions`(2026-07-31 추가, optional)로 key별 `Content-Disposition`(다운로드 파일명) 지정 가능 — 납품용 원본 아카이브 ZIP 다운로드에 사용, 기존 호출부는 생략 시 그대로 동작. |
 
 > **정정(2026-07-31)**: 과거 이 표에 있던 `POST /api/upload/originals`(납품 파일 업로드, `delivered` 상태 전용, `delivery_files` 테이블 INSERT)는 실제로는 존재하지 않는 phantom 엔드포인트였다 — 코드베이스 전체 grep으로 확인. `delivery_files` 테이블은 2026-07-23 `DROP TABLE`로 완전히 제거됐고, 납품용 원본은 `include_original` 아키텍처(프로젝트 생성 시점에 셀렉용 이미지와 함께 업로드)로 대체됐다. §10, `docs/upload-flow.md` 참고.
@@ -795,7 +808,7 @@ sequenceDiagram
 6. **보정본(V1/V2) 업로드**: 브라우저가 `/api/upload/versions/delivery/presign`을 받아 원본을 `versions/{project_id}/delivery/v{version}/...`에 동시 3개(`DIRECT_UPLOAD_CONCURRENCY`)씩 direct PUT한다. 이후 `/api/upload/versions`가 HEAD 검증 후 고유한 업로드 토큰을 포함한 key에 검토용 1200px/82%와 300px/75% JPEG를 만든다. `replace_photo_versions_with_history` RPC는 기존 활성 파일과 검토 결과를 `photo_version_revisions`에 먼저 보존하고 현재 `photo_versions`를 원자적으로 교체한다. 고객 확정(`version_reviews.status='approved'`) 사진은 presign·업로드 확정·RPC에서 교체를 거부한다. 그 외 교체는 프로젝트 상태, V1/V2 단계, 재보정 허용 횟수를 변경하지 않으며 고객 API는 계속 현재 활성 행만 읽는다. 작가 상세 API만 교체 이력을 읽기 전용으로 함께 반환한다.
    - **파일-사진 매칭 우선순위**(`src/lib/version-mapping.ts`, `src/lib/retouch-gemini-match.ts`, `UploadVersionsPanel.tsx`의 `runGeminiMatchPass`): ① `exact`(확장자 제외 파일명 완전 일치) → ② `fuzzy`(편집 툴 접미사·1~2자리 버전 번호 제거 후 stem 일치, 3자리 이상 원본 순번 보존) → ③ `gemini`/`gemini_low`(Gemini 이미지 임베딩 유사도, `GEMINI_MATCH_AUTO_THRESHOLD` 기본 0.96, `GEMINI_MATCH_LOW_THRESHOLD` 기본 0.85) → ④ `order`(잔여 타깃과 파일을 순서대로 짝짓는 최후 폴백). Gemini가 0.96 이상이어도 같은 파일의 1·2위 후보 점수 차이가 `GEMINI_MATCH_MARGIN_THRESHOLD` 기본 0.03 미만이면 연결과 업로드는 유지한 채 `gemini_low`의 "AI 확인 필요"로 표시한다. 이 판정은 이미 계산한 유사도 행렬만 사용해 추가 AI 호출이나 전송을 만들지 않는다. `order`도 별도의 "순서 확인 필요" 배지로 표시되어 작가가 재지정할 수 있다.
    - **사진 전환 선로딩**: `useAdjacentImagePreload`가 이미 화면 데이터에 포함된 표시용 URL만 사용해 인접 이미지를 다운로드하고 `Image.decode()`를 시작한다. 고객 보정본 수령/상세와 워크플로우 비교 뷰어는 현재 보기 탭에서 실제 필요한 원본·V1·V2 조합만 대상으로 하며, 업로드/셀렉 결과 라이트박스는 원본 파일이 아니라 기존 1200px 프리뷰만 대상으로 한다. 기본 범위는 PC 이전 1장·다음 2장(두 이미지를 동시에 쓰는 비교 모드는 양옆 1장), 모바일 양옆 1장이고, 유지하는 `Image` 객체는 화면별 최대 2~6개다. 브라우저 데이터 절약 모드에서는 현재 사진만 로드하며 `(max-width: 900px)` 변화도 즉시 반영한다. 이 최적화는 신규 API나 서버 재조회를 만들지 않는다.
-7. **삭제**: 프로젝트/사진/보정본 삭제 시 Next API가 FastAPI `POST /api/storage/delete`(§12: 인증 헤더 없음)를 호출해 R2 객체를 먼저 지운 뒤 DB 행을 삭제. 보정본은 해당 편집 단계에서만 삭제할 수 있고, 고객 확정 보정본은 개별·일괄 선택과 서버 삭제를 모두 거부한다.
+7. **삭제**: 프로젝트/사진/보정본 삭제 시 Next API가 FastAPI `POST /api/storage/delete`(`INTERNAL_PRESIGN_SECRET` Bearer 인증)를 호출해 R2 객체를 먼저 지운 뒤 DB 행을 삭제. 보정본은 해당 편집 단계에서만 삭제할 수 있고, 고객 확정 보정본은 개별·일괄 선택과 서버 삭제를 모두 거부한다.
 
 ---
 
@@ -861,7 +874,7 @@ sequenceDiagram
 - **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher는 고객 경로(`/c/:token`, `/c/:token/:path+`)와 관리자 경로만 포함하므로, 인증되지 않은 사용자도 작가 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
 - **`/admin/**`는 미들웨어에서 렌더링 전에 접근 제어됩니다.** `src/middleware.ts`가 세션 이메일을 허용 목록(`ADMIN_EMAILS`)과 대조해 HTTP 리다이렉트하고, `src/app/admin/layout.tsx`도 `getAdminUser()`로 확인합니다. 역할/권한 테이블 없이 이메일 허용 목록으로 판별합니다. **페이지 가드는 `/api/admin/**`에 자동 적용되지 않으므로**, 각 Route Handler가 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
 - **레거시 미인증 라우트**: `src/app/api/projects/[id]/route.ts`(PATCH)는 세션/소유권 확인이 전혀 없이 `src/lib/db.ts`의 `updateProject()`를 직접 호출합니다. 같은 기능을 하는 `src/app/api/photographer/projects/[id]/route.ts`는 세션+소유권 검증을 하므로, 이 레거시 경로는 사용되지 않는 것으로 보이나 **엔드포인트 자체는 살아있어 확인 필요**합니다.
-- **FastAPI `/api/storage/delete`는 인증 의존성이 전혀 없습니다.** 요청 가능한 누구나 임의의 R2 키 목록을 삭제 요청할 수 있는 구조입니다(코드상 사실이며, 실제 배포 환경에서 네트워크 격리 등으로 외부 접근이 막혀 있는지는 `확인 필요`).
+- **FastAPI `/api/storage/delete`는 서버 간 Bearer 인증이 필수다.** Next API에서 사용자 소유권을 확인한 후 `INTERNAL_PRESIGN_SECRET`을 보낸다. secret 미설정은 503, 불일치는 403이며 R2를 호출하지 않는다.
 - **이용량 등급(관리자/베타/일반) 판정은 요청마다 실시간 계산됩니다.** 배치/크론으로 상태를 미리 갱신해두지 않고, 매 프로젝트 생성·사진 업로드 요청 시점에 `photographers.beta_status`/`beta_end_date`를 조회해 그 순간 유효한지 판정합니다(§6.3). 그래서 베타 기간이 지나거나 관리자가 상태를 바꾸면 다음 요청부터 즉시 반영되고, 별도 만료 처리 로직이 없습니다. 기존 데이터(이미 생성된 프로젝트/사진)는 이 판정과 무관하게 항상 그대로 조회·진행 가능합니다 — 한도 검사는 오직 "새로 생성/업로드하는 시점"에만 개입합니다.
 - **고객 데이터 격리**: 고객은 `access_token` 단위로만 접근하며, 모든 고객 API가 `checkPinAuth` + `validateTokenAndProject`(토큰과 `project_id`가 실제로 같은 행을 가리키는지)를 확인합니다. 다만 `access_token` 자체가 노출되면(예: URL 공유) 그 프로젝트에는 PIN이 없거나 PIN을 아는 사람은 완전히 접근 가능합니다 — 이는 설계상 의도된 동작으로 보입니다.
 - **Postgres RLS**: `AUTH_SETUP.md`가 "RLS 정책이 없으면 INSERT가 실패한다"고 언급하고 있어 RLS가 활성화되어 있을 가능성이 있으나, 정책 원문은 Supabase 대시보드에만 있고 레포지토리 코드에는 없어 **`확인 필요`**입니다. 프론트엔드 일부 클라이언트 읽기(`src/lib/db.ts`의 anon 클라이언트 사용)는 이 RLS에 의존하는 구조로 보입니다.
@@ -911,12 +924,12 @@ sequenceDiagram
 
 우선순위 없이 코드에서 관찰된 사실만 나열합니다(심각도 판단은 실제 배포 환경 확인 후 별도 필요).
 
-1. **`POST /api/storage/delete`(FastAPI)에 인증이 전혀 없음.** 이 엔드포인트에 도달할 수 있는 누구나 R2 키를 지정해 파일을 삭제할 수 있습니다. `/api/storage/presign`은 `INTERNAL_PRESIGN_SECRET`으로 보호되는 것과 대조적입니다.
+1. **2026-10-11 수정: 저장소 삭제 API 인증 누락.** 서버 간 Bearer 인증과 네 곳의 Next 호출부 헤더를 추가했다. FE·BE의 `INTERNAL_PRESIGN_SECRET` 일치 및 함께 배포 필요.
 2. **`/api/projects/[id]`(Next.js, PATCH)에 인증/소유권 검사가 없음.** 같은 목적의 `/api/photographer/projects/[id]`는 검증이 있어, 레거시 경로가 남아있는 것으로 보입니다.
 3. **PIN 쿠키 서명 검증 로직이 두 곳(Edge/Node)에 중복 구현**되어 있어 드리프트 시 인증 우회 또는 정상 사용자 오탐 락아웃 가능성이 있습니다.
-4. **FE→BE R2 삭제 프록시 호출 다수가 `Authorization` 헤더를 보내지 않음**(`versions/[versionId]`, `photos/route.ts`, `photos/[photoId]/route.ts`) — 이는 대상 엔드포인트(`/api/storage/delete`)가 애초에 인증을 요구하지 않기 때문에 발생하는 결과로 보이며, 항목 1과 같은 원인입니다.
+4. **2026-10-11 수정: R2 부분 삭제 실패.** 응답 `Errors`를 검사하고 실패를 전파한다. 전체 사진 삭제도 R2 실패 후 DB 삭제를 진행하지 않는다.
 5. **`/api/c/review-submit`(레거시)이 클라이언트가 보낸 `result` 문자열을 그대로 신뢰**하여 개별 검토 내역 검증 없이 프로젝트를 `delivered`로 전환할 수 있는 경로가 존재합니다(프론트 조사 보고 근거, 코드 재검증 권장).
-6. **`/health/db`(FastAPI)가 인증 없이 `photographers` 테이블 샘플 1행을 응답 본문에 포함**합니다.
+6. **2026-10-11 수정: `/health/db` 개인정보 응답.** 연결 확인만 반환하며 작가 행은 응답에 포함하지 않는다.
 7. **`CORS allow_origin_regex`가 `https://*.vercel.app` 전체를 `allow_credentials=True`와 함께 허용**하여, 신뢰 경계가 이 프로젝트의 배포뿐 아니라 Vercel에 배포된 임의의 앱까지 넓어질 수 있습니다.
 8. **서비스 간 시크릿(`INTERNAL_PRESIGN_SECRET`, `CLIP_INTERNAL_TOKEN`) 비교가 문자열 `==`/`!=` 비교**로 구현되어 있어 상수 시간 비교가 아닙니다.
 9. ~~`selections` 저장 API가 N장 초과 선택을 클라이언트 로직에만 의존~~ — 2026-09-16 수정됨(§11 참고). `set_customer_selection_states`가 프로젝트 행 잠금 안에서 여러 세션의 선택을 직렬화하고 N장 초과 요청을 거부합니다.
@@ -936,7 +949,7 @@ sequenceDiagram
 - Kakao OAuth 프로바이더가 Supabase Auth 대시보드에서 실제로 활성화되어 있는지(코드는 지원하지만 기존 문서와 불일치, §12).
 - FE가 실제로 Vercel에 배포되는지에 대한 결정적 설정 파일(`vercel.json` 등)이 레포에 없어 정황 증거(코드 주석)로만 추정.
 - 로컬에서 `photo-selection-be`/`clip-service`를 기동하는 정확한 커맨드(README 존재 여부와 내용은 이번 조사에서 전문 확인하지 않음).
-- `/api/storage/delete`가 실제 운영 환경에서 Railway 프라이빗 네트워크 등으로 외부 접근이 제한되어 있는지(코드만으로는 "인증 없음"만 확인 가능, 네트워크 계층 보호 여부는 별개).
+- 삭제 API의 실제 배포 버전과 FE·BE 내부 시크릿 설정 일치 여부(로컬 인증 테스트와 별도로 배포 확인 필요).
 - `/api/c/review-result`, `/api/c/review-submit`의 정확한 호출 조건과 `mock-data.ts` 폴백이 실제로 트리거되는 상황(토큰 오타 등) — 프론트 조사 보고에 근거했으며 직접 코드 재검증은 하지 않음.
 - `TanStack Virtual`이 실제로 어느 페이지의 가상 스크롤에 적용되어 있는지 구체적 파일:라인.
 - `src/types/supabase.ts` 타입이 최신 스키마(예: `photo_groups`, `clip_analysis_*` 컬럼 포함) 기준으로 재생성되었는지 여부.
@@ -974,3 +987,9 @@ sequenceDiagram
 **규칙**: `src/lib/keyboard-shortcut-guard.ts`의 `hasShortcutModifier(e)`(= `e.metaKey || e.ctrlKey || e.altKey`)를 모든 단축키 분기 앞에서 먼저 호출한다. Shift는 일부러 뺐다 — `Shift+/`(=`?`, 도움말 열기)처럼 이 앱이 의도적으로 쓰는 조합이 있고, bare Shift+글자는 이 목록의 조합키들과 달리 브라우저/OS가 전역으로 예약해 둔 게 없다. **새 단축키 핸들러를 추가할 때는 이 함수를 가장 먼저 부른다** — Escape/Tab처럼 모달이 이미 쓰는 키, 순수 문자/숫자/방향키에는 아무 영향이 없고 조합키가 눌렸을 때만 앱이 조용해진다.
 
 **Escape/Tab 트랩은 그대로 둔다**: 모달 접근성 훅(`useDialogAccessibility.ts`)의 Escape·Tab-트랩, PIN 입력의 Backspace/Enter처럼 조합키와 무관한 단독 키는 대상이 아니다.
+
+### 2026-10-11 무결성 점검 반영
+
+- PIN `from`/자동 인증 `to`는 `customerReturnPath`에서 현재 `/c/[token]` 내부 경로만 허용한다. 실패 횟수 조회·기록 오류는 인증을 중단하고 500으로 반환한다.
+- `submit_customer_version_reviews`는 프로젝트와 현재 보정본을 잠근 뒤 전체 대상 검증, 검토 저장, 상태 전환, 초안 삭제, 납품 아카이브 확정을 한 트랜잭션으로 수행한다. 미선택 후보는 검토·결과 조회에서도 제외한다.
+- 배포 전 `20261011010000_atomic_customer_review_submission.sql` 적용이 필요하다. SQL 테스트는 독립 PostgreSQL의 동시 연결·실패 주입으로 검증하며 운영 스키마 전체/RLS 검증을 대체하지 않는다.

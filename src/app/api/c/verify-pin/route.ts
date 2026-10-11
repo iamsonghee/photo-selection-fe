@@ -26,13 +26,14 @@ export async function POST(req: NextRequest) {
 
     // 2. Check rate limiting: 5 failed attempts within 1 minute
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
-    const { data: attempts } = await admin
+    const { data: attempts, error: attemptsError } = await admin
       .from("pin_attempts")
       .select("attempted_at")
       .eq("project_token", token)
       .gte("attempted_at", oneMinuteAgo)
       .order("attempted_at", { ascending: true });
 
+    if (attemptsError) throw attemptsError;
     const attemptsCount = attempts?.length ?? 0;
 
     if (attemptsCount >= 5) {
@@ -64,10 +65,11 @@ export async function POST(req: NextRequest) {
 
     // 6. Wrong PIN — record failure (성공은 잠금 횟수에 넣지 않음) and return remaining attempts
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-    await admin.from("pin_attempts").insert({
+    const { error: recordError } = await admin.from("pin_attempts").insert({
       project_token: token,
       ip_address: ip,
     });
+    if (recordError) throw recordError;
     const remaining = 5 - (attemptsCount + 1);
     return NextResponse.json({ success: false, remaining }, { status: 401 });
   } catch (e) {

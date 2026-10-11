@@ -51,12 +51,17 @@ test("shared participant can leave opinions but cannot change the final selectio
   expect(writes.some((body) => "is_selected" in body)).toBe(false);
 });
 
-test("first-time participant chooses an available color before entering", async ({ page }) => {
+test("first-time participant browses before registration and resumes the first like", async ({ page }) => {
   await loginAsPhotographer(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => localStorage.removeItem("acut:customer-select:identity:join-check"));
 
   let claim: Record<string, unknown> | null = null;
+  const likes: Record<string, unknown>[] = [];
+  await page.route("**/api/customer-select/projects/join-check/selections", async (route) => {
+    likes.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
   const photos = Array.from({ length: 24 }, (_, index) => ({
     id: `p${index + 1}`, projectId: "join-check", orderIndex: index, url: "", previewUrl: "", originalFilename: `A${index + 1}.jpg`,
   }));
@@ -78,10 +83,18 @@ test("first-time participant chooses an available color before entering", async 
   } }));
 
   await page.goto("/customer-select/join-check/select");
-  // 처음 온 참여자는 초대 화면(작가 고객 초대와 같은 구성)을 보고, `함께 고르기 시작`을 눌러 이름 시트를 연다.
+  // 이름 없이 탐색한 뒤 첫 찜에서 등록한다. 취소한 찜은 저장하지 않는다.
   // 소유자 이름이 없는 프로젝트라 제목은 "함께 사진을 골라 주세요".
   await expect(page.getByRole("heading", { name: /함께 사진을\s*골라 주세요/ })).toBeVisible();
-  await page.getByRole("button", { name: "함께 고르기 시작" }).click();
+  await page.getByRole("button", { name: "사진 둘러보기" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(claim).toBeNull();
+  const firstLike = page.locator('[data-photo-id="p1"]').getByRole("button", { name: "찜하기", exact: true });
+  await firstLike.click();
+  await page.getByRole("dialog").getByRole("button", { name: "닫기" }).click();
+  expect(claim).toBeNull();
+  expect(likes).toHaveLength(0);
+  await firstLike.click();
   // 이름만 입력하면 남은 색(사용 중인 파랑 제외)이 자동으로 배정된다.
   await page.getByRole("button", { name: "바꾸기" }).click();
   await expect(page.getByRole("radio", { name: "파랑" })).toHaveCount(0);
@@ -95,6 +108,8 @@ test("first-time participant chooses an available color before entering", async 
     return cards.filter((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 1).length;
   })).toBe(7);
   expect(claim).toMatchObject({ claim: true, color: "red", nickname: "신부" });
+  await expect.poll(() => likes.length).toBe(1);
+  expect(likes[0]).toMatchObject({ photo_id: "p1", color_op: { color: "red", add: true } });
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:join-check"))).toBe("red");
 });
 
@@ -132,6 +147,51 @@ test("participant can continue the same identity on another device", async ({ pa
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:resume-check"))).toBe("blue");
   expect(participantWrites).toBe(0);
 });
+
+for (const action of ["comment", "done"] as const) {
+  test(`first ${action} waits for registration and resumes once`, async ({ page }) => {
+    await loginAsPhotographer(page);
+    const writes: Record<string, unknown>[] = [];
+    const nicknames: Record<string, string> = { red: "소유자" };
+    const state = { selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: {}, participantNicknames: nicknames, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null };
+    await page.route("**/api/customer-select/projects/late-join", (route) => route.fulfill({ json: { isOwner: false, project: {
+      ...state, id: "late-join", name: "둘러보기", target: 1, uploaded: true, photoCount: 1, shareToken: "", shareEnabled: true,
+      photos: [{ id: "p1", projectId: "late-join", orderIndex: 0, url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", originalFilename: "A001.jpg" }],
+    } } }));
+    await page.route("**/api/customer-select/projects/late-join/sync", (route) => route.fulfill({ json: state }));
+    await page.route("**/api/customer-select/projects/late-join/presence", (route) => route.fulfill({ json: { ok: true } }));
+    await page.route("**/api/customer-select/projects/late-join/participants", (route) => {
+      const body = route.request().postDataJSON();
+      writes.push(body);
+      if (body.claim) nicknames[body.color] = body.nickname;
+      return route.fulfill({ json: { ok: true } });
+    });
+    await page.route("**/api/customer-select/projects/late-join/selections", (route) => {
+      writes.push(route.request().postDataJSON());
+      return route.fulfill({ json: { ok: true } });
+    });
+    await page.goto("/customer-select/late-join/select");
+    await page.getByRole("button", { name: "사진 둘러보기" }).click();
+    await expect(page.getByRole("button", { name: "참여하기", exact: true })).toBeVisible();
+    if (action === "comment") {
+      await page.locator('[data-photo-id="p1"]').click();
+      const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
+      await memo.fill("등록 후 저장할 메모");
+      await memo.blur();
+    } else {
+      await page.getByRole("button", { name: "다 골랐어요", exact: true }).click();
+    }
+    const join = page.getByRole("dialog", { name: "이름을 알려 주세요", exact: true });
+    await expect(join).toBeVisible();
+    expect(writes).toHaveLength(0);
+    await join.getByRole("textbox", { name: "이름", exact: true }).fill("참여자");
+    await join.getByRole("button", { name: "시작하기", exact: true }).click();
+    await expect(join).toHaveCount(0);
+    await expect.poll(() => writes.filter((body) => action === "comment" ? "comment" in body : "done" in body).length).toBe(1);
+    expect(writes[0]).toMatchObject({ claim: true, color: "blue", nickname: "참여자" });
+    expect(writes[1]).toMatchObject(action === "comment" ? { photo_id: "p1", comment: "등록 후 저장할 메모" } : { color: "blue", done: true });
+  });
+}
 
 test("stopped or replaced invite shows an access-ended screen", async ({ page }) => {
   await loginAsPhotographer(page);

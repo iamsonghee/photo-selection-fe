@@ -34,7 +34,7 @@ export function PhotoDetail({
   onPhotoChange: (photoId: string) => void;
   onClose: () => void;
   isOwner: boolean;
-  myColor: ColorTag;
+  myColor: ColorTag | null;
   people: Person[];
   selectedIds: ReadonlySet<string>;
   likesOf: (photoId: string) => ColorTag[];
@@ -94,7 +94,7 @@ export function PhotoDetail({
   const viewId = view?.id ?? photoId;
   // 처음 열 때(아직 보이는 사진이 없을 때)만 버튼을 막는다. 넘기는 동안에는 보이는 사진에 대해 그대로 동작한다.
   const canAct = Boolean(shown) || !src;
-  const liked = likesOf(viewId).includes(myColor);
+  const liked = myColor !== null && likesOf(viewId).includes(myColor);
   const selected = selectedIds.has(viewId);
   const [zoomed, setZoomed] = useState(false);
   // 크게 보기: 사진을 한 번 누르면 위쪽 줄·띠·버튼(PC는 오른쪽 패널)을 숨기고 사진만 꽉 채운다. 다시 누르면 돌아온다. 넘겨도 유지.
@@ -226,6 +226,7 @@ export function PhotoDetail({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (document.querySelector("[data-customer-sheet]")) return;
       if (event.key === "Tab" && rootRef.current) {
         const focusable = [...rootRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), textarea, a[href], [tabindex]:not([tabindex='-1'])")].filter((element) => element.offsetParent !== null);
         if (!focusable.length) return;

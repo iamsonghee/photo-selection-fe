@@ -112,6 +112,9 @@ interface StoreValue {
   isOwner: boolean;
   currentIdentity: ColorTag;
   participantReady: boolean;
+  joining: boolean;
+  requestParticipation: () => void;
+  cancelJoin: () => void;
   accessDenied: boolean;
   shareUrl: string;
   syncStatus: "syncing" | "connected" | "offline";
@@ -151,6 +154,8 @@ export function CustomerSelectStoreProvider({
   const [accessDenied, setAccessDenied] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"syncing" | "connected" | "offline">("syncing");
   const writesInFlightRef = useRef(0);
+  const writeQueuesRef = useRef(new Map<string, Promise<void>>());
+  const latestWritesRef = useRef(new Map<string, symbol>());
   const syncInFlightRef = useRef<Promise<CollaborationState | null> | null>(null);
 
   const apiGet = useCallback(async () => {
@@ -164,6 +169,9 @@ export function CustomerSelectStoreProvider({
   }, [projectId]);
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingParticipation, setPendingParticipation] = useState<{ kind: "join" | "like" | "comment" | "done"; photoId?: string; text?: string } | null>(null);
+  const requestParticipation = useCallback(() => setPendingParticipation({ kind: "join" }), []);
+  const cancelJoin = useCallback(() => setPendingParticipation(null), []);
   const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
   const [failedComments, setFailedComments] = useState<Record<string, string>>({});
   const commentWriteVersionsRef = useRef<Record<string, number>>({});
@@ -189,14 +197,24 @@ export function CustomerSelectStoreProvider({
   /**
    * 저장 실패 시 최대 2회 재시도(짧은 backoff) 후에도 실패하면 낙관적 업데이트를
    * 되돌리고 사용자에게 알린다 — 네트워크가 끊겨도 변경이 조용히 유실되지 않게 하는
-   * 최소한의 보장이다(SelectionContext.tsx의 flushPatch/flushSelection과 같은 원칙,
-   * 다만 폴링·버전 관리 없이 "이번 요청 하나"의 성공/실패만 다룬다 — 1차 범위에 맞춘 축소판).
+   * 보장이다. 같은 사진/참가자의 쓰기는 재시도까지 직렬화하고 최신 요청만 되돌린다.
    */
   const apiPost = useCallback(
     async (path: string, body: Record<string, unknown>, onFinalFailure?: () => void) => {
       const payload = JSON.stringify(body);
+      const entity = `${path}:${body.photo_id ?? body.color ?? "project"}`;
+      const field = "is_selected" in body ? "selection" : "color_op" in body ? "like" : "comment" in body ? "comment" : "rating" in body ? "rating" : "done" in body ? "done" : "nickname";
+      const key = `${entity}:${field}`;
+      const version = Symbol();
+      latestWritesRef.current.set(key, version);
+      const previous = writeQueuesRef.current.get(entity);
+      let release!: () => void;
+      const pending = new Promise<void>((resolve) => { release = resolve; });
+      writeQueuesRef.current.set(entity, pending);
       writesInFlightRef.current += 1;
       try {
+        // 같은 사진의 재시도까지 순서를 지켜 오래된 요청이 최신 선택·메모를 덮지 않게 한다.
+        await previous;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
@@ -210,11 +228,14 @@ export function CustomerSelectStoreProvider({
           }
           if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         }
-        onFinalFailure?.();
+        if (latestWritesRef.current.get(key) === version) onFinalFailure?.();
         setSaveError("저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
         return false;
       } finally {
         writesInFlightRef.current -= 1;
+        release();
+        if (writeQueuesRef.current.get(entity) === pending) writeQueuesRef.current.delete(entity);
+        if (latestWritesRef.current.get(key) === version) latestWritesRef.current.delete(key);
       }
     },
     [projectId]
@@ -343,6 +364,7 @@ export function CustomerSelectStoreProvider({
   }, [accessDenied, currentIdentity, hydrated, participantReady, projectId]);
 
   const setViewingPhoto = useCallback((photoId: string | null) => {
+    if (!participantReady) return;
     setProject((current) => ({
       ...current,
       participantViews: { ...current.participantViews, [currentIdentity]: photoId },
@@ -352,7 +374,7 @@ export function CustomerSelectStoreProvider({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ color: currentIdentity, current_photo_id: photoId }),
     });
-  }, [currentIdentity, projectId]);
+  }, [currentIdentity, projectId, participantReady]);
 
   const toggleSelect = useCallback(
     (photoId: string) => {
@@ -375,6 +397,7 @@ export function CustomerSelectStoreProvider({
 
   const toggleLike = useCallback(
     (photoId: string, identity: ColorTag) => {
+      if (!isOwner && !participantReady) { setPendingParticipation({ kind: "like", photoId }); return; }
       const hadBefore = project.photoStates[photoId]?.color?.includes(identity) ?? false;
       setProject((prev) => {
         const current = prev.photoStates[photoId]?.color ?? [];
@@ -391,7 +414,7 @@ export function CustomerSelectStoreProvider({
         });
       });
     },
-    [apiPost, project.photoStates]
+    [apiPost, project.photoStates, isOwner, participantReady]
   );
 
   const setStar = useCallback(
@@ -421,6 +444,7 @@ export function CustomerSelectStoreProvider({
 
   const setComment = useCallback(
     (photoId: string, text: string) => {
+      if (!isOwner && !participantReady) { if (text.trim()) setPendingParticipation({ kind: "comment", photoId, text }); return; }
       const prevComment = project.photoStates[photoId]?.comment;
       const trimmed = text.trim() || undefined;
       const version = (commentWriteVersionsRef.current[photoId] ?? 0) + 1;
@@ -445,7 +469,7 @@ export function CustomerSelectStoreProvider({
         });
       });
     },
-    [apiPost, project.photoStates, setCommentSaveStatus]
+    [apiPost, project.photoStates, setCommentSaveStatus, isOwner, participantReady]
   );
   const retryFailedComments = useCallback(() => {
     Object.entries(failedComments).forEach(([photoId, text]) => setComment(photoId, text));
@@ -453,13 +477,14 @@ export function CustomerSelectStoreProvider({
 
   const toggleDone = useCallback(
     (identity: ColorTag) => {
+      if (!isOwner && !participantReady) { setPendingParticipation({ kind: "done" }); return; }
       const prevDone = project.participantDone[identity];
       setProject((prev) => ({ ...prev, participantDone: { ...prev.participantDone, [identity]: !prevDone } }));
       apiPost("/participants", { color: identity, done: !prevDone }, () => {
         setProject((prev) => ({ ...prev, participantDone: { ...prev.participantDone, [identity]: prevDone } }));
       });
     },
-    [apiPost, project.participantDone]
+    [apiPost, project.participantDone, isOwner, participantReady]
   );
 
   const setNickname = useCallback(
@@ -515,12 +540,22 @@ export function CustomerSelectStoreProvider({
 
   const clearSaveError = useCallback(() => setSaveError(null), []);
 
+  useEffect(() => {
+    if (!participantReady || !pendingParticipation) return;
+    const action = pendingParticipation;
+    setPendingParticipation(null);
+    if (action.kind === "like" && action.photoId && !project.photoStates[action.photoId]?.color?.includes(currentIdentity)) toggleLike(action.photoId, currentIdentity);
+    if (action.kind === "comment" && action.photoId) setComment(action.photoId, action.text ?? "");
+    if (action.kind === "done") toggleDone(currentIdentity);
+  }, [participantReady, pendingParticipation, currentIdentity, project.photoStates, toggleLike, setComment, toggleDone]);
+
   const value = useMemo<StoreValue>(
     () => ({
+      joining: Boolean(pendingParticipation), requestParticipation, cancelJoin,
       project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, failedComments, retryFailedComments, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, failedComments, retryFailedComments, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, failedComments, retryFailedComments, saveError, clearSaveError, pendingParticipation, requestParticipation, cancelJoin]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

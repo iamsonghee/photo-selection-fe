@@ -60,19 +60,22 @@ test("selection and participant completion sync between sessions without a reloa
 
   await owner.goto("/customer-select/live-sync/select");
   await participant.goto("/customer-select/live-sync/select");
-  // 헤더의 참여자 아바타: 이름·상태는 아바타 이름(aria-label)에 `동행 · 다 골랐어요 · 온라인`처럼 들어 있다.
+  await expect(participant.getByRole("button", { name: "함께 2", exact: true })).toBeVisible();
+  await owner.getByRole("button", { name: "함께 2", exact: true }).click();
   const ownerSeesParticipant = owner.getByRole("group", { name: "함께 고르는 사람" }).locator('[aria-label^="동행"]');
   await expect(ownerSeesParticipant).toBeVisible();
   await expect(ownerSeesParticipant).not.toHaveAttribute("aria-label", /다 골랐어요/);
   await participant.getByRole("button", { name: "다 골랐어요" }).click();
   await expect(ownerSeesParticipant).toHaveAttribute("aria-label", /다 골랐어요/, { timeout: 5000 });
   await expect(ownerSeesParticipant).toHaveAttribute("aria-label", /온라인|보는 사진 열기/, { timeout: 5000 });
+  await owner.getByRole("dialog", { name: "함께 고르기" }).getByRole("button", { name: "닫기" }).click();
   await owner.locator('[data-photo-id="p1"] .gl-check-box').click();
   // 참여자는 소유자의 최종 선택을 "✓ 최종 선택" 보기로 확인한다.
   await participant.getByRole("button", { name: "✓ 최종 선택" }).click();
   await expect(participant.locator('[data-photo-id="p1"]')).toBeVisible({ timeout: 5000 });
   await participant.getByRole("button", { name: "모두", exact: true }).click();
   await participant.locator('[data-photo-id="p1"]').click();
+  await owner.getByRole("button", { name: "함께 2", exact: true }).click();
   const samePhoto = owner.getByRole("button", { name: /^동행 · .*보는 사진 열기/ }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
   await samePhoto.click();
@@ -103,8 +106,8 @@ test("result link copy does not complete or lock the project", async ({ page }) 
     await route.fulfill({ json: { isOwner: true, project: {
       id: "delivery-sync", name: "전달 확인", shootType: "wedding", target: 1, photoCount: 1, uploaded: true,
       photos: [{ id: "p1", projectId: "delivery-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
-      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false, blue: true },
-      participantNicknames: { red: "소유자", blue: "동행" }, shareToken: "", shareEnabled: true,
+      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false },
+      participantNicknames: { red: "소유자" }, shareToken: "", shareEnabled: true,
       exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } } });
   });
@@ -112,8 +115,8 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   await page.route("**/api/customer-select/projects/delivery-sync/presence", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
     await route.fulfill({ json: {
-      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false, blue: true },
-      participantNicknames: { red: "소유자", blue: "동행" }, onlineParticipants: ["red", "blue"], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false },
+      participantNicknames: { red: "소유자" }, onlineParticipants: ["red"], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } });
   });
   await page.route("**/api/customer-select/projects/delivery-sync/result-link", async (route) => {
@@ -122,6 +125,12 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   });
 
   await page.goto("/customer-select/delivery-sync/export");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole("button", { name: "내 이름 소유자 수정", exact: true })).toHaveText("소유자");
+    await expect(page.getByRole("button", { name: "함께 1", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "초대", exact: true })).toBeVisible();
+  }
   await expect(page.getByRole("heading", { name: "1장을 골랐어요" })).toBeVisible();
   await page.getByText("다른 전달 방식", { exact: true }).click();
   const [csvDownload] = await Promise.all([

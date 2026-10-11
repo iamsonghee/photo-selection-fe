@@ -1,3 +1,4 @@
+import { customerReturnPath } from "@/lib/customer-return-path";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { signPinCookie } from "@/lib/customer-auth-server";
@@ -9,9 +10,10 @@ import { signPinCookie } from "@/lib/customer-auth-server";
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const token = searchParams.get("token");
-  const to = searchParams.get("to") ?? "/";
+
 
   if (!token) return NextResponse.redirect(new URL("/", req.url));
+  const to = customerReturnPath(token, searchParams.get("to"));
 
   const admin = getAdminClient();
   const { data: project, error } = await admin

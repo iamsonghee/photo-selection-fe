@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import { registerTestParticipant, seedLegacyRatings, setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
@@ -71,6 +71,7 @@ test("V12: 완료 화면의 라이트 테마와 다운로드 준비·만료 상�
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
   project = await setupFullProject(page, 5);
+  await seedLegacyRatings(page, project);
   await page.close();
 });
 
@@ -83,6 +84,7 @@ test.afterAll(async ({ browser }) => {
 });
 
 async function openGallery(page: import("@playwright/test").Page) {
+    await registerTestParticipant(page.context(), project);
   await page.goto(project.galleryUrl);
   await page.waitForLoadState("networkidle");
 }

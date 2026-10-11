@@ -1,3 +1,4 @@
+import { customerReturnPath } from "@/lib/customer-return-path";
 import { redirect } from "next/navigation";
 import { getAdminClient } from "@/lib/supabase-admin";
 import PinForm from "./PinForm";
@@ -16,7 +17,7 @@ export default async function PinPage({
 }) {
   const { token } = await params;
   const sp = await searchParams;
-  const fromUrl = sp.from ?? `/c/${token}`;
+  const fromUrl = customerReturnPath(token, sp.from);
 
   const admin = getAdminClient();
   const { data: project } = await admin

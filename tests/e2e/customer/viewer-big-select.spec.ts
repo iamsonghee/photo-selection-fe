@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setupFullProject, deleteTestProject, mockCustomerThumbPresigning, type TestProject } from "../../helpers/setup";
+import { registerTestParticipant, setupFullProject, deleteTestProject, mockCustomerThumbPresigning, type TestProject } from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
@@ -19,6 +19,7 @@ test.afterAll(async ({ browser }) => {
 });
 
 async function openViewer(page: import("@playwright/test").Page, index = 0) {
+  await registerTestParticipant(page.context(), project);
   await mockCustomerThumbPresigning(page);
   await page.goto(`/c/${project.accessToken}/viewer/${project.photoIds![index]}`);
   await page.waitForLoadState("networkidle");

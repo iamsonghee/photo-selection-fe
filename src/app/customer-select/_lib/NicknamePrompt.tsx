@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { X } from "lucide-react";
+import { User, X } from "lucide-react";
 import { COLOR_LABELS } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "./real-store";
 import ui from "./ui.module.css";
+import shell from "./ProjectShell.module.css";
 
-export function NicknamePrompt({ hex, isDone, online }: { hex: string; isDone: boolean; online: boolean }) {
+export function NicknamePrompt({ hex, isDone }: { hex: string; isDone: boolean }) {
   const { project, currentIdentity, setNickname } = useCustomerSelectStore();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nickname = project.participantNicknames[currentIdentity]?.trim() ?? "";
@@ -26,11 +27,9 @@ export function NicknamePrompt({ hex, isDone, online }: { hex: string; isDone: b
 
   return (
     <>
-      {/* 내 아바타 — 누르면 이름 설정. 이름이 없으면 "나"와 점선 테두리로 설정을 권한다. */}
-      <button type="button" className={`${ui.avatar} ${online ? ui.avatarOnline : ""} ${nickname ? "" : ui.avatarMissing}`} style={{ background: hex }} onClick={open}
+      <button type="button" className={shell.peopleButton} onClick={open}
         title={nickname ? `${nickname} (나) · ${isDone ? "다 골랐어요" : "고르는 중"} · 이름 수정` : "내 이름 설정"} aria-label={nickname ? `내 이름 ${nickname} 수정` : "내 이름 설정"}>
-        {nickname ? nickname.slice(0, 1) : "나"}
-        {isDone ? <span className={ui.avatarDone} aria-hidden>✓</span> : null}
+        <User size={16} aria-hidden /><span className={shell.peopleLabel}>{nickname || "내 이름"}</span>
       </button>
       <dialog ref={dialogRef} className={ui.nicknameDialog} onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
         <form method="dialog" onSubmit={(event) => { event.preventDefault(); save(); }}>

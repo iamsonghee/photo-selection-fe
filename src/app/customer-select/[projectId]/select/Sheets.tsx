@@ -15,7 +15,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className={s.sheetBackdrop} onClick={onClose}>
+    <div data-customer-sheet className={s.sheetBackdrop} onClick={onClose}>
       <div className={s.sheet} role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <div className={s.sheetHead}>
           <h2>{title}</h2>

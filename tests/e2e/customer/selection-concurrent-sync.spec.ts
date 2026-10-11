@@ -15,7 +15,7 @@
 
 import { test, expect } from "@playwright/test";
 import type { BrowserContext, Page, Route } from "@playwright/test";
-import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import { registerTestParticipant, seedLegacyRatings, setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
@@ -23,9 +23,7 @@ let photoId: string;
 let viewerUrl: string;
 
 async function identifyAs(context: BrowserContext, color: string, initial: string) {
-  await context.addInitScript(({ token, color, initial }) => {
-    localStorage.setItem(`ps:c-participant:v1:${token}`, JSON.stringify({ color, initial }));
-  }, { token: project.accessToken, color, initial });
+  await registerTestParticipant(context, project, color, initial);
 }
 
 async function openPcComment(page: Page) {
@@ -36,6 +34,7 @@ async function openPcComment(page: Page) {
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
   project = await setupFullProject(page, 5);
+  await seedLegacyRatings(page, project);
   await page.goto(project.galleryUrl, { waitUntil: "networkidle" });
   const photosRes = await page.request.get(
     `/api/c/photos?token=${encodeURIComponent(project.accessToken)}`
@@ -93,6 +92,8 @@ test("C1: A가 별점, B가 색상칩을 거의 동시에 저장해도 서버에
 test("C2: 코멘트를 남긴 뒤 다른 세션이 선택 토글을 해도 코멘트가 지워지지 않는다", async ({ browser }) => {
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
+  await identifyAs(ctxA, "yellow", "A");
+  await identifyAs(ctxB, "red", "B");
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
 
@@ -129,6 +130,8 @@ test("C2: 코멘트를 남긴 뒤 다른 세션이 선택 토글을 해도 코�
 test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 반영된다", async ({ browser }) => {
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
+  await identifyAs(ctxA, "yellow", "A");
+  await identifyAs(ctxB, "red", "B");
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
   const remoteComment = "다른 탭 코멘트 동기화 ✨";
@@ -138,7 +141,10 @@ test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 
 
   const commentB = await openPcComment(pageB);
   await commentB.fill(remoteComment);
+  const saved = pageB.waitForResponse((response) => response.url().endsWith("/api/c/selections") && response.request().method() === "POST");
   await commentB.blur();
+  expect((await saved).ok()).toBe(true);
+  await pageA.bringToFront();
 
   const remoteCommentButton = pageA.getByRole("button", { name: `작가 전달 메모 수정: ${remoteComment}` });
   await expect(remoteCommentButton).toBeVisible({ timeout: 8_000 });
@@ -150,6 +156,7 @@ test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 
 
 test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값은 유지한다", async ({ browser }) => {
   const ctx = await browser.newContext();
+  await identifyAs(ctx, "red", "테스트 고객");
   const page = await ctx.newPage();
   await page.goto(viewerUrl, { waitUntil: "networkidle" });
   await page.request.post("/api/c/selections", {
@@ -220,6 +227,7 @@ test("C5: PC와 모바일 참가자가 같은 사진을 동시에 찜해도 두 
 
 test("C6: 같은 사진을 빠르게 세 번 선택해도 최종 선택 상태와 서버가 일치한다", async ({ browser }) => {
   const ctx = await browser.newContext();
+  await identifyAs(ctx, "red", "테스트 고객");
   const page = await ctx.newPage();
   await page.goto(viewerUrl, { waitUntil: "networkidle" });
   await page.request.post("/api/c/selections", { data: {
@@ -264,6 +272,8 @@ test("C7: 두 세션의 동시 선택도 서버에서 목표 장수를 넘지 �
 
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
+  await identifyAs(ctxA, "yellow", "A");
+  await identifyAs(ctxB, "red", "B");
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
   await Promise.all([

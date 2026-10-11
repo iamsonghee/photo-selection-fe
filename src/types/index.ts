@@ -108,6 +108,8 @@ export interface Project {
   shootDate: string; // ISO date
   deadline: string; // ISO date
   requiredCount: number; // N
+  /** 기존 별점 사용 프로젝트는 별점을 모두 지워도 별점 UI를 유지한다. */
+  selectionUsesRatings?: boolean;
   photoCount: number; // M (실제 업로드된 장수)
   /** 촬영 유형: wedding | family | graduation | profile | etc */
   shootType?: string | null;

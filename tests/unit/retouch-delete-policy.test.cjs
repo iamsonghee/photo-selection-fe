@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const ts = require("typescript");
 
 // 실제 DELETE 핸들러를 실행하되 인증·DB·스토리지는 메모리 대역으로 격리한다.
-async function deleteVersion({ version = 2, status = "editing_v2", review = null, history = [], historyError = null } = {}) {
+async function deleteVersion({ version = 2, status = "editing_v2", review = null, history = [], historyError = null, storageOk = true } = {}) {
   const effects = [];
   const admin = { from(table) {
     let deleting = false;
@@ -38,14 +38,15 @@ async function deleteVersion({ version = 2, status = "editing_v2", review = null
   const source = fs.readFileSync(path.join(__dirname, "../../src/app/api/photographer/projects/[id]/versions/[versionId]/route.ts"), "utf8");
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
-    exports, console, URL, process: { env: {} },
+    exports, console, URL, process: { env: { INTERNAL_PRESIGN_SECRET: "test-secret" } },
     require(name) {
       if (name === "next/server") return { NextResponse: { json: (body, options) => ({ body, status: options?.status ?? 200 }) } };
+      if (name.endsWith("photographer-session-auth")) return { getPhotographerIdFromSession: async () => "owner" };
       if (name.endsWith("supabase/server")) return { createClient: async () => session };
       if (name.endsWith("supabase-admin")) return { getAdminClient: () => admin };
       throw new Error(name);
     },
-    fetch: async () => { effects.push("storage"); return { ok: true }; },
+    fetch: async (_url, options) => { assert.equal(options.headers.Authorization, "Bearer test-secret"); effects.push("storage"); return { ok: storageOk, json: async () => ({ detail: "storage unavailable" }) }; },
   });
   const response = await exports.DELETE({}, { params: Promise.resolve({ id: "project", versionId: "version" }) });
   return { response, effects };
@@ -81,4 +82,10 @@ test("확정본 및 고객 검토 중에는 삭제하지 않음", async () => {
 test("V1 작업 중 삭제 정책은 유지", async () => {
   const { response } = await deleteVersion({ version: 1, status: "editing" });
   assert.equal(response.status, 200);
+});
+
+test("스토리지 삭제 실패 시 DB 기록을 보존", async () => {
+  const { response, effects } = await deleteVersion({ storageOk: false });
+  assert.equal(response.status, 500);
+  assert.deepEqual(effects, ["storage"]);
 });
