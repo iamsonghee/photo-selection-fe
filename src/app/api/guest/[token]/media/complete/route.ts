@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { GuestRequestError, authorizeGuest, callGuestStorage, getGuestAlbumByToken } from "@/lib/guest-album-server";
+import { limitGuestRequest, guestDatabaseError, GuestRequestError, authorizeGuest, callGuestStorage, getGuestAlbumByToken, readGuestDeviceKey, deviceHash } from "@/lib/guest-album-server";
 
 /**
  * POST: 브라우저가 R2에 다 올렸다고 알린다. 서버가 R2에서 원본 크기를 확인한 뒤에만 신랑신부 화면에 보인다(ready).
@@ -8,6 +8,10 @@ import { GuestRequestError, authorizeGuest, callGuestStorage, getGuestAlbumByTok
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  try { await limitGuestRequest(); } catch (error) {
+    return NextResponse.json({ error: error instanceof GuestRequestError ? error.message : "잠시 후 다시 시도해 주세요." },
+      { status: error instanceof GuestRequestError ? error.status : 503, headers: { "Retry-After": "60" } });
+  }
   const body = await req.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id.toLowerCase() : "";
   const submissionId = typeof body.submissionId === "string" ? body.submissionId : "";
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     if (sizes[media.original_key] !== media.size_bytes) {
       throw new GuestRequestError(409, "incomplete", "파일이 다 올라가지 않았어요. 다시 보내 주세요.");
     }
-    // ponytail: 마감 확인과 ready 전환 사이의 아주 짧은 경합은 허용한다(마감 직후 1건이 더 보일 수 있음).
+    // DB trigger serializes completion with closing and deletion.
     const { error } = await admin.from("guest_media").update({
       status: "ready",
       thumb_key: media.thumb_key && sizes[media.thumb_key] ? media.thumb_key : null,
@@ -43,22 +47,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof GuestRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    const message = guestDatabaseError(error as { message: string });
+    if (message) return NextResponse.json({ error: message, code: (error as { message?: string })?.message?.includes("guest_closed") ? "closed" : "invalid" }, { status: 409 });
     console.error("[guest media complete]", error);
     return NextResponse.json({ error: "잠시 후 다시 시도해 주세요." }, { status: 500 });
   }
 }
 
 async function discardPending(token: string, id: string, submissionId: string) {
-  try {
-    const album = await getGuestAlbumByToken(token);
-    if (!album) return;
-    const admin = getAdminClient();
-    const { data } = await admin.from("guest_media").select("original_key, thumb_key, preview_key")
-      .eq("id", id).eq("album_id", album.id).eq("submission_id", submissionId).eq("status", "pending").maybeSingle();
-    if (!data) return;
-    await callGuestStorage("delete", { keys: [data.original_key, data.thumb_key, data.preview_key].filter(Boolean) });
-    await admin.from("guest_media").delete().eq("id", id).eq("status", "pending");
-  } catch (error) {
-    console.warn("[guest media discard after close]", error);
-  }
+  const album = await getGuestAlbumByToken(token);
+  if (!album) return;
+  const device = await readGuestDeviceKey();
+  if (!device) return;
+  const { data: submission } = await getAdminClient().from("guest_submissions").select("id")
+    .eq("id", submissionId).eq("album_id", album.id).eq("device_hash", deviceHash(album.id, device)).maybeSingle();
+  if (!submission) return;
+  await getAdminClient().from("guest_media").update({ cleanup_at: new Date().toISOString() })
+    .eq("id", id).eq("album_id", album.id).eq("submission_id", submissionId).eq("status", "pending");
 }

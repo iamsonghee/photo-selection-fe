@@ -13,6 +13,7 @@ export type GuestAlbumInfo = {
   greeting: string | null;
   uploadToken: string;
   closed: boolean;
+  uploadStarted: boolean;
 };
 
 /** 화면에 내려보내는 파일 하나(ready만). URL은 공개 주소 — 키가 추측할 수 없는 UUID다. */
@@ -27,6 +28,7 @@ export type GuestMedia = {
   /** 사진을 줄이지 않고 원본으로 보냈는지(영상은 항상 true) */
   isOriginal: boolean;
   uploadedAt: string;
+  selected: boolean;
   guestName: string;
   guestMessage: string | null;
 };

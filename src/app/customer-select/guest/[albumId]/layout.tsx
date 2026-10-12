@@ -18,7 +18,7 @@ export default async function GuestAlbumLayout({ children, params }: { children:
 
   return (
     <CustomerSelectShell compactTitle={<strong className="block truncate text-[15px] font-bold">{row.name}</strong>}>
-      <GuestAlbumProvider initialAlbum={toGuestAlbumInfo(row)} media={media} guests={guests} limits={limits}>{children}</GuestAlbumProvider>
+      <GuestAlbumProvider key={`${row.id}:${row.wedding_date}:${row.upload_started_at}:${row.closed_at}`} initialAlbum={toGuestAlbumInfo(row)} media={media} guests={guests} limits={limits}>{children}</GuestAlbumProvider>
     </CustomerSelectShell>
   );
 }

@@ -82,9 +82,9 @@ HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 �
 보정본 있음 → 비교, 선택 완료 → 결과, 나머지 → 기존 단계. 조회 실패(null)는 보정본 개수를 단정하지 않고 기존 상태에 따른 경로를 사용한다.
 기존 exported/delivery_count/retouch_done 분기는 과거 프로젝트 호환용으로 유지한다. 앱 배포 전에 위 마이그레이션을 적용해야 한다.
 
-## 하객 사진 모으기 (2026-10-06, 1단계)
+## 하객 사진 모으기 (2026-10-12)
 
-셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`, `20261006010000_guest_media_is_original.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 상세·남은 일은 `customer-select.md`의 "하객 사진 모으기".
+셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`, `20261006010000_guest_media_is_original.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 선택 저장(`guest_media.selected`), `guest_archives`/`guest_archive_parts` 기반 ZIP, DB rate bucket·예약 용량 트리거, `deleting_at`/`cleanup_at` 수명주기가 추가되었다(`20261012000000_guest_album_completion.sql`). FastAPI lifespan에서 `guest_archive_worker`(5초)·`guest_cleanup_worker`(5분)를 실행한다. 정책 6개를 app_settings/admin에 추가했다. 소유자 쓰기는 service-role 전용 `guest_owner_action`에서 소유권과 앨범 잠금을 검증한다. 파일 삭제 성공 전에 DB 행을 제거하지 않는다. 상세·설정·유예 기간은 `customer-select.md`의 "하객 사진 모으기".
 
 ## 작가 추천 편집 (2026-09-18)
 
@@ -645,7 +645,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/guest/[token]/submissions` | POST | 없음(업로드 토큰, 식별 쿠키 발급) | 하객 보내기 묶음(이름·메시지) 생성 |
 | `api/guest/[token]/media/presign` | POST | 업로드 토큰+식별 쿠키 | 파일 하나의 R2 PUT 주소(원본·썸네일·미리보기), 용량 한도 확인, `guest_media` pending(`is_original` — 줄여 보낸 사진이면 false) |
 | `api/guest/[token]/media/complete` | POST | 업로드 토큰+식별 쿠키 | R2 원본 크기 확인 후 ready. 마감됐으면 파일 삭제 후 409 |
-| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 9개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
+| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 15개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
 | `api/photographer/beta-survey/status` | GET | 세션 | 지금 노출해야 할 설문 타입 조회(`{surveyType}`, 없으면 `null`) — §6.1b |
 | `api/photographer/beta-survey` | POST | 세션 | 설문 제출(`action:"submit"`) 또는 "나중에" 기록(`action:"later"`, 24h 재노출 억제). 이미 제출된 설문은 재기록 없이 `alreadySubmitted:true` 반환(멱등) |
 | `api/photographer/beta-survey/skip` | POST | 세션 | 설문 "다시 묻지 않기"(영구 건너뛰기) 기록 |
@@ -993,3 +993,11 @@ sequenceDiagram
 - PIN `from`/자동 인증 `to`는 `customerReturnPath`에서 현재 `/c/[token]` 내부 경로만 허용한다. 실패 횟수 조회·기록 오류는 인증을 중단하고 500으로 반환한다.
 - `submit_customer_version_reviews`는 프로젝트와 현재 보정본을 잠근 뒤 전체 대상 검증, 검토 저장, 상태 전환, 초안 삭제, 납품 아카이브 확정을 한 트랜잭션으로 수행한다. 미선택 후보는 검토·결과 조회에서도 제외한다.
 - 배포 전 `20261011010000_atomic_customer_review_submission.sql` 적용이 필요하다. SQL 테스트는 독립 PostgreSQL의 동시 연결·실패 주입으로 검증하며 운영 스키마 전체/RLS 검증을 대체하지 않는다.
+
+### 하객 앨범 추가 API (2026-10-12)
+
+- `PATCH /api/customer-select/guest-albums/[id]`: 소유자 선택 저장/결혼식 날짜 변경. 최초 업로드 제출 이후 날짜 잠금.
+- `DELETE /api/customer-select/guest-albums/[id]`: 소유자 삭제 예약. 접근 차단 후 워커가 R2·DB 삭제.
+- `POST/GET /api/customer-select/guest-albums/[id]/archives`: 소유자 ZIP 스냅샷 요청/파트 상태와 다운로드 서명 주소 조회.
+- FastAPI 내부 `POST /api/guest-upload/archive-urls`: 내부 비밀값과 ZIP 전용 키 패턴 검증, 15분 GET URL.
+- 공개 업로드 세 API는 DB의 기기·IP 분당 한도를 공유한다. pending+ready 예약량으로 동시 업로드 총량을 제한한다.

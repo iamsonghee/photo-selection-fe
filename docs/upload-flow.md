@@ -503,3 +503,11 @@ HEIC 파일은 `include_original=true` 상태에서 FE와 BE 모두에서 거부
 ### 저장소 삭제 오류 처리 (2026-10-11)
 
 Next의 사진 단건·선택 묶음·전체·보정본 삭제는 소유권 검사 후 `INTERNAL_PRESIGN_SECRET` Bearer로 FastAPI `/api/storage/delete`를 호출한다. R2 배치 응답의 `Errors`와 버킷 설정 누락을 실패로 처리하며 전체 사진 삭제도 실패 시 DB 행을 지우지 않는다. 여러 배치 중 앞선 배치만 삭제된 경우 원격 파일까지 롤백되지는 않으므로 재시도로 남은 파일을 정리한다.
+
+## 하객 앨범 저장·다운로드·정리 (2026-10-12)
+
+공개 submissions/presign/complete는 DB `check_guest_rate`로 기기 쿠키·신뢰 IP의 분당 요청 수를 먼저 확인한다. presign의 DB 트리거는 앨범 행을 잠가 pending+ready 수와 원본·파생 이미지 예약 바이트 합계를 검사한다. 재시도는 같은 ID를 유지하며 원본 크기·종류·형식을 바꾸거나 예약량을 줄일 수 없다. 완료/마감/삭제 경합도 DB에서 거절한다. 파일별 실패 집계로 전송 오류 때 완료 화면 대신 재시도 화면을 보인다.
+
+마감 후 소유자 선택을 `guest_media.selected`에 저장한다. ZIP 요청은 그 시점의 선택을 `guest_archive_parts.manifest`에 고정하고 `guest_archive_part_mb` 기준으로 나눈다. FastAPI `guest_archive_worker`가 스트리밍 ZIP을 만들고 바이트 진행률을 기록한다. UUID를 붙인 파일명을 `원본/`·`줄인 사진/`로 구분한다. 다운로드와 재시도는 소유자 API를 통한다.
+
+`guest_cleanup_worker`는 KST 결혼식 날짜+`guest_retention_days` 종료 다음 날 만료 표시하고, 마지막 presign 후 `guest_pending_hours`가 지난 pending을 정리 표시한다. 표시 후 2시간(`DELETE_GRACE_HOURS`, 기존 1시간 PUT URL 고려)과 처리 중 ZIP lease를 기다린 뒤 R2 prefix를 지우고 DB 행을 지운다. 부분 삭제 실패면 DB는 보존하고 다음 5분 주기(`SWEEP_SECONDS`)에 재시도한다. 소유자 삭제도 같은 경로다. 상세 설정과 미검증 범위는 `customer-select.md`를 따른다.

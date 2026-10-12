@@ -91,6 +91,7 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
     setPhase("sending");
 
     let closed = false;
+    let uploadFailed = false;
     try {
       submissionRef.current ??= await createGuestSubmission(token, name.trim(), message.trim());
     } catch (error) {
@@ -110,6 +111,7 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
           await uploadGuestFile(token, submissionId, id, file, sendOriginal, (ratio) => update(id, { progress: ratio * 100 }));
           update(id, { status: "done", progress: 100 });
         } catch (error) {
+          uploadFailed = true;
           if (error instanceof GuestUploadError && error.code === "closed") closed = true;
           update(id, { status: "failed", error: error instanceof Error ? error.message : "보내지 못했어요." });
         }
@@ -117,7 +119,7 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
     };
     await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker));
     if (closed) return setPhase("closed");
-    setPhase(itemsRef.current.some((item) => item.status === "failed") ? "failed" : "done");
+    setPhase(uploadFailed ? "failed" : "done");
   }
 
   function sendMore() {
