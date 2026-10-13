@@ -12,7 +12,7 @@ import { AlertTriangle, Copy, FileSpreadsheet, FileText, MessageSquare, Send } f
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
-import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
+import { csvEscape, downloadTextFile, filenameWithoutExtension, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { formatSceneRange } from "@/lib/customer-scenes";
 import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
@@ -179,8 +179,8 @@ function SendScreen() {
               <summary>다른 전달 방식</summary>
               <div className={s.fileLinks}>
               <button type="button" onClick={() => void copyList()}><FileText size={14} />{listCopied ? "복사했어요" : "파일명·메모 복사"}</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />파일명과 메모 CSV</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />파일명만 TXT</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(filenameWithoutExtension(getPhotoDisplayName(photo))), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />파일명과 메모 CSV</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map((photo) => filenameWithoutExtension(getPhotoDisplayName(photo))).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />파일명만 TXT</button>
               </div>
             </details>
           </section>

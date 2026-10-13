@@ -1,3 +1,9 @@
+/** 파일명 목록 내보내기에서는 마지막 확장자만 제외한다. */
+export function filenameWithoutExtension(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  return dot > 0 && dot < filename.length - 1 ? filename.slice(0, dot) : filename;
+}
+
 export function sanitizeFilenamePart(value: string) {
   return value.replace(/[\\/:*?"<>|]/g, "_").trim();
 }

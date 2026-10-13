@@ -37,7 +37,7 @@ import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet } from "@/lib/photo-groups";
 import { downloadSelectedPhotosToDirectory } from "@/lib/selected-photo-download";
-import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
+import { csvEscape, downloadTextFile, filenameWithoutExtension, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { useCollapsibleAssetHeader } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import styles from "../results/ResultsTheme.module.css";
@@ -440,13 +440,13 @@ export default function ProjectAssetsPageClient({
   };
   const handleDownloadCsv = () => {
     const rows = selectedPhotos.map((photo) => [
-      csvEscape(getDisplayFilename(photo)),
+      csvEscape(filenameWithoutExtension(getDisplayFilename(photo))),
       csvEscape(photoStates[photo.id]?.comment?.trim() ?? ""),
     ].join(","));
     downloadTextFile(`${exportBaseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
   };
   const handleDownloadTxt = () => downloadTextFile(
-    `${exportBaseName}.txt`, selectedPhotos.map(getDisplayFilename).join("\n"), "text/plain;charset=utf-8",
+    `${exportBaseName}.txt`, selectedPhotos.map((photo) => filenameWithoutExtension(getDisplayFilename(photo))).join("\n"), "text/plain;charset=utf-8",
   );
   const selectedDownloadLabel = project?.includeOriginal ? "선택한 사진의 원본" : "선택한 사진의 미리보기";
   const selectionIsFinal = project ? !["preparing", "selecting"].includes(project.status) : false;

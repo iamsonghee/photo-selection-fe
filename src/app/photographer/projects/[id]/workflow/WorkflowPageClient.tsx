@@ -58,6 +58,7 @@ import {
 } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAssetStatusActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { filenameWithoutExtension } from "@/lib/text-file-download";
 import { formatPhotoDisplayFilename, getPhotoDisplayFilename } from "@/lib/photo-display-filename";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -1506,7 +1507,7 @@ export default function WorkflowPageClient({
       ? withComment ? ["번호", "파일명", "작가 전달 메모"] : ["번호", "파일명"]
       : withComment ? ["번호", "파일명", "보정본 파일명", "상태", "재보정 요청 내용"] : ["번호", "파일명", "보정본 파일명", "상태"];
     const rowData = rows.map((row, i) => {
-      const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
+      const filename = filenameWithoutExtension(row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`);
       if (isOriginal) {
         return withComment
           ? [String(i + 1), filename, row.photo.comment ?? ""]
@@ -1520,7 +1521,7 @@ export default function WorkflowPageClient({
         ver?.reviewStatus === "approved" ? "확정"
         : ver?.reviewStatus === "revision_requested" ? "재보정 요청"
         : "미검토";
-      const versionFilename = ver?.filename ?? "";
+      const versionFilename = filenameWithoutExtension(ver?.filename ?? "");
       return withComment
         ? [String(i + 1), filename, versionFilename, status, ver?.comment ?? ""]
         : [String(i + 1), filename, versionFilename, status];

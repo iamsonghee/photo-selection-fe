@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { ProjectBodySkeleton } from "../../../_lib/ProjectBodySkeleton";
-import { csvEscape, downloadTextFile } from "@/lib/text-file-download";
+import { csvEscape, downloadTextFile, filenameWithoutExtension } from "@/lib/text-file-download";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
 import ui from "../../../_lib/ui.module.css";
@@ -47,12 +47,12 @@ export default function RetouchExportPage() {
   }
 
   function handleDownloadCsv() {
-    const rows = redoList.map(({ photo, version }) => `${csvEscape(photo.filename)},${csvEscape(version.redoReason ?? "")}`);
+    const rows = redoList.map(({ photo, version }) => `${csvEscape(filenameWithoutExtension(photo.filename))},${csvEscape(version.redoReason ?? "")}`);
     downloadTextFile("재보정_요청.csv", ["파일명,재보정 요청", ...rows].join("\n"), "text/csv;charset=utf-8");
   }
 
   function handleDownloadTxt() {
-    downloadTextFile("재보정_요청.txt", redoList.map(({ photo, version }) => `${photo.filename} — ${version.redoReason ?? ""}`).join("\n"), "text/plain;charset=utf-8");
+    downloadTextFile("재보정_요청.txt", redoList.map(({ photo, version }) => `${filenameWithoutExtension(photo.filename)} — ${version.redoReason ?? ""}`).join("\n"), "text/plain;charset=utf-8");
   }
 
   if (loadError) return <RetouchErrorScreen message={loadError} />;
