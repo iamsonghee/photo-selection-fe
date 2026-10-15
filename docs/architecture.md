@@ -1,5 +1,9 @@
 # 시스템 아키텍처
 
+## 작가 업로드 성능 기록 (2026-10-16)
+
+작가 업로드 화면은 세션 종료 시 집계 report 한 건을 `POST /api/photographer/upload-performance`로 전송한다. 로그인 세션에서 확인한 작가 ID와 배포 커밋 SHA를 붙여 service role로 `upload_performance_logs`에 저장한다. 테이블은 RLS를 켜고 일반 사용자 정책을 두지 않으며 `created_at` 인덱스 하나만 사용한다. 브라우저 report에는 파일명·파일 객체·프로젝트 ID·R2 key·URL·토큰이 없다. FastAPI `/photos`와 `/originals/confirm`은 추가 조회 없이 `time.perf_counter()`로 단계별 시간을 Railway 로그에 남긴다. 저장·로그 실패는 업로드 결과를 바꾸지 않는다. 상세 필드와 분석 쿼리는 `upload-flow.md` 및 `photographer-upload-performance-analysis.md`를 따른다.
+
 ## 초대 고객 셀렉 협업 (2026-10-10)
 
 2026-10-14 작가 보관함 집계 보정: `getPhotosWithSelections()`는 `selections.is_selected=true`인 사진만 최종 선택 목록에 포함한다. 미선택 행의 찜·별점·메모는 `photoStates`에 보존한다. 작가 셀렉 장수·목록·내보내기와 해당 목록을 사용하는 보정 작업 대상이 이 선택 목록을 공유한다. DB·고객 API·FastAPI 변경은 없다.

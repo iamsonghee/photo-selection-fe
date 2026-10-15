@@ -287,7 +287,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | 모드 | 배치 크기 | 동시 배치 수(concurrency) | 상수/근거 |
 |---|---|---|---|
 | `include_original=false`, PC | 8장/배치 | **6**(기본), 느린 회선이면 2~4로 하향 | `BATCH_SIZE=8`, `getDesktopUploadConcurrency(false)` → `PC_CONCURRENCY(5)+1` |
-| `include_original=false`, Mobile | 3장/배치 | **1** | `MOBILE_BATCH_SIZE=3`, `MOBILE_CONCURRENCY=1` |
+| `include_original=false`, Mobile | 5장/배치 | **1** | `MOBILE_BATCH_SIZE=5`, `MOBILE_CONCURRENCY=1` |
 | `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
@@ -352,15 +352,21 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 
 ### 구간별 성능 기록
 
-세션 종료 또는 화면 이탈 시 브라우저 console의 `[upload-performance]` 및 `acut:upload-performance` CustomEvent로 집계 1건을 기록한다. 서버 전송·영구 보관은 하지 않는다. 파일명, 파일 객체, 프로젝트/사용자 ID, R2 key, URL, 토큰은 포함하지 않는다.
+세션 종료 또는 화면 이탈 시 브라우저 console의 `[upload-performance]` 및 `acut:upload-performance` CustomEvent로 집계 1건을 기록한다. 같은 집계를 세션당 한 번 `POST /api/photographer/upload-performance`로 보내며 `navigator.sendBeacon`을 우선하고 큐 등록이 되지 않으면 `fetch(keepalive)`로 대체한다. 전송·저장 오류는 업로드 결과에 영향을 주지 않는다. API는 로그인한 작가를 확인하고 service role로 `upload_performance_logs`에 저장한다. 배포 커밋 SHA가 있으면 `app_version`에 함께 저장한다.
 
-- `version=2`, `previewBytes`(준비된 중간 이미지 크기 합계), `device`, `includesOriginal`, `fileCount`, `sourceBytes`, `transferredBytes`(유효 전송량), `savedCount`, `failedCount`, `outcome`, `elapsedMs`, `retryCount`
+브라우저 report에는 파일명, 파일 객체, 프로젝트/사용자 ID, R2 key, URL, 토큰이 포함되지 않는다. 서버가 세션에서 확인한 `photographer_id`만 내부 테스트 계정 제외를 위해 행에 붙인다. RLS를 켜고 일반 사용자 정책을 두지 않아 브라우저가 테이블을 직접 읽거나 쓸 수 없다.
+
+- `version=3`, `previewBytes`(준비된 중간 이미지 크기 합계), `device`, `includesOriginal`, `fileCount`, `sourceBytes`, `transferredBytes`(유효 전송량), `savedCount`, `failedCount`, `outcome`, `elapsedMs`, `retryCount`
 - `firstOriginalMs`: 파일 선택 세션 시작부터 첫 원본 PUT 시작까지
 - `firstSavedMs`: 세션 시작부터 첫 사진 저장 확인 성공까지
 - `fileStageMs`: 큐 대기, 압축 준비, 압축 후 대기, 미리보기 바디 전송, 미리보기 응답 대기, 원본 PUT, 저장 확인, 재시도 등 단계 체류 시간의 파일별 합계
 - `finalizeMs`: 세션 마지막 DB 집계 요청 시간
+- `originalConcurrency`: 원본 PUT 동시성의 시작·종료·최소·최대값과 조정/측정 횟수
+- `uploadStrategy`: 프로젝트의 `preview_first` 또는 `parallel` 설정
 
 병렬 파일의 시간은 겹치므로 `fileStageMs` 합계를 전체 소요 시간으로 해석하면 안 된다. 셀렉 전용의 여러 파일 batch는 batch의 단계 경계를 각 파일에 적용한다. `previewProcessing`은 브라우저의 바디 전송 완료부터 응답까지로 네트워크 왕복·서버 이미지 처리·R2·DB 시간이 합쳐진 값이다. **서버 내부 CPU/R2/DB 개별 시간 또는 운영 속도 개선율을 실측한 지표가 아니다.**
+
+FastAPI는 `/photos` 요청마다 `photographer upload timing` 한 줄을 남긴다. 필드는 `project`, `files`, `ok`, `rejected`, `mb`, `include_original`, `auth_ms`, `db_pre_ms`, `process_ms`, `resize_max_ms`, `r2_max_ms`, `db_insert_ms`, `db_post_ms`, `presign_ms`, `total_ms`다. `/originals/confirm`은 `original confirm timing` 한 줄에 `project`, `r2_head_ms`, `rpc_ms`, `total_ms`를 남긴다. `total_ms`가 15초를 넘으면 warning, 나머지는 info다. 계측은 `time.perf_counter()`만 사용하며 추가 DB 조회를 하지 않는다.
 
 "업로드 완료!" 토스트가 실제로 기다리는 것:
 

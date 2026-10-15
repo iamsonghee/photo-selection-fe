@@ -31,6 +31,7 @@ import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/
 import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
 import { readTakenAt } from "@/lib/exif-taken-at";
 import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
+import { sendUploadPerformance } from "@/lib/upload-performance-client";
 import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
@@ -926,6 +927,8 @@ export default function ProjectDetailPage() {
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "originals" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const uploadTelemetryRef = useRef<UploadTelemetry | null>(null);
+  const uploadPerformanceSentRef = useRef(false);
+  const uploadPerformanceStrategyRef = useRef<"preview_first" | "parallel" | null>(null);
   const [uploadSnapshot, setUploadSnapshot] = useState<UploadSnapshot | null>(null);
   const [uploadStopRequested, setUploadStopRequested] = useState(false);
   /** 네트워크 전송은 끝났고 서버(썸네일·저장) 응답 대기 중 — 99% 정지로 오해하지 않도록 별도 표시 */
@@ -1220,6 +1223,10 @@ export default function ProjectDetailPage() {
         const report = tracker.report();
         console.info("[upload-performance]", report);
         window.dispatchEvent(new CustomEvent("acut:upload-performance", { detail: report }));
+        if (!uploadPerformanceSentRef.current) {
+          uploadPerformanceSentRef.current = true;
+          sendUploadPerformance(report, uploadPerformanceStrategyRef.current);
+        }
         uploadTelemetryRef.current = null;
       }
     };
@@ -1881,6 +1888,8 @@ export default function ProjectDetailPage() {
     uploadInProgressRef.current = true;
     const inclOrig = project?.includeOriginal ?? false;
     const telemetry = new UploadTelemetry(uploadFiles.map(file => file.size), inclOrig, isMobileUploadClient() ? "mobile" : "pc");
+    uploadPerformanceSentRef.current = false;
+    uploadPerformanceStrategyRef.current = project?.uploadStrategy ?? null;
     uploadTelemetryRef.current = telemetry;
     setUploadSnapshot(telemetry.snapshot());
     setUploadError(null);

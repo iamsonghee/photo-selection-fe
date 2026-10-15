@@ -15,6 +15,7 @@ for (const viewport of scenarios) {
     let allowThumbnail = () => {};
     let finalized = false, recovered = false, previewRegistered = false, selectionActivated = false;
     let uploadedClientId: string | null = null;
+    let telemetryRequests = 0;
     const verifyThumbnailTransition = viewport.width === 1440 && !viewport.fallback && !viewport.retry;
     const context = await browser.newContext({
       viewport,
@@ -35,6 +36,10 @@ for (const viewport of scenarios) {
         url: testInfo.project.use.baseURL!, sameSite: "Lax" }]);
       await page.route("**/rest/v1/**", route => route.fulfill({ json: [] }));
       await page.route("**/api/photographer/**", route => route.fulfill({ json: {} }));
+      await page.route("**/api/photographer/upload-performance", route => {
+        telemetryRequests++;
+        return route.abort("failed");
+      });
       // More-specific routes below take precedence over these read-only defaults.
       await page.route("**/auth/v1/user", route => route.fulfill({ json: {
         id: login.userId, aud: "authenticated", role: "authenticated", email: "upload-test@example.test",
@@ -242,6 +247,7 @@ for (const viewport of scenarios) {
       }> }).uploadReports);
       expect(reports).toHaveLength(1);
       expect(reports[0]).toMatchObject({ outcome: "completed", device: viewport.width < 768 ? "mobile" : "pc" });
+      await expect.poll(() => telemetryRequests).toBe(1);
       if (viewport.width >= 768) {
         expect(reports[0]).toMatchObject({
           version: 3,
