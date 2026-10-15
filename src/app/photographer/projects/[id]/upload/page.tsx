@@ -2059,7 +2059,12 @@ export default function ProjectDetailPage() {
           // A long original backlog may outlive the token used by its preview request.
           const { data: { session: latestSession } } = await supabase.auth.getSession();
           jobToken = latestSession?.access_token ?? jobToken;
-          const recovered = await requestSlots.run(() => recoverOriginalJob(job.job_id, jobToken).catch(() => null));
+          // 이번 업로드에서 새로 만든 업로드 ID의 원본은 아직 보낸 적이 없다 — 전송 전 확인(서버 왕복 1회)을 건너뛴다.
+          // 다시 시도한 사진은 이전 업로드에서 이미 올라갔을 수 있어 확인한다. 전송 실패 뒤 확인은 putOriginalToR2가 맡는다.
+          const mayAlreadyExist = Boolean(retryClientUploadIds?.[index]);
+          const recovered = mayAlreadyExist
+            ? await requestSlots.run(() => recoverOriginalJob(job.job_id, jobToken).catch(() => null))
+            : null;
           const putOk = recovered?.status === "confirmed" || await requestSlots.run(() => putOriginalMeasured(
             recovered?.status === "needs_upload" ? { ...job, ...recovered } : job,
             file,

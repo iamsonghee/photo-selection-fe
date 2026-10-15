@@ -464,7 +464,8 @@ test("original-inclusive PC upload batches previews and pairs each original with
       tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
     } }));
     await page.route("**/originals/pending?**", route => route.fulfill({ json: { jobs: [] } }));
-    await page.route("**/originals/recover", route => route.fulfill({ status: 404, json: {} }));
+    let recoverCalls = 0;
+    await page.route("**/originals/recover", route => { recoverCalls++; return route.fulfill({ status: 404, json: {} }); });
     await page.route("**/originals/confirm", route => route.fulfill({ json: { ok: true } }));
     await page.route("**/originals/report-failure", route => route.fulfill({ json: { ok: true } }));
     await page.route("**/originals/finalize", route => { finalized++; return route.fulfill({ json: {
@@ -496,6 +497,8 @@ test("original-inclusive PC upload batches previews and pairs each original with
     await expect.poll(() => finalized, { timeout: 30_000 }).toBeGreaterThan(0);
 
     expect(requestSizes).toEqual([5, 2]);
+    // 새로 만든 업로드 ID의 원본은 보낸 적이 없어 전송 전 복구 확인을 하지 않는다.
+    expect(recoverCalls).toBe(0);
     const puts = await page.evaluate(() => (window as unknown as { puts: { url: string; size: number }[] }).puts);
     expect(puts).toHaveLength(6);
     for (const put of puts) {
