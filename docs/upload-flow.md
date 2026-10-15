@@ -74,7 +74,7 @@ DB의 `customer_photos_lock_owner_quota`가 같은 소유자의 동시 INSERT를
 
 1. 파일 선택 → `startUpload()` 호출.
 2. `include_original=true`이면 HEIC 파일 전체 차단(FE 선행 검증, BE도 동일하게 거부).
-3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 파일별 job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
+3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 5장이고, 원본 포함은 PC 5장/모바일 3장이다(2026-10-16, HEIC가 섞인 선택은 1장). PC 원본 포함은 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 모든 업로드에 원본 `File`의 이름/크기/MIME/수정 시각과, 압축 디코딩에서 얻은 경우 `source_widths/source_heights`를 함께 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
 5. `include_original=true`이면 압축한 셀렉용 사진을 `/photos`로 보내 모든 photo row와 original job을 먼저 만든다. 응답의 presigned URL은 원본 큐에 보관하며, 전체 프리뷰 row가 등록되기 전에는 원본 PUT을 시작하지 않는다.
 6. 모든 프리뷰 등록과 화면 갱신이 끝나면 원본 큐가 raw `File` PUT을 시작하고 기존 confirm/recover로 저장을 확인한다. 이때 고객 셀렉 요청을 바로 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다. 원본 단계에는 화면 유지 경고를 표시한다. 전체 업로드 세션 동안 내부 링크·화면 버튼·브라우저 history 이동을 확인한 뒤 처리하며, 실제 문서 종료·새로고침은 `beforeunload`로 경고한다. 업로드 중에는 `useWakeLock`(Screen Wake Lock API)으로 화면 자동 꺼짐·노트북 자동 절전을 막는다 — 고객 셀프 업로드·보정본 업로드에도 같은 훅을 쓰며, 사용자가 직접 화면을 끄거나 앱을 전환하는 경우는 막지 못한다. 그렇게 끊긴 요청(앱 전환·화면 잠금·오프라인)은 `lib/upload-resume.ts`가 재시도 횟수를 쓰지 않고 화면이 다시 보이고 인터넷이 연결될 때까지 기다렸다가 이어 보낸다(사진 XHR·원본 PUT·고객 업로드·보정본 PUT 공통, 끊김 재시도는 최대 20회). 업로드 진행 표시에는 `UploadConnectionHint`로 `끝날 때까지 이 화면을 켜 두세요`/오프라인 시 `인터넷 연결 끊김 · 다시 연결되면 이어서 업로드`를 보인다. 예전 모바일 `화면이 전환되어 일부 사진이 누락됐을 수 있습니다` 경고는 자동 이어 보내기와 최종 실패 목록으로 대체해 없앴다.
@@ -183,7 +183,7 @@ Browser                    FastAPI                    R2                    DB
 
 ### include_original=true (셀렉 + 납품 원본)
 
-아래는 파일 1장(=batch, `effectiveBatch=1`)이 거치는 `/photos → original PUT → confirm` 체인이다 — 이 순서 자체는 모든 기기에서 동일하다(`uploadOneBatch()` 공유, §FE 배치·동시성·파이프라인 구조 참고). 모든 기기는 producer-consumer 파이프라인으로 이 체인을 스케줄링한다. PC는 여러 consumer lane을 사용하지만 모바일은 단일 lane이라 원본 PUT을 병렬화하지 않고, 그 PUT 중 다음 파일의 압축만 겹친다.
+아래는 파일 1장이 거치는 `/photos → original PUT → confirm` 체인이다. `/photos`는 여러 장(PC 5·모바일 3)을 한 요청으로 보내고, 응답의 `original_presigned` 항목을 `client_upload_id`로 각 사진에 짝짓는다. 그 뒤 원본 PUT·confirm은 사진마다 따로 간다 — 이 순서 자체는 모든 기기에서 동일하다(`uploadOneBatch()` 공유, §FE 배치·동시성·파이프라인 구조 참고). 모든 기기는 producer-consumer 파이프라인으로 이 체인을 스케줄링한다. PC는 여러 consumer lane을 사용하지만 모바일은 단일 lane이라 원본 PUT을 병렬화하지 않고, 그 PUT 중 다음 파일의 압축만 겹친다.
 
 ```
 Browser                    FastAPI                    R2                   DB                  Worker
@@ -288,16 +288,16 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 |---|---|---|---|
 | `include_original=false`, PC | 8장/배치 | **6**(기본), 느린 회선이면 2~4로 하향 | `BATCH_SIZE=8`, `getDesktopUploadConcurrency(false)` → `PC_CONCURRENCY(5)+1` |
 | `include_original=false`, Mobile | 5장/배치 | **1** | `MOBILE_BATCH_SIZE=5`, `MOBILE_CONCURRENCY=1` |
-| `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
-| `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
+| `include_original=true`, PC | **5장/배치**(HEIC 섞이면 1장) | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
+| `include_original=true`, Mobile | **3장/배치**(HEIC 섞이면 1장) | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true`는 파일별 job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, PC와 모바일 모두 모든 프리뷰 row를 등록할 때까지 원본 네트워크 요청을 시작하지 않는다. 등록 완료 뒤 PC 원본 큐는 2개로 시작해 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일 원본 전송은 1개씩 순차 실행한다.
+`include_original=true` 미리보기는 여러 장을 한 요청으로 보내 요청마다 반복되는 서버 DB·인증 비용을 나눈다(2026-10-16 운영 실측 요청당 약 1.9초). 원본 주소 발급·저장에 실패한 사진은 응답 항목이 빠지므로 순서가 아니라 `client_upload_id`로 짝짓고, 짝이 없는 사진은 원본 작업을 시작하지 않고 실패로 표시한다. `client_upload_id`가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다. HEIC는 원본 없이 미리보기만 보내는데 `include_original`이 요청 단위라, HEIC가 섞인 선택은 통째로 1장씩 보낸다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, PC와 모바일 모두 모든 프리뷰 row를 등록할 때까지 원본 네트워크 요청을 시작하지 않는다. 등록 완료 뒤 PC 원본 큐는 2개로 시작해 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일 원본 전송은 1개씩 순차 실행한다.
 
 ### 모든 기기: producer-consumer 파이프라인 (2026-08-07 모바일 적용)
 
 `pipelineMode = true`로 `include_original` 값과 기기 종류에 무관하게 같은 파이프라인 구조를 쓴다. 압축(producer)과 XHR 전송(consumer)을 **bounded async channel**로 연결해, batch 압축이 끝나는 즉시 전송을 시작하고 동시에 다음 batch 압축을 이어간다 — 기존 round의 "전체 압축 완료 후 전송 시작" barrier를 제거했다.
 
-- **producer**: 셀렉 전용과 모바일은 기존처럼 batch를 순서대로 압축한다. 원본 포함 PC는 1장 batch의 예약/job 연결은 유지하면서 2~3개 batch의 파일을 한 번에 워커 풀에 넘겨 실제 병렬 압축하고, 결과를 다시 각 1장 batch로 분리해 순서대로 channel에 넣는다. 압축 라운드가 끝나면 전송 완료를 기다리지 않고 다음 라운드를 이어간다.
+- **producer**: 셀렉 전용과 모바일은 기존처럼 batch를 순서대로 압축한다. 원본 포함 PC는 2~3개 batch의 파일을 한 번에 워커 풀에 넘겨 병렬 압축하고, 결과를 다시 각 batch로 분리해 순서대로 channel에 넣는다. 압축 라운드가 끝나면 전송 완료를 기다리지 않고 다음 라운드를 이어간다.
 - **channel(bounded queue)**: 용량 = `concurrency`다. PC는 기존 값(비원본 기본 6, 원본 포함 기본 4/고사양·빠른 회선 6)을 유지하고, 모바일은 항상 1이다(`MOBILE_CONCURRENCY=1`; 원본 포함도 고정 1). 모바일 producer는 queue가 차면 **다음 batch 압축 전에** 대기하므로, 전송 중인 batch와 다음 batch를 넘는 압축본·미리보기 누적을 막는다.
 - **consumer lane**: 셀렉 전용은 기존 `concurrency`, 원본 포함은 `previewConcurrency`개의 lane이 `/photos` 응답까지 처리한다. 원본 PUT/confirm은 별도 `originalQueue`에서 처리하므로 미리보기 lane이 원본 전송을 기다리지 않는다. `UploadWorkQueue`는 FIFO로 활성 작업 수를 제한한다. 사진 등록 결과를 기다리는 동안에는 네트워크 슬롯을 점유하지 않아 모바일 단일 슬롯 교착을 피한다. 대기 항목은 이미 선택된 File 참조·Promise이며 새 원본 복사본을 만들지 않는다.
 - **FE 압축과 network 업로드의 overlap**: 다음 batch 압축은 현재 batch의 네트워크 전송 중에 진행될 수 있다. 따라서 모바일에서도 압축 대기와 전송 대기가 번갈아 생기던 유휴 구간을 줄인다. 단, 모바일은 동시 전송을 늘리지 않으므로 원본 R2 PUT의 실제 업링크 대역폭 자체를 높이지는 않는다. `uploadOneBatch()`의 `setTimeout(0)` 양보는 유지돼 iOS에서 이전 batch 프리뷰가 그려진 뒤 다음 전송이 시작된다.

@@ -375,35 +375,138 @@ test(`mobile ${strategy} upload ordering`, async ({ browser }, testInfo) => {
     });
     await page.route("**/originals/confirm", route => route.fulfill({ json: { ok: true } }));
     await page.route("**/originals/finalize", route => route.fulfill({ json: {
-      ok: true, total: 6, accepted: 6, completed: 6, incomplete: 0, missing_jobs: 0,
+      ok: true, total: 9, accepted: 9, completed: 9, incomplete: 0, missing_jobs: 0,
     } }));
     await page.route(/\/api\/(?:photographer\/)?upload\/photos$/, async route => {
-      const index = ++previewCount;
-      await page.evaluate(() => (window as unknown as { uploadOrder: string[] }).uploadOrder.push("preview"));
-      await route.fulfill({ json: { uploaded: 1, rejected: [], original_presigned: [{
-        job_id: `job-${index}`, url: `http://localhost:3001/__upload-burst/r2/${index}`,
-        content_type: "image/jpeg", source_key: `source-${index}`, expires_at: "2099-01-01",
-      }] } });
+      // 실제 BE처럼 묶음 안 사진마다 client_upload_id가 붙은 원본 주소를 돌려준다.
+      const clientIds = [...(route.request().postDataBuffer()?.toString() ?? "").matchAll(/name="client_upload_ids"\r\n\r\n([^\r]+)/g)].map(match => match[1]);
+      // 순서 기록은 사진 단위다(한 요청에 여러 장).
+      await page.evaluate((count) => (window as unknown as { uploadOrder: string[] }).uploadOrder.push(...Array(count).fill("preview")), clientIds.length);
+      await route.fulfill({ json: { uploaded: clientIds.length, rejected: [], original_presigned: clientIds.map(clientId => {
+        const index = ++previewCount;
+        return { job_id: `job-${index}`, client_upload_id: clientId, url: `http://localhost:3001/__upload-burst/r2/${index}`,
+          content_type: "image/jpeg", source_key: `source-${index}`, expires_at: "2099-01-01" };
+      }) } });
     });
 
     await page.goto(`/photographer/projects/${projectId}/upload`);
     const sample = fs.readFileSync(path.join(__dirname, "../../fixtures/sample.jpg"));
-    await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 6 }, (_, index) => ({
+    await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 9 }, (_, index) => ({
       name: `sample-${index + 1}.jpg`, mimeType: "image/jpeg", buffer: sample,
     })));
     await page.getByRole("button", { name: "업로드 시작", exact: true }).click();
     await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 30_000 });
     const order = await page.evaluate(() => (window as unknown as { uploadOrder: string[] }).uploadOrder);
     expect(reservationCount).toBe(0);
-    if (strategy === "preview_first") expect(order.indexOf("original")).toBe(6);
-    else expect(order.indexOf("original")).toBeLessThan(6);
-    expect(order.filter((event) => event === "preview")).toHaveLength(6);
-    expect(order.filter((event) => event === "original")).toHaveLength(6);
+    // 모바일 원본 포함은 3장씩 묶어 보낸다(묶음 3개). 병렬 방식은 원본이 마지막 미리보기 묶음을 기다리지 않는다.
+    if (strategy === "preview_first") expect(order.indexOf("original")).toBe(9);
+    else expect(order.indexOf("original")).toBeLessThan(order.lastIndexOf("preview"));
+    expect(order.filter((event) => event === "preview")).toHaveLength(9);
+    expect(order.filter((event) => event === "original")).toHaveLength(9);
   } finally {
     await context.close();
   }
 });
 }
+
+test("original-inclusive PC upload batches previews and pairs each original with its own job", async ({ browser }, testInfo) => {
+  // 5장 묶음 + 2장 묶음. 첫 묶음의 두 번째 사진은 서버가 원본 주소를 주지 않은 경우(발급 실패)다.
+  // 순서가 아니라 client_upload_id로 짝지어야 나머지 원본이 엉뚱한 job으로 올라가지 않는다.
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: testInfo.project.use.baseURL });
+  const page = await context.newPage();
+  try {
+    const expires = Math.floor(Date.now() / 1000) + 3600;
+    const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const jwt = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: projectId, aud: "authenticated", exp: expires })}.test-signature`;
+    const storageKey = `sb-${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split(".")[0]}-auth-token`;
+    await context.addCookies([{ name: storageKey, value: `base64-${encode({ access_token: jwt, refresh_token: "mock-refresh", expires_at: expires,
+      token_type: "bearer", user: { id: projectId, aud: "authenticated", role: "authenticated" } })}`,
+      url: testInfo.project.use.baseURL!, sameSite: "Lax" }]);
+    await page.addInitScript(() => {
+      const state = window as unknown as { puts: { url: string; size: number }[] };
+      state.puts = [];
+      const nativeOpen = XMLHttpRequest.prototype.open;
+      const nativeSend = XMLHttpRequest.prototype.send;
+      const urls = new WeakMap<XMLHttpRequest, string>();
+      XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: unknown[]) {
+        if (method === "PUT" && String(url).includes("/__upload-batch/r2")) urls.set(this, String(url));
+        return Reflect.apply(nativeOpen, this, [method, url, ...rest]);
+      };
+      XMLHttpRequest.prototype.send = function(body) {
+        const url = urls.get(this);
+        if (!url) return nativeSend.call(this, body);
+        const size = (body as Blob).size;
+        state.puts.push({ url, size });
+        this.upload.dispatchEvent(new ProgressEvent("progress", { lengthComputable: true, loaded: size, total: size }));
+        Object.defineProperty(this, "status", { value: 200 });
+        setTimeout(() => this.dispatchEvent(new ProgressEvent("load")), 0);
+      };
+    });
+    const requestSizes: number[] = [];
+    const originalSizeByClientId = new Map<string, number>();
+    let droppedClientId = "";
+    let finalized = 0;
+    await page.route("**/rest/v1/**", route => route.fulfill({ json: [] }));
+    await page.route("**/api/photographer/**", route => route.fulfill({ json: {} }));
+    await page.route("**/auth/v1/user", route => route.fulfill({ json: {
+      id: projectId, aud: "authenticated", role: "authenticated", email: "batch-test@example.test",
+      app_metadata: {}, user_metadata: {}, created_at: "2026-09-17T00:00:00Z",
+    } }));
+    await page.route("**/rest/v1/photographers?**", route => route.fulfill({ json: {
+      id: projectId, auth_id: projectId, name: "테스트 작가", studio_name: "테스트 작가",
+    } }));
+    await page.route("**/rest/v1/projects?**", route => route.fulfill({ json: {
+      id: projectId, photographer_id: projectId, name: "원본 묶음 검증", customer_name: "테스트",
+      required_count: 1, photo_count: 0, status: "preparing", include_original: true, upload_strategy: "preview_first",
+      access_token: "test-upload-token", created_at: "2026-09-17T00:00:00Z", updated_at: "2026-09-17T00:00:00Z",
+    } }));
+    await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
+      tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
+    } }));
+    await page.route("**/originals/pending?**", route => route.fulfill({ json: { jobs: [] } }));
+    await page.route("**/originals/recover", route => route.fulfill({ status: 404, json: {} }));
+    await page.route("**/originals/confirm", route => route.fulfill({ json: { ok: true } }));
+    await page.route("**/originals/report-failure", route => route.fulfill({ json: { ok: true } }));
+    await page.route("**/originals/finalize", route => { finalized++; return route.fulfill({ json: {
+      ok: true, total: 7, accepted: 6, completed: 6, incomplete: 1, missing_jobs: 0,
+    } }); });
+    await page.route(/\/api\/(?:photographer\/)?upload\/photos$/, async route => {
+      const body = route.request().postDataBuffer()?.toString("latin1") ?? "";
+      const field = (name: string) => [...body.matchAll(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`, "g"))].map(match => match[1]);
+      const clientIds = field("client_upload_ids");
+      const sizes = field("original_file_sizes").map(Number);
+      clientIds.forEach((clientId, index) => originalSizeByClientId.set(clientId, sizes[index]));
+      requestSizes.push(clientIds.length);
+      if (requestSizes.length === 1) droppedClientId = clientIds[1];
+      // 실제 BE처럼 발급에 실패한 사진은 항목이 빠지고, 순서도 섞여 올 수 있다.
+      const items = clientIds.filter(clientId => clientId !== droppedClientId).reverse().map(clientId => ({
+        job_id: `job-${clientId}`, client_upload_id: clientId, url: `http://localhost:3001/__upload-batch/r2/${clientId}`,
+        content_type: "image/jpeg", source_key: `source-${clientId}`, expires_at: "2099-01-01",
+      }));
+      await route.fulfill({ json: { uploaded: clientIds.length, rejected: [], original_presigned: items } });
+    });
+
+    await page.goto(`/photographer/projects/${projectId}/upload`);
+    const sample = fs.readFileSync(path.join(__dirname, "../../fixtures/sample.jpg"));
+    // 사진마다 원본 크기를 다르게 해 PUT 본문이 어느 사진인지 구분한다(JPEG 뒤 여분 바이트는 무시된다).
+    await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 7 }, (_, index) => ({
+      name: `batch-${index + 1}.jpg`, mimeType: "image/jpeg", buffer: Buffer.concat([sample, Buffer.alloc(index + 1)]),
+    })));
+    await page.getByRole("button", { name: "업로드 시작", exact: true }).click();
+    await expect.poll(() => finalized, { timeout: 30_000 }).toBeGreaterThan(0);
+
+    expect(requestSizes).toEqual([5, 2]);
+    const puts = await page.evaluate(() => (window as unknown as { puts: { url: string; size: number }[] }).puts);
+    expect(puts).toHaveLength(6);
+    for (const put of puts) {
+      const clientId = put.url.split("/").pop()!;
+      expect(clientId).not.toBe(droppedClientId);
+      expect(put.size).toBe(originalSizeByClientId.get(clientId));
+    }
+  } finally {
+    await context.close();
+  }
+});
 
 test("upload completion shows the refreshed photo count, not the pre-upload count", async ({ browser }, testInfo) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, baseURL: testInfo.project.use.baseURL });

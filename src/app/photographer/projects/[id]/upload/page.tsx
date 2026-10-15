@@ -99,6 +99,10 @@ const ORIGINAL_PC_CONCURRENCY_FAST = 6;
  * 5장 동시 처리라(UPLOAD_PHOTOS_CONCURRENCY, be/app/routers/upload.py), 3장이면
  * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
 const MOBILE_BATCH_SIZE = 5;
+/* 원본 포함 미리보기 묶음 — 요청마다 반복되는 서버 DB·인증 비용(운영 실측 약 1.9초, 2026-10-16)을
+ * 여러 장이 나눠 쓴다. 원본 PUT·confirm은 지금처럼 사진마다 따로 간다. */
+const ORIGINAL_BATCH_SIZE = 5;
+const ORIGINAL_MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const BROWSER_BACK_TARGET = "__acut_browser_back__";
@@ -396,6 +400,8 @@ function isNetworkFailure(e: unknown) {
 
 type OriginalPresignedItem = {
   job_id: string;
+  /** 여러 장 묶음에서 사진과 짝짓는 키. 이전 BE 응답에는 없다. */
+  client_upload_id?: string | null;
   url: string;
   source_key: string;
   content_type: string;
@@ -1926,10 +1932,13 @@ export default function ProjectDetailPage() {
     const clientUploadIds = uploadFiles.map((_, index) => retryClientUploadIds?.[index] ?? createClientUploadId());
 
     // Compression producer + bounded preview channel; originals wait until every preview row exists.
-    // Original-inclusive previews stay one file per request so jobs remain unambiguous.
+    // Original-inclusive previews are matched to their jobs by client_upload_id, so several files share a request.
     // PC dedicates up to two preview lanes. Mobile keeps one network request at a time.
     const mobileUploadClient = isMobileUploadClient();
-    const effectiveBatch = inclOrig ? 1 : (mobileUploadClient ? MOBILE_BATCH_SIZE : BATCH_SIZE);
+    // ponytail: HEIC는 원본 없이 미리보기만 보내는데 include_original은 요청 단위다. HEIC가 섞인 선택은
+    // 통째로 예전처럼 1장씩 보낸다(2026-10-16 기준 작가 업로드 HEIC 0장). 흔해지면 HEIC만 따로 묶는다.
+    const originalBatchSize = uploadFiles.some(isHeicFile) ? 1 : (mobileUploadClient ? ORIGINAL_MOBILE_BATCH_SIZE : ORIGINAL_BATCH_SIZE);
+    const effectiveBatch = inclOrig ? originalBatchSize : (mobileUploadClient ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const concurrency = inclOrig
       ? (mobileUploadClient ? 1 : getDesktopUploadConcurrency(true))
       : (mobileUploadClient ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
@@ -2143,14 +2152,15 @@ export default function ProjectDetailPage() {
           return;
         }
         const globalIdx = batchIndex;
-        // B Plan: rawFile은 브라우저 원본 파일 (effectiveBatch=1이므로 globalIdx가 uploadFiles와 1:1 대응). HEIC는 원본 PUT 불가 → undefined.
-        const rawFile = (inclOrig && !isHeicFile(uploadFiles[globalIdx])) ? uploadFiles[globalIdx] : undefined;
+        const batchStart = batchIndex * effectiveBatch;
+        // HEIC는 원본 PUT 불가 → 미리보기만. HEIC가 섞인 선택은 1장 묶음이라 요청 단위 판단이 사진마다 맞다.
+        const sendsOriginals = inclOrig && batch.every((_, fileIndex) => !isHeicFile(uploadFiles[batchStart + fileIndex]));
         // 원본 촬영 시각 — 압축본은 EXIF가 지워져 원본에서 읽는다(파일 앞부분만 읽어 빠름). 지금은 저장만 하고 나중에 이미지 분석에 쓴다.
         const takenAts = await Promise.all(batch.map((file, fileIndex) => readTakenAt(uploadFiles[batchIndex * effectiveBatch + fileIndex] ?? file)));
         const buildForm = () => {
           const f = new FormData();
           f.append("project_id", id);
-          f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
+          f.append("include_original", sendsOriginals ? "true" : "false");
           batch.forEach((file, fileIndex) => {
             const sourceIndex = batchIndex * effectiveBatch + fileIndex;
             const sourceFile = uploadFiles[sourceIndex] ?? file;
@@ -2212,15 +2222,23 @@ export default function ProjectDetailPage() {
               settledSourceIndexes.add(sourceIndex);
             }
 
-            if (inclOrig && rawFile) {
-              const job = okBody.original_presigned?.[0];
-              if (job) {
-                batchStage(batchIndex, "ready");
-                originalResults[batchIndex].resolve({ job, token: currentToken });
-              } else {
-                batchStage(batchIndex, "failed");
-                sendingSourceFailedRef.current++;
-              }
+            if (sendsOriginals) {
+              const jobs = okBody.original_presigned ?? [];
+              const jobByClientId = new Map(jobs.filter((job) => job.client_upload_id).map((job) => [job.client_upload_id, job]));
+              batch.forEach((_, fileIndex) => {
+                const sourceIndex = batchStart + fileIndex;
+                // 주소 발급·저장에 실패한 사진은 항목이 빠진다 — 순서가 아니라 업로드 ID로 짝짓는다.
+                // client_upload_id가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다.
+                const job = jobByClientId.get(clientUploadIds[sourceIndex])
+                  ?? (batch.length === 1 && jobs[0] && !jobs[0].client_upload_id ? jobs[0] : undefined);
+                if (job) {
+                  telemetry.stage(sourceIndex, "ready");
+                  originalResults[sourceIndex].resolve({ job, token: currentToken });
+                } else {
+                  telemetry.stage(sourceIndex, "failed");
+                  sendingSourceFailedRef.current++;
+                }
+              });
             } else {
               for (let i = 0; i < batch.length; i++) {
                 telemetry.stage(batchIndex * effectiveBatch + i, okBody.rejected?.includes(batch[i].name) ? "failed" : "completed");
@@ -2283,7 +2301,7 @@ export default function ProjectDetailPage() {
 
         // Visible progress is sampled from telemetry; completed batches never overwrite byte progress.
       } finally {
-        if (inclOrig) originalResults[batchIndex].resolve(null);
+        if (inclOrig) batch.forEach((_, fileIndex) => originalResults[batchIndex * effectiveBatch + fileIndex].resolve(null));
         // 실패·중단 케이스에서 uploading 상태 잔류 방지
         setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
         uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
@@ -2365,7 +2383,7 @@ export default function ProjectDetailPage() {
             { length: Math.min(batchesPerCompressionRound, totalBatches - groupStart) },
             (_, offset) => groupStart + offset,
           );
-          batchIndexes.forEach(startOriginalTask);
+          batchIndexes.forEach((batchIndex) => rawBatches[batchIndex].forEach((_, fileIndex) => startOriginalTask(batchIndex * effectiveBatch + fileIndex)));
           const rawGroup = batchIndexes.flatMap(batchIndex => rawBatches[batchIndex]);
           const chunkTs = Date.now();
           const chunkQueued = batchIndexes.flatMap(batchIndex => rawBatches[batchIndex].map((file, i) => {
