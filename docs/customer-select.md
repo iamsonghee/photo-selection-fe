@@ -425,7 +425,8 @@ Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
 Management API `/database/query`로 해당 파일만 실행한다.
 
-로컬 테스트 기본값은 BE `8001`, FE `3002`, `BACKEND_URL=http://localhost:8001`이다. 서버를
+로컬 테스트 기본값은 FE `3001`, BE `8000`(`BACKEND_URL=http://localhost:8000`), clip-service `8001`
+(`CLIP_SERVICE_URL=http://localhost:8001`)이다(`architecture.md` §14.1). 서버를
 종료하기 전에 `ps` 또는 `lsof`로 포트 소유 프로세스를 확인한다.
 
 ## 10. 남은 작업
