@@ -101,4 +101,17 @@ assert.equal(inserts[0].payload.previewBytes, undefined);
 assert.equal(inserts[0].payload.original_concurrency.ignored, undefined);
 assert.equal(inserts[0].payload.file_stage_ms.ignored, undefined);
 
+// 실제 업로드 기록(소수 밀리초 시계)이 서버 검증을 통과해야 한다 — 2026-10-16 운영에서 전부 400으로 버려졌다.
+const { UploadTelemetry } = load("src/lib/upload-telemetry.ts", {});
+let clock = 0.4;
+const telemetry = new UploadTelemetry([1000, 2000], true, "pc", () => clock);
+clock = 10.37; telemetry.stage(0, "previewSending");
+clock = 25.81; telemetry.originalStage(0, "originalSending");
+clock = 33.29; telemetry.stage(0, "completed");
+telemetry.finalize(4.66);
+clock = 40.51; telemetry.finish("completed");
+const realReport = { ...telemetry.report(), uploadStrategy: "preview_first" };
+assert.doesNotThrow(() => performanceModule.parseUploadPerformance(realReport));
+assert.equal((await route.POST(request(realReport))).status, 200);
+
 console.log("upload performance API: auth, validation, sanitization and insert checks passed");
