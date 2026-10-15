@@ -316,6 +316,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 - Pillow decode/리사이즈 전용 스레드풀: `_cpu_executor`, `PILLOW_EXECUTOR_MAX_WORKERS`(기본 4)
 - R2 PUT 전용 스레드풀: `_r2_executor`, `R2_EXECUTOR_MAX_WORKERS`(기본 6)
 - 위 둘은 `/photos` 엔드포인트 전용이다. 그 외 엔드포인트(보정본 업로드, 프로필 이미지, R2 head/get/delete, 원본 검증 worker의 R2 HEAD)는 공용 풀 `_executor`(`IMAGE_EXECUTOR_MAX_WORKERS`, 기본 8)를 그대로 쓴다.
+- `/photos`·`/originals/confirm`과 원본 확인 worker의 동기 Supabase 호출은 `asyncio.to_thread`로 스레드에서 실행한다(2026-10-16). async 엔드포인트에서 바로 부르면 DB 왕복(운영 실측 약 130~150ms)마다 이벤트 루프가 멈춰 동시에 들어온 다른 업로드·confirm 요청까지 기다렸다. 쿼리·응답 형식은 같다.
 - Worker(`original_compress_worker`) 동시 클레임 수: `ORIGINAL_COMPRESS_CONCURRENCY`(기본 4) — 재압축이 없어져 R2 HEAD+DB 전이만 하므로 가벼운 작업이다.
 
 ---
