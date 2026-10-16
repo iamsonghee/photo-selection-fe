@@ -316,7 +316,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 - Pillow decode/리사이즈 전용 스레드풀: `_cpu_executor`, `PILLOW_EXECUTOR_MAX_WORKERS`(기본 4)
 - R2 PUT 전용 스레드풀: `_r2_executor`, `R2_EXECUTOR_MAX_WORKERS`(기본 6)
 - 위 둘은 `/photos` 엔드포인트 전용이다. 그 외 엔드포인트(보정본 업로드, 프로필 이미지, R2 head/get/delete, 원본 검증 worker의 R2 HEAD)는 공용 풀 `_executor`(`IMAGE_EXECUTOR_MAX_WORKERS`, 기본 8)를 그대로 쓴다.
-- `/photos`·`/originals/confirm`과 원본 확인 worker의 동기 Supabase 호출은 `asyncio.to_thread`로 스레드에서 실행한다(2026-10-16). async 엔드포인트에서 바로 부르면 DB 왕복(운영 실측 약 130~150ms)마다 이벤트 루프가 멈춰 동시에 들어온 다른 업로드·confirm 요청까지 기다렸다. 쿼리·응답 형식은 같다.
+- `/photos`·`/originals/confirm`과 원본 확인 worker의 동기 Supabase 호출은 `asyncio.to_thread`로 스레드에서 실행한다(2026-10-16). async 엔드포인트에서 바로 부르면 DB 왕복(운영 실측 약 130~150ms)마다 이벤트 루프가 멈춰 동시에 들어온 다른 업로드·confirm 요청까지 기다렸다. 쿼리·응답 형식은 같다. 이때 조회와 멱등 쓰기는 전송 계층·게이트웨이 일시 오류(HTTP/2 연결 끊김 `Server disconnected` 등)에 한해 최대 3번 짧게 다시 시도한다(`_db`). 원본 작업 조회가 끝내 실패하면 원본 주소가 빠진 성공 응답 대신 500으로 응답해 FE가 같은 업로드 ID로 다시 보내게 한다(2026-10-16 운영에서 5장 원본이 이 경로로 누락됨).
 - Worker(`original_compress_worker`) 동시 클레임 수: `ORIGINAL_COMPRESS_CONCURRENCY`(기본 4) — 재압축이 없어져 R2 HEAD+DB 전이만 하므로 가벼운 작업이다.
 
 ---
