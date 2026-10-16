@@ -135,8 +135,10 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
   expect([...csvBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   expect(csvText).toContain("파일명,작가 전달 메모");
-  expect(csvText).toContain("유사컷02.jpg");
-  expect(csvText).not.toContain("유사컷02.jpg".normalize("NFD"));
+  // 파일명 목록은 확장자를 뺀다(a8baece2, filenameWithoutExtension) — 한글은 NFC 그대로
+  expect(csvText).toContain("유사컷02");
+  expect(csvText).not.toContain("유사컷02.jpg");
+  expect(csvText).not.toContain("유사컷02".normalize("NFD"));
   expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

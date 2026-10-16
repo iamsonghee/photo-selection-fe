@@ -27,7 +27,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   }
   await page.goto("/select/projects");
   await expect(page.getByText(/미입력/)).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "전체 사진 이용량" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "내 사진 셀렉 사진 이용량" })).toBeVisible();
   const accountMenu = page.locator('summary[aria-label="계정 메뉴"]');
   await expect(accountMenu).toBeVisible();
   await accountMenu.click();
