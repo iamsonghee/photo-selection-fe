@@ -2228,14 +2228,28 @@ export default function ProjectDetailPage() {
             }
 
             if (sendsOriginals) {
-              const jobs = okBody.original_presigned ?? [];
-              const jobByClientId = new Map(jobs.filter((job) => job.client_upload_id).map((job) => [job.client_upload_id, job]));
+              let jobs = okBody.original_presigned ?? [];
+              // 주소 발급·저장에 실패한 사진은 항목이 빠진다 — 순서가 아니라 업로드 ID로 짝짓는다.
+              // client_upload_id가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다.
+              const findJob = (fileIndex: number) => jobs.find((job) => job.client_upload_id === clientUploadIds[batchStart + fileIndex])
+                ?? (batch.length === 1 && jobs[0] && !jobs[0].client_upload_id ? jobs[0] : undefined);
+              const missingJob = batch.some((file, fileIndex) => !okBody.rejected?.includes(file.name) && !findJob(fileIndex));
+              if (missingJob) {
+                // 성공 응답인데 거절되지 않은 사진의 원본 주소가 없으면(서버 일시 오류) 실패로 표시하기 전에
+                // 같은 업로드 ID로 한 번 더 보낸다. 이미 저장된 사진은 서버가 replay로 주소만 다시 준다.
+                const again = await requestSlots.run(() => postPhotosUpload(
+                  buildForm, currentToken, useProxyRef,
+                  (loaded, total) => applyProgress(globalIdx, loaded, total),
+                  { onRetry: () => batchStage(batchIndex, "retrying") },
+                )).catch(() => null);
+                if (again?.ok) {
+                  const againBody = await again.json().catch(() => ({})) as UploadOkBody;
+                  jobs = [...jobs, ...(againBody.original_presigned ?? [])];
+                }
+              }
               batch.forEach((_, fileIndex) => {
                 const sourceIndex = batchStart + fileIndex;
-                // 주소 발급·저장에 실패한 사진은 항목이 빠진다 — 순서가 아니라 업로드 ID로 짝짓는다.
-                // client_upload_id가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다.
-                const job = jobByClientId.get(clientUploadIds[sourceIndex])
-                  ?? (batch.length === 1 && jobs[0] && !jobs[0].client_upload_id ? jobs[0] : undefined);
+                const job = findJob(fileIndex);
                 if (job) {
                   telemetry.stage(sourceIndex, "ready");
                   originalResults[sourceIndex].resolve({ job, token: currentToken });

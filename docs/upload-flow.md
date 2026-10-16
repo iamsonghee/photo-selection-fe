@@ -291,7 +291,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | `include_original=true`, PC | **5장/배치**(HEIC 섞이면 1장) | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **3장/배치**(HEIC 섞이면 1장) | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true` 미리보기는 여러 장을 한 요청으로 보내 요청마다 반복되는 서버 DB·인증 비용을 나눈다(2026-10-16 운영 실측 요청당 약 1.9초). 원본 주소 발급·저장에 실패한 사진은 응답 항목이 빠지므로 순서가 아니라 `client_upload_id`로 짝짓고, 짝이 없는 사진은 원본 작업을 시작하지 않고 실패로 표시한다. `client_upload_id`가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다. HEIC는 원본 없이 미리보기만 보내는데 `include_original`이 요청 단위라, HEIC가 섞인 선택은 통째로 1장씩 보낸다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, PC와 모바일 모두 모든 프리뷰 row를 등록할 때까지 원본 네트워크 요청을 시작하지 않는다. 등록 완료 뒤 PC 원본 큐는 2개로 시작해 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일 원본 전송은 1개씩 순차 실행한다.
+`include_original=true` 미리보기는 여러 장을 한 요청으로 보내 요청마다 반복되는 서버 DB·인증 비용을 나눈다(2026-10-16 운영 실측 요청당 약 1.9초). 원본 주소 발급·저장에 실패한 사진은 응답 항목이 빠지므로 순서가 아니라 `client_upload_id`로 짝짓고, 거절되지 않았는데 짝이 없는 사진이 있으면 같은 업로드 ID로 묶음을 한 번 더 보내(서버 replay가 주소를 다시 준다) 그래도 없을 때만 원본 작업을 시작하지 않고 실패로 표시한다. 서버는 읽을 수 없는 이미지는 `rejected`로 알리고, R2 저장 실패 같은 일시 오류는 저장 전에 요청 전체를 500으로 실패시켜 FE가 다시 보내게 한다 — 사진이 거절 목록에도 없이 조용히 빠지지 않는다. `client_upload_id`가 없는 이전 BE 응답은 1장 묶음일 때만 순서로 맞춘다. HEIC는 원본 없이 미리보기만 보내는데 `include_original`이 요청 단위라, HEIC가 섞인 선택은 통째로 1장씩 보낸다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, PC와 모바일 모두 모든 프리뷰 row를 등록할 때까지 원본 네트워크 요청을 시작하지 않는다. 등록 완료 뒤 PC 원본 큐는 2개로 시작해 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일 원본 전송은 1개씩 순차 실행한다.
 
 ### 모든 기기: producer-consumer 파이프라인 (2026-08-07 모바일 적용)
 

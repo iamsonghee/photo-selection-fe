@@ -410,8 +410,9 @@ test(`mobile ${strategy} upload ordering`, async ({ browser }, testInfo) => {
 }
 
 test("original-inclusive PC upload batches previews and pairs each original with its own job", async ({ browser }, testInfo) => {
-  // 5장 묶음 + 2장 묶음. 첫 묶음의 두 번째 사진은 서버가 원본 주소를 주지 않은 경우(발급 실패)다.
-  // 순서가 아니라 client_upload_id로 짝지어야 나머지 원본이 엉뚱한 job으로 올라가지 않는다.
+  // 5장 묶음 + 2장 묶음. 순서가 아니라 client_upload_id로 짝지어야 원본이 엉뚱한 job으로 올라가지 않는다.
+  // 첫 묶음 2번째 사진은 첫 응답에서만 주소가 빠지고(서버 일시 오류 → 다시 보내 복구),
+  // 둘째 묶음 1번째 사진은 매번 빠진다(한 번 다시 보낸 뒤 실패로 표시).
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: testInfo.project.use.baseURL });
   const page = await context.newPage();
   try {
@@ -444,7 +445,9 @@ test("original-inclusive PC upload batches previews and pairs each original with
     });
     const requestSizes: number[] = [];
     const originalSizeByClientId = new Map<string, number>();
+    let transientDropId = "";
     let droppedClientId = "";
+    const seenClientIds = new Set<string>();
     let finalized = 0;
     await page.route("**/rest/v1/**", route => route.fulfill({ json: [] }));
     await page.route("**/api/photographer/**", route => route.fulfill({ json: {} }));
@@ -478,9 +481,13 @@ test("original-inclusive PC upload batches previews and pairs each original with
       const sizes = field("original_file_sizes").map(Number);
       clientIds.forEach((clientId, index) => originalSizeByClientId.set(clientId, sizes[index]));
       requestSizes.push(clientIds.length);
-      if (requestSizes.length === 1) droppedClientId = clientIds[1];
+      const firstTime = !clientIds.some(clientId => seenClientIds.has(clientId));
+      clientIds.forEach(clientId => seenClientIds.add(clientId));
+      if (firstTime && clientIds.length === 5) transientDropId = clientIds[1];
+      if (firstTime && clientIds.length === 2) droppedClientId = clientIds[0];
+      const missing = new Set([droppedClientId, ...(firstTime ? [transientDropId] : [])]);
       // 실제 BE처럼 발급에 실패한 사진은 항목이 빠지고, 순서도 섞여 올 수 있다.
-      const items = clientIds.filter(clientId => clientId !== droppedClientId).reverse().map(clientId => ({
+      const items = clientIds.filter(clientId => !missing.has(clientId)).reverse().map(clientId => ({
         job_id: `job-${clientId}`, client_upload_id: clientId, url: `http://localhost:3001/__upload-batch/r2/${clientId}`,
         content_type: "image/jpeg", source_key: `source-${clientId}`, expires_at: "2099-01-01",
       }));
@@ -496,11 +503,13 @@ test("original-inclusive PC upload batches previews and pairs each original with
     await page.getByRole("button", { name: "업로드 시작", exact: true }).click();
     await expect.poll(() => finalized, { timeout: 30_000 }).toBeGreaterThan(0);
 
-    expect(requestSizes).toEqual([5, 2]);
+    // 각 묶음이 주소 누락 때문에 한 번씩 더 보내졌다.
+    expect([...requestSizes].sort()).toEqual([2, 2, 5, 5]);
     // 새로 만든 업로드 ID의 원본은 보낸 적이 없어 전송 전 복구 확인을 하지 않는다.
     expect(recoverCalls).toBe(0);
     const puts = await page.evaluate(() => (window as unknown as { puts: { url: string; size: number }[] }).puts);
     expect(puts).toHaveLength(6);
+    expect(puts.some(put => put.url.endsWith(transientDropId))).toBe(true); // 다시 보내 복구됨
     for (const put of puts) {
       const clientId = put.url.split("/").pop()!;
       expect(clientId).not.toBe(droppedClientId);
