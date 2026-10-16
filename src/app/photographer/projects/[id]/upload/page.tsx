@@ -4166,6 +4166,8 @@ export default function ProjectDetailPage() {
               <button
                 type="button"
                 role="menuitem"
+                // Safari blurs the summary before clicking a tapped button, closing the menu too early.
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={(event) => {
                   event.currentTarget.closest("details")?.removeAttribute("open");
                   setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size });
