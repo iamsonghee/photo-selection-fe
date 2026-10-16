@@ -415,6 +415,25 @@ test("V10: 최종 보정본 상세에서 전체 수령 확인 및 실패 후 재
   expect(attempts).toBe(2);
 });
 
+test("V14: 재보정 0회 상품의 수령 확인은 라이트 목록이고 사진만 상세로 연다", async ({ page }) => {
+  await page.route("**/api/c/photos?*", async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({ response, json: { ...data, project: { ...data.project, status: "reviewing_v1", maxRevisionCount: 0, revisionRound: 0 } } });
+  });
+  await page.route("**/api/c/review?*", route => route.fulfill({ json: { photos: [
+    { id: "rcpt-list-1", photoVersionId: "rcpt-list-v1", originalFilename: "a.jpg", versionUrl: "/favicon.ico", orderIndex: 1 },
+    { id: "rcpt-list-2", photoVersionId: "rcpt-list-v2", originalFilename: "b.jpg", versionUrl: "/favicon.ico", orderIndex: 2 },
+  ] } }));
+  await page.route("**/api/c/review/draft?*", route => route.fulfill({ json: { drafts: {} } }));
+  await page.goto(`${project.galleryUrl.replace(/\/gallery$/, "")}/review`);
+  await expect(page.getByText("마지막 보정본")).toBeVisible();
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "수령 완료", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "b.jpg 검토" }).click();
+  await expect(page).toHaveURL(/\/review\/rcpt-list-2$/);
+});
+
 test("V13: 보정본 확정 후 현재 사진에 머문다", async ({ page }) => {
   await page.route("**/api/c/photos?*", async route => {
     const response = await route.fetch();
