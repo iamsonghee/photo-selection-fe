@@ -9,17 +9,17 @@ test("세 랜딩과 명시적 로그인 목적지 · 모바일 표시", async ({
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 850 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("사진을 고르고");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("셀렉이 쉬워지면");
     await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
-    await page.getByRole("link", { name: "작가·스튜디오 알아보기", exact: true }).click();
+    await page.getByRole("link", { name: "작가·스튜디오 →", exact: true }).first().click(); // 히어로·마무리에 같은 버튼
     await expect(page).toHaveURL(/\/studio$/);
-    await page.getByRole("link", { name: "고객 프로젝트 시작하기", exact: true }).click();
+    await page.getByRole("link", { name: "무료로 시작하기", exact: true }).first().click(); // 메뉴·히어로·마무리에 같은 버튼
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(new URL(page.url()).searchParams.get("next")).toBe("/studio/dashboard");
     await page.getByRole("button", { name: "로그인 닫기" }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await page.goto("/select");
-    await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).click();
+    await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).first().click(); // 히어로·마무리에 같은 버튼
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(new URL(page.url()).searchParams.get("next")).toBe("/select/projects");
     await page.screenshot({ path: testInfo.outputPath(`login-${width}.png`), fullPage: true });
@@ -99,7 +99,7 @@ test("같은 계정의 공간 선택·전환·재로그인, 저장 실패 시 �
     await page.setViewportSize({ width: 1280, height: 850 });
     await setSpace("studio");
     await page.goto("/select");
-    await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).click();
+    await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).first().click();
     await expect(page).toHaveURL(/\/select\/projects$/);
     await expect.poll(storedSpace).toBe("select");
     await page.getByLabel("계정 메뉴", { exact: true }).click();

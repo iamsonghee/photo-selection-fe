@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { EntryPage } from "@/components/entry/EntryPage";
+import { createClient } from "@/lib/supabase/server";
+import { MainLanding } from "./_landing/MainLanding";
 import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
 import { OG_MAIN_IMAGE, SITE_NAME, SITE_URL } from "@/lib/site-metadata";
 
@@ -45,11 +46,13 @@ const jsonLd = {
   ],
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <EntryPage />
+      <MainLanding loggedIn={!!user} />
     </>
   );
 }

@@ -6,7 +6,9 @@
 
 ## 공통 랜딩·로그인·공간 전환 (2026-10-11, 로컬 검증 브랜치)
 
-`feat/landing-entry-flow`에서 `/`(통합), `/studio`(스튜디오), `/select`(내 사진 셀렉)에 임시 소개 화면을 제공한다. 로고는 A-CUT, 메뉴는 작가·스튜디오/내 사진 셀렉이다. 본격적인 랜딩 디자인·가격표·운영 배포는 포함하지 않는다.
+`feat/landing-entry-flow`에서 `/`(통합), `/studio`(스튜디오), `/select`(내 사진 셀렉) 랜딩을 제공한다. 로고는 A-CUT, 메뉴는 작가·스튜디오/내 사진 셀렉이다. 가격표·운영 배포는 포함하지 않는다.
+
+2026-10-16: `/`·`/select`·`/studio`는 확정 시안(`design/landing-preview/<main|select|studio>`, 셀렉·스튜디오 아티팩트 BFr7SpsVVbFuKnm92whnjR·NqZtmWdwPdr1gz9pYQnyfz)을 옮긴 새 랜딩(`src/app/_landing/`, `src/app/<select|studio>/_landing/`)을 렌더한다. `/`의 버튼·입구 카드는 `/studio`·`/select`로, 하객 띠는 `/select#guest`로 간다. 마크업은 `*Landing.tsx`, 움직임은 `motion.ts`(언마운트 때 타이머·관찰자 정리), CSS는 `scripts/landing-preview-css.mjs`로 시안에서 생성해 `.mnl`/`.sl`/`.stl` 안으로 한정한다(튕기는 easing은 부드러운 감속으로 바꿈). 시작하기 버튼은 비로그인이면 `/login?next=<작업 공간>`, 로그인 상태면 작업 공간(`/select/projects`, `/studio/dashboard`)으로 간다. 셀렉 랜딩의 하객 앨범 버튼은 `/select/new/guest`로 간다. 셀렉 FAQ의 하객 사진 보관 일수는 `app_settings.guest_retention_days`, 스튜디오 무료 이용 한도는 `general_max_projects`·`general_max_photos_per_project`를 읽는다. `EntryPage`는 이제 `/login`·`/workspaces`의 틀로만 쓴다.
 
 - 공통 로그인은 `/login`, 로그인 후 일반 진입은 `/workspaces`다. 마지막 공간이 있으면 해당 작업 화면으로, 없거나 값이 잘못됐으면 공간 선택으로 이동한다. 기존 `/select/login`은 개인 목록을 목적지로 지정한 공통 로그인으로 연결한다. `/landing`은 기존대로 `/`로 리다이렉트한다.
 - 각 시작 버튼은 `/login?next=...`에 스튜디오 `/studio/dashboard`, 개인 `/select/projects`를 지정한다. 로그인 상태면 인증을 생략한다. 명시한 상세/초대 목적지가 일반 로그인보다 우선하며 마지막 공간으로 덮어쓰지 않는다.
@@ -188,7 +190,7 @@ BE `/api/customer-upload/*`에 직접 보낸다 — Vercel 함수를 거치면 �
 
 ## 기존 랜딩의 독립 샘플 체험 (보존된 구현, 현재 홈에서는 미사용)
 
-2026-10-11: 아래는 기존 `LandingStory.tsx`의 구현 기록이다. 코드는 보존하지만 임시 통합 홈은 `EntryPage`를 렌더하므로 현재 홈의 사용자 흐름이 아니다.
+2026-10-11: 아래는 기존 `LandingStory.tsx`의 구현 기록이다. 코드는 보존하지만 통합 홈은 `src/app/_landing/MainLanding`을 렌더하므로 현재 홈의 사용자 흐름이 아니다.
 
 - 02 영역은 최초 진입부터 `SAMPLE_SELECTED_PHOTOS`의 원본 4장과 코멘트·별점·찜을 표시한다. 셀렉 확정 전에는 예시를 유지하고, 확정 후 고객이 수정한 선택 결과로 전환한다. 파일명 복사와 CSV는 현재 02에 표시된 결과를 사용한다. 처음부터는 기본 예시로 돌아간다.
 
