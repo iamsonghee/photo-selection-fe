@@ -2,10 +2,11 @@ import Link from "next/link";
 import {
   getAllProjectsForAdmin,
   getPhotographerStatsForAdmin,
+  getUploadHealthForAdmin,
   countByStatus,
 } from "@/lib/admin-db";
 import { getActiveDeadline } from "@/lib/project-deadline";
-import { formatAdminDate, ddayFrom } from "@/lib/admin-format";
+import { formatAdminDate, formatAdminDateTime, ddayFrom } from "@/lib/admin-format";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS } from "@/lib/project-status";
 import { StatusPill } from "@/components/ui/StatusPill";
 
@@ -19,10 +20,12 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default async function AdminDashboardPage() {
-  const [projects, photographerStats] = await Promise.all([
+  const [projects, photographerStats, uploadHealth] = await Promise.all([
     getAllProjectsForAdmin(),
     getPhotographerStatsForAdmin(),
+    getUploadHealthForAdmin(),
   ]);
+  const uploadIssueCount = uploadHealth.stuckOriginals.length + uploadHealth.failedSessions.length;
 
   const statusCounts = countByStatus(projects);
   const inProgressCount = projects.length - statusCounts.delivered;
@@ -48,6 +51,55 @@ export default async function AdminDashboardPage() {
         <StatCard label="진행중 프로젝트" value={`${inProgressCount}건`} />
         <StatCard label="마감 임박 / 지연" value={`${upcomingDeadlines.length}건`} />
       </div>
+
+      <section className="mt-10" aria-labelledby="upload-health-title">
+        <h3 id="upload-health-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          업로드 이상 {uploadIssueCount > 0 ? <span className="ml-1 text-danger">{uploadIssueCount}건</span> : null}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          원본이 1시간 넘게 저장 확인되지 않은 프로젝트(최근 30일)와 실패가 있던 업로드(최근 7일)예요. 내부 계정
+          {uploadHealth.excludedInternal > 0 ? ` ${uploadHealth.excludedInternal}건은` : "은"} 빼고 보여요.
+        </p>
+        {uploadIssueCount === 0 ? (
+          <div className="mt-3 rounded-xl border border-border bg-surface px-4 py-6 text-center text-sm text-muted-foreground">
+            업로드 이상이 없습니다.
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <tbody>
+                {uploadHealth.stuckOriginals.map((item) => (
+                  <tr key={item.projectId} className="border-b border-border last:border-b-0 hover:bg-surface-raised">
+                    <td className="px-4 py-3">
+                      <Link href={`/admin/projects/${item.projectId}`} className="font-medium text-foreground hover:text-primary">
+                        {item.projectName}
+                      </Link>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{item.photographerName}</div>
+                    </td>
+                    <td className="px-4 py-3 text-danger">원본 미확인 {item.count}장</td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground">가장 오래된 사진 {formatAdminDateTime(item.oldestUploadedAt)}</td>
+                  </tr>
+                ))}
+                {uploadHealth.failedSessions.map((session) => (
+                  <tr key={`${session.createdAt}-${session.photographerName}`} className="border-b border-border last:border-b-0 hover:bg-surface-raised">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground">{session.photographerName}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {session.device === "mobile" ? "모바일" : "PC"} · {session.includesOriginal ? "원본 포함" : "원본 미포함"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-danger">
+                      {session.fileCount}장 중 {session.failedCount}장 실패
+                      {session.retryCount > 0 ? <span className="ml-2 text-xs text-muted-foreground">재시도 {session.retryCount}회</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground">업로드 {formatAdminDateTime(session.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <h3 className="mt-10 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         상태 분포

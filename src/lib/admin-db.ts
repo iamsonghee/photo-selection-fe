@@ -1,4 +1,5 @@
 import { getAdminClient } from "@/lib/supabase-admin";
+import { ADMIN_EMAILS } from "@/lib/admin-emails";
 import { mapProjectRow } from "@/lib/db";
 import type { ProjectLogAction } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
@@ -562,4 +563,111 @@ export async function getPendingBetaInvitations(): Promise<AdminBetaInvitation[]
     invitedAt: row.invited_at,
     adminNote: row.admin_note,
   }));
+}
+
+// ── 업로드 이상 감시 ────────────────────────────────────────────────────────
+
+/** 업로드 이상에서 빼는 내부 계정(관리자·운영자 테스트·e2e). 실제 작가 문제만 보이게 한다. */
+const INTERNAL_UPLOAD_EMAILS = new Set([...ADMIN_EMAILS, "cand0701@hanmail.net", "cand0701@naver.com"].map((email) => email.toLowerCase()));
+
+export type AdminStuckOriginalProject = {
+  projectId: string;
+  projectName: string;
+  photographerName: string;
+  count: number;
+  oldestUploadedAt: string;
+};
+
+export type AdminFailedUploadSession = {
+  createdAt: string;
+  photographerName: string;
+  device: string;
+  includesOriginal: boolean;
+  fileCount: number;
+  savedCount: number;
+  failedCount: number;
+  retryCount: number;
+  outcome: string;
+};
+
+export type AdminUploadHealth = {
+  stuckOriginals: AdminStuckOriginalProject[];
+  failedSessions: AdminFailedUploadSession[];
+  excludedInternal: number;
+};
+
+type PhotographerRef = { name: string | null; email: string | null } | null;
+
+/** 원본이 1시간 넘게 저장 확인되지 않은 사진(최근 30일)과 실패가 있던 업로드 세션(최근 7일). 내부 계정은 뺀다. */
+export async function getUploadHealthForAdmin(): Promise<AdminUploadHealth> {
+  const admin = getAdminClient();
+  const now = Date.now();
+  const hourAgo = new Date(now - 3_600_000).toISOString();
+  const monthAgo = new Date(now - 30 * 86_400_000).toISOString();
+  const weekAgo = new Date(now - 7 * 86_400_000).toISOString();
+
+  const [stuckResult, sessionResult] = await Promise.all([
+    admin
+      .from("photos")
+      .select("project_id, uploaded_at, projects!photos_project_id_fkey!inner(name, photographers(name, email))")
+      .in("original_status", ["awaiting_upload", "pending", "processing"])
+      .lt("uploaded_at", hourAgo)
+      .gte("uploaded_at", monthAgo)
+      .limit(2000),
+    admin
+      .from("upload_performance_logs")
+      .select("created_at, device, includes_original, file_count, saved_count, failed_count, retry_count, outcome, photographers(name, email)")
+      .gte("created_at", weekAgo)
+      .or("failed_count.gt.0,outcome.eq.incomplete")
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+  if (stuckResult.error) throw new Error(stuckResult.error.message);
+  if (sessionResult.error) throw new Error(sessionResult.error.message);
+
+  let excludedInternal = 0;
+  const isInternal = (photographer: PhotographerRef) => {
+    const internal = INTERNAL_UPLOAD_EMAILS.has((photographer?.email ?? "").toLowerCase());
+    if (internal) excludedInternal++;
+    return internal;
+  };
+
+  const byProject = new Map<string, AdminStuckOriginalProject>();
+  for (const row of stuckResult.data ?? []) {
+    const project = row.projects as unknown as { name: string; photographers: PhotographerRef };
+    if (isInternal(project.photographers)) continue;
+    const entry = byProject.get(row.project_id) ?? {
+      projectId: row.project_id,
+      projectName: project.name,
+      photographerName: project.photographers?.name ?? project.photographers?.email ?? "(알 수 없음)",
+      count: 0,
+      oldestUploadedAt: row.uploaded_at,
+    };
+    entry.count++;
+    if (row.uploaded_at < entry.oldestUploadedAt) entry.oldestUploadedAt = row.uploaded_at;
+    byProject.set(row.project_id, entry);
+  }
+
+  const failedSessions: AdminFailedUploadSession[] = [];
+  for (const row of sessionResult.data ?? []) {
+    const photographer = row.photographers as unknown as PhotographerRef;
+    if (isInternal(photographer)) continue;
+    failedSessions.push({
+      createdAt: row.created_at,
+      photographerName: photographer?.name ?? photographer?.email ?? "(알 수 없음)",
+      device: row.device,
+      includesOriginal: row.includes_original,
+      fileCount: row.file_count,
+      savedCount: row.saved_count,
+      failedCount: row.failed_count,
+      retryCount: row.retry_count,
+      outcome: row.outcome,
+    });
+  }
+
+  return {
+    stuckOriginals: [...byProject.values()].sort((a, b) => b.count - a.count),
+    failedSessions,
+    excludedInternal,
+  };
 }

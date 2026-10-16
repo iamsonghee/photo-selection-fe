@@ -78,3 +78,10 @@ Railway의 백엔드 로그에서는 `/photos`는 `photographer upload timing`, 
 DELETE FROM public.upload_performance_logs
 WHERE created_at < now() - interval '90 days';
 ```
+
+## 관리자 대시보드 "업로드 이상" (2026-10-16)
+
+`/admin` 대시보드가 매번 열릴 때 두 가지를 보여준다(`getUploadHealthForAdmin`, `src/lib/admin-db.ts`). 관리자(`ADMIN_EMAILS`)·e2e 계정(`cand0701@hanmail.net`, `cand0701@naver.com`)은 뺀다.
+
+- 원본 미확인: `photos.original_status`가 `awaiting_upload`·`pending`·`processing`인 채 1시간이 지난 사진(최근 30일), 프로젝트별 장수
+- 실패 업로드: 최근 7일 `upload_performance_logs` 중 `failed_count > 0` 또는 `outcome = 'incomplete'`
