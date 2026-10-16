@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createHash, randomBytes } from "crypto";
+import { headers } from "next/headers";
+import { allRows } from "@/lib/supabase-all-rows";
 import { cookies } from "next/headers";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getAppSettings } from "@/lib/app-settings";
@@ -25,9 +27,11 @@ export type GuestAlbumRow = {
   upload_token: string;
   closed_at: string | null;
   created_at: string;
+  upload_started_at: string | null;
+  deleting_at: string | null;
 };
 
-export const GUEST_ALBUM_COLUMNS = "id, owner_id, name, wedding_date, ceremony_time, venue, greeting, upload_token, closed_at, created_at";
+export const GUEST_ALBUM_COLUMNS = "id, owner_id, name, wedding_date, ceremony_time, venue, greeting, upload_token, closed_at, created_at, upload_started_at, deleting_at";
 
 export function toGuestAlbumInfo(row: GuestAlbumRow): GuestAlbumInfo {
   return {
@@ -39,6 +43,7 @@ export function toGuestAlbumInfo(row: GuestAlbumRow): GuestAlbumInfo {
     greeting: row.greeting,
     uploadToken: row.upload_token,
     closed: Boolean(row.closed_at),
+    uploadStarted: Boolean(row.upload_started_at),
   };
 }
 
@@ -78,14 +83,14 @@ export async function ensureGuestDeviceKey() {
 
 export async function getGuestAlbumByToken(token: string): Promise<GuestAlbumRow | null> {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
-  const { data } = await getAdminClient().from("guest_albums").select(GUEST_ALBUM_COLUMNS).eq("upload_token", token).maybeSingle();
+  const { data } = await getAdminClient().from("guest_albums").select(GUEST_ALBUM_COLUMNS).eq("upload_token", token).is("deleting_at", null).maybeSingle();
   return (data as GuestAlbumRow | null) ?? null;
 }
 
 /** 로그인한 소유자의 앨범만. 남의 앨범·없는 앨범은 null. */
 export async function getOwnedGuestAlbum(albumId: string, ownerId: string): Promise<GuestAlbumRow | null> {
   if (!/^[0-9a-f-]{36}$/i.test(albumId)) return null;
-  const { data } = await getAdminClient().from("guest_albums").select(GUEST_ALBUM_COLUMNS).eq("id", albumId).eq("owner_id", ownerId).maybeSingle();
+  const { data } = await getAdminClient().from("guest_albums").select(GUEST_ALBUM_COLUMNS).eq("id", albumId).eq("owner_id", ownerId).is("deleting_at", null).maybeSingle();
   return (data as GuestAlbumRow | null) ?? null;
 }
 
@@ -94,7 +99,7 @@ export type GuestAlbumSummary = { id: string; name: string; weddingDate: string;
 /** 내 프로젝트 목록용. 테이블이 아직 없거나(마이그레이션 전) 실패하면 빈 목록 — 목록 화면을 깨지 않는다. */
 export async function listOwnerGuestAlbums(ownerId: string): Promise<GuestAlbumSummary[]> {
   const admin = getAdminClient();
-  const { data, error } = await admin.from("guest_albums").select("id, name, wedding_date, ceremony_time, venue, closed_at, created_at").eq("owner_id", ownerId).order("created_at", { ascending: false });
+  const { data, error } = await admin.from("guest_albums").select("id, name, wedding_date, ceremony_time, venue, closed_at, created_at").eq("owner_id", ownerId).is("deleting_at", null).order("created_at", { ascending: false });
   if (error) {
     console.warn("[guest albums list]", error.message);
     return [];
@@ -128,10 +133,11 @@ type MediaRow = {
   is_original: boolean;
   created_at: string;
   submission_id: string;
+  selected: boolean;
 };
 type SubmissionRow = { id: string; name: string; message: string | null; device_hash: string };
 
-const MEDIA_COLUMNS = "id, kind, filename, original_key, thumb_key, preview_key, duration_seconds, is_original, created_at, submission_id";
+const MEDIA_COLUMNS = "id, kind, filename, original_key, thumb_key, preview_key, duration_seconds, is_original, created_at, submission_id, selected";
 
 /**
  * 앨범의 올라온 파일(ready)과 참여 하객 수. deviceHash를 주면 그 브라우저가 보낸 것만.
@@ -139,21 +145,22 @@ const MEDIA_COLUMNS = "id, kind, filename, original_key, thumb_key, preview_key,
  */
 export async function listGuestMedia(albumId: string, onlyDeviceHash?: string): Promise<{ media: GuestMedia[]; guests: number }> {
   const admin = getAdminClient();
-  let submissionsQuery = admin.from("guest_submissions").select("id, name, message, device_hash").eq("album_id", albumId);
-  if (onlyDeviceHash) submissionsQuery = submissionsQuery.eq("device_hash", onlyDeviceHash);
-  const { data: submissions, error: submissionError } = await submissionsQuery;
-  if (submissionError) throw submissionError;
+  const submissions = await allRows<SubmissionRow>((from, to) => {
+    let query = admin.from("guest_submissions").select("id, name, message, device_hash").eq("album_id", albumId).order("id").range(from, to);
+    if (onlyDeviceHash) query = query.eq("device_hash", onlyDeviceHash);
+    return query;
+  });
   const byId = new Map((submissions as SubmissionRow[]).map((row) => [row.id, row]));
   if (!byId.size) return { media: [], guests: 0 };
 
   const rows: MediaRow[] = [];
   for (let from = 0; ; from += 1000) {
-    let query = admin.from("guest_media").select(MEDIA_COLUMNS).eq("album_id", albumId).eq("status", "ready")
+    let query = admin.from("guest_media").select(onlyDeviceHash ? `${MEDIA_COLUMNS}, guest_submissions!inner(device_hash)` : MEDIA_COLUMNS).eq("album_id", albumId).eq("status", "ready")
       .order("created_at", { ascending: true }).order("id").range(from, from + 999);
-    if (onlyDeviceHash) query = query.in("submission_id", [...byId.keys()]);
-    const { data, error } = await query;
+    if (onlyDeviceHash) query = query.eq("guest_submissions.device_hash", onlyDeviceHash);
+    const { data, error } = await query.returns<MediaRow[]>();
     if (error) throw error;
-    rows.push(...(data as MediaRow[]));
+    rows.push(...data);
     if (data.length < 1000) break;
   }
 
@@ -170,6 +177,7 @@ export async function listGuestMedia(albumId: string, onlyDeviceHash?: string): 
       durationSeconds: row.duration_seconds,
       isOriginal: row.is_original,
       uploadedAt: row.created_at,
+      selected: row.selected,
       guestName: submission.name,
       guestMessage: submission.message,
     }];
@@ -179,7 +187,7 @@ export async function listGuestMedia(albumId: string, onlyDeviceHash?: string): 
 }
 
 export class GuestRequestError extends Error {
-  constructor(public status: number, public code: "not_found" | "closed" | "forbidden" | "invalid" | "too_large" | "incomplete", message: string) {
+  constructor(public status: number, public code: "not_found" | "closed" | "forbidden" | "invalid" | "too_large" | "incomplete" | "rate_limited" | "expired", message: string) {
     super(message);
   }
 }
@@ -190,6 +198,8 @@ export const GUEST_CLOSED_MESSAGE = "업로드가 마감됐어요. 신랑신부�
 export async function authorizeGuest(token: string, submissionId?: string) {
   const album = await getGuestAlbumByToken(token);
   if (!album) throw new GuestRequestError(404, "not_found", "앨범을 찾을 수 없어요. 링크를 다시 확인해 주세요.");
+  const { retentionDays } = await getGuestUploadLimits();
+  if (guestExpired(album.wedding_date, retentionDays)) throw new GuestRequestError(410, "expired", "앨범 보관 기간이 끝났어요.");
   if (album.closed_at) throw new GuestRequestError(409, "closed", GUEST_CLOSED_MESSAGE);
   if (submissionId === undefined) return { album, submission: null };
   const deviceKey = await readGuestDeviceKey();
@@ -201,7 +211,7 @@ export async function authorizeGuest(token: string, submissionId?: string) {
 }
 
 /** FastAPI 하객 업로드 내부 API(R2 서명·확인·삭제). */
-export async function callGuestStorage<T>(path: "presign-put" | "head" | "delete", body: unknown): Promise<T> {
+export async function callGuestStorage<T>(path: "presign-put" | "head" | "delete" | "archive-urls", body: unknown): Promise<T> {
   if (!INTERNAL_PRESIGN_SECRET) throw new Error("INTERNAL_PRESIGN_SECRET is not set");
   const res = await fetch(`${BACKEND_URL}/api/guest-upload/${path}`, {
     method: "POST",
@@ -211,4 +221,34 @@ export async function callGuestStorage<T>(path: "presign-put" | "head" | "delete
   });
   if (!res.ok) throw new Error(`guest storage ${path} ${res.status}: ${await res.text().catch(() => "")}`);
   return res.json() as Promise<T>;
+}
+
+export function guestExpired(date: string, days: number) {
+  const end = new Date(`${date}T00:00:00+09:00`).getTime() + (days + 1) * 86400000;
+  return Date.now() >= end;
+}
+
+/** Vercel overwrites this header. Missing trusted proxy information shares one conservative bucket. */
+export async function limitGuestRequest() {
+  const device = await ensureGuestDeviceKey();
+  const ip = (await headers()).get("x-vercel-forwarded-for")?.split(",")[0].trim() || "unknown";
+  const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+  const { data, error } = await getAdminClient().rpc("check_guest_rate", { p_device: hash(device), p_ip: hash(ip) });
+  if (error) throw error;
+  if (!data) throw new GuestRequestError(429, "rate_limited", "요청이 많아요. 1분 뒤 다시 보내 주세요.");
+}
+
+export function guestDatabaseError(error: { message: string }) {
+  const messages: Record<string, string> = {
+    guest_file_limit: "앨범에 담을 수 있는 파일 수를 넘었어요. 이미 보낸 파일은 그대로 보관돼요.",
+    guest_byte_limit: "앨범 저장 공간이 가득 찼어요. 이미 보낸 파일은 그대로 보관돼요.",
+    guest_date_locked: "하객이 보내기를 시작한 뒤에는 결혼식 날짜를 바꿀 수 없어요.",
+    guest_expired: "보관 기간이 끝났거나 정리 중인 파일이에요. 앨범 상태를 확인해 주세요.",
+    guest_closed: GUEST_CLOSED_MESSAGE,
+    guest_empty_selection: "내려받을 사진이나 영상을 먼저 골라 주세요.",
+    guest_not_found: "앨범이나 파일을 찾을 수 없어요.",
+    guest_invalid: "앨범 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.",
+  };
+  const code = Object.keys(messages).find((key) => (error?.message ?? "").includes(key));
+  return code ? messages[code] : null;
 }

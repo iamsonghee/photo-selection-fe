@@ -8,7 +8,7 @@ import { LockedPhotoViewer } from "@/components/customer/LockedPhotoViewer";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { hasCustomerResultComment } from "@/lib/customer-result-comments";
-import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
+import { csvEscape, downloadTextFile, filenameWithoutExtension, sanitizeFilenamePart } from "@/lib/text-file-download";
 import type { Photo } from "@/types";
 
 type Props = {
@@ -25,12 +25,12 @@ export default function ResultViewer({ project, photos, comments }: Props) {
   const visiblePhotos = commentOnly ? commentedPhotos : photos;
 
   function downloadCsv() {
-    const rows = photos.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(comments[photo.id]?.comment ?? "")].join(","));
+    const rows = photos.map((photo) => [csvEscape(filenameWithoutExtension(getPhotoDisplayName(photo))), csvEscape(comments[photo.id]?.comment ?? "")].join(","));
     downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
   }
 
   function downloadTxt() {
-    downloadTextFile(`${baseName}.txt`, photos.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8");
+    downloadTextFile(`${baseName}.txt`, photos.map((photo) => filenameWithoutExtension(getPhotoDisplayName(photo))).join("\n"), "text/plain;charset=utf-8");
   }
 
   return (

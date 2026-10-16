@@ -4,6 +4,7 @@ import { loadSceneReview } from "@/lib/admin-scene-review";
 import { customerShootTypeLabel } from "@/lib/customer-shoot-scenes";
 import { SceneLabeler } from "./SceneLabeler";
 import { AdminAiTidyButton } from "./AdminAiTidyButton";
+import { AdminSceneDownloadButton } from "./AdminSceneDownloadButton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,10 @@ export default async function AdminSceneReviewPage({ params }: { params: Promise
         {customerShootTypeLabel(review.project.shootType)} · 사진 {review.photos.length.toLocaleString()}장 · AI 장면 {review.aiScenes?.length ?? "없음"}
         {review.label ? ` · 마지막 검수 ${review.label.labeled_by}` : ""}
       </p>
-      <AdminAiTidyButton projectId={review.project.id} photoCount={review.photos.length} />
+      <div className="flex flex-wrap items-center gap-x-3">
+        <AdminAiTidyButton projectId={review.project.id} photoCount={review.photos.length} />
+        <AdminSceneDownloadButton photos={review.photos} />
+      </div>
       {review.labelTableMissing && (
         <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           정답 테이블이 없어 저장할 수 없어요. <code>supabase/migrations/20261002000000_add_customer_scene_labels.sql</code>을 먼저 실행해 주세요.

@@ -50,7 +50,7 @@ export function AdminSidebar({ email }: { email: string }) {
   };
 
   const navList = (
-    <nav className="flex-1 px-3 py-4">
+    <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
       {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const isActive = navIsActive(pathname, href);
         return (
@@ -115,12 +115,13 @@ export function AdminSidebar({ email }: { email: string }) {
       )}
 
       {/* 사이드바 본체. 모바일에서는 왼쪽에서 미끄러져 들어오는 드로어(fixed + translate),
-        * `lg` 이상에서는 원래대로 항상 펼쳐진 정적 사이드바(lg:static, 항상 translate-x-0)다. */}
+        * `lg` 이상에서는 항상 펼쳐진 사이드바(항상 translate-x-0)다. 콘텐츠가 길면 페이지 전체가
+        * 스크롤되므로 `lg:sticky lg:top-0`으로 화면 높이에 붙여 둔다 — `static`이면 같이 밀려 올라갔다. */}
       <aside
         role={open ? "dialog" : undefined}
         aria-modal={open ? true : undefined}
         aria-label="어드민 메뉴"
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[240px] max-w-[80vw] flex-col border-r border-border bg-surface transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-[240px] lg:max-w-none lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[240px] max-w-[80vw] flex-col border-r border-border bg-surface transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:w-[240px] lg:max-w-none lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ flexShrink: 0 }}

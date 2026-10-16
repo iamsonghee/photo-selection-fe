@@ -114,7 +114,8 @@ export class UploadTelemetry {
       failedCount: this.items.filter(item => item.stage === "failed").length,
       transferredBytes: this.items.reduce((sum, item) => sum + item.loaded, 0),
       outcome: this.outcome, elapsedMs: Math.round((this.finished ?? this.now()) - this.started),
-      retryCount: this.retries, firstOriginalMs: this.firstOriginalMs, firstSavedMs: this.firstSavedMs,
+      // 서버 기록 API는 정수 밀리초만 받는다 — performance.now() 차이는 소수라 반올림한다.
+      retryCount: this.retries, firstOriginalMs: roundMs(this.firstOriginalMs), firstSavedMs: roundMs(this.firstSavedMs),
       finalizeMs: Math.round(this.finalizeMs),
       originalConcurrency: this.originalConcurrency,
       // Parallel file durations overlap. Do not sum these to infer session wall time.
@@ -124,6 +125,10 @@ export class UploadTelemetry {
 }
 
 export type UploadSnapshot = ReturnType<UploadTelemetry["snapshot"]>;
+
+function roundMs(value: number | null) {
+  return value === null ? null : Math.round(value);
+}
 
 export function formatUploadBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GB`;

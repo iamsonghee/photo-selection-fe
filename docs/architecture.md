@@ -6,17 +6,22 @@
 
 ## 공통 진입 구조 (2026-10-11, feat/landing-entry-flow)
 
-- 임시 소개: `/`, `/studio`, `/select` → 공통 `/login` → 기존 작업 공간(`/studio/dashboard`, `/select/projects`). 일반 복귀 `/workspaces`는 검증된 현재 사용자의 `user_metadata.acut_last_workspace`만 읽어 공간을 결정한다. 기억 값이 없거나 잘못됐으면 선택 화면을 표시한다.
+- 소개 랜딩: `/`, `/studio`, `/select`(2026-10-16 확정 시안으로 교체, `src/app/_landing`·`src/app/<select|studio>/_landing`) → 공통 `/login` → 기존 작업 공간(`/studio/dashboard`, `/select/projects`). 일반 복귀 `/workspaces`는 검증된 현재 사용자의 `user_metadata.acut_last_workspace`만 읽어 공간을 결정한다. 기억 값이 없거나 잘못됐으면 선택 화면을 표시한다.
 - `src/lib/workspaces.ts`는 두 공간의 명칭·착지 경로와 기억 키를 정의한다. `WorkspaceMemory`는 인증된 공간 진입 시 기존 Supabase `auth.updateUser`로 해당 설정만 갱신한다. 새 DB 테이블·Next API·결제 의존성은 추가하지 않는다. 사용자 메타데이터는 사용자 수정 가능하므로 프로젝트 권한·과금에 절대로 사용하지 않는다.
 - OAuth 목적지는 기존 `acut_post_login_redirect` 쿠키(10분)를 재사용한다. 기본값은 `/workspaces`이며 쿠키가 없을 때 쿼리 `next`를 보조로 사용한다. 외부 주소·제어 문자·로그인/API/콜백 복귀 경로를 거절한다. 인증 실패/취소도 쿠키를 지우고 원래 목적지를 지정한 `/login?error=oauth`로 재시도한다.
 - 기존 공통 `photographers` 행 생성·베타 초대 처리·신청 매칭은 유지한다. 작가 이용 지표는 명시적인 `/studio/**`·`/beta/apply` 로그인에만 기록하고 일반 로그인·개인 셀렉·공유 링크를 작가 지표에 섞지 않는다. 일반 로그인 후 스튜디오를 선택하는 동작 자체는 OAuth 지표 이벤트를 새로 만들지 않는다.
 - middleware는 작가 영역과 기존 개인 소유자 전용 진입점에서 `auth.getUser()`로 확인하며 세션 갱신 쿠키를 전달한다. 미인증이면 원래 경로와 쿼리를 `/login?next=...`에 보존한다. 프로젝트 소유권·PIN·공유 토큰 검사는 각 기존 서버 경계에 남는다.
 - 저장 실패는 계정별 `acut_workspace_save_failed_<auth user id>` 쿠키(30일, SameSite=Lax, HTTPS에서 Secure)로 같은 브라우저에 기억한다. `/workspaces`는 이 경우 서비스 선택을 보여준다. 실패 쿠키도 이동 힌트일 뿐 권한이 아니다.
 - 기존 스튜디오 `getPolicyForPhotographer` 기반 프로젝트·사진 한도와 개인 `customerPhotoLimit`/BE `customer_upload`의 계정별 한도는 변경하지 않았다. 정식 공간별 상품·결제·차감 모델은 아직 구현하지 않았다.
-- `/login`, `/workspaces`는 X-Robots-Tag 및 metadata로 noindex 처리한다. 임시 `/studio`, `/select`도 metadata noindex이며 sitemap에 추가하지 않는다. 홈의 기존 인증 메타 태그는 보존하고 표시하지 않는 FAQ 구조화 데이터는 홈에서 제외했다.
+- `/login`, `/workspaces`는 X-Robots-Tag 및 metadata로 noindex 처리한다. `/studio`, `/select` 랜딩도 metadata noindex이며 sitemap에 추가하지 않는다. 홈의 기존 인증 메타 태그는 보존하고 표시하지 않는 FAQ 구조화 데이터는 홈에서 제외했다.
 
+## 작가 업로드 성능 기록 (2026-10-16)
+
+작가 업로드 화면은 세션 종료 시 집계 report 한 건을 `POST /api/photographer/upload-performance`로 전송한다. 로그인 세션에서 확인한 작가 ID와 배포 커밋 SHA를 붙여 service role로 `upload_performance_logs`에 저장한다. 테이블은 RLS를 켜고 일반 사용자 정책을 두지 않으며 `created_at` 인덱스 하나만 사용한다. 브라우저 report에는 파일명·파일 객체·프로젝트 ID·R2 key·URL·토큰이 없다. FastAPI `/photos`와 `/originals/confirm`은 추가 조회 없이 `time.perf_counter()`로 단계별 시간을 Railway 로그에 남긴다. 저장·로그 실패는 업로드 결과를 바꾸지 않는다. 상세 필드와 분석 쿼리는 `upload-flow.md` 및 `photographer-upload-performance-analysis.md`를 따른다.
 
 ## 초대 고객 셀렉 협업 (2026-10-10)
+
+2026-10-14 작가 보관함 집계 보정: `getPhotosWithSelections()`는 `selections.is_selected=true`인 사진만 최종 선택 목록에 포함한다. 미선택 행의 찜·별점·메모는 `photoStates`에 보존한다. 작가 셀렉 장수·목록·내보내기와 해당 목록을 사용하는 보정 작업 대상이 이 선택 목록을 공유한다. DB·고객 API·FastAPI 변경은 없다.
 
 2026-10-11 별점 기본값 보정: 실제 `selections.rating`의 미평가 값 0을 별점 사용 이력으로 세지 않는다. 백필과 트리거는 1~5점만 인정하고, 트리거는 값이 실제로 바뀐 경우에만 표시 플래그를 켠다. 이미 최초 마이그레이션을 적용했다면 `20261011000000_ignore_unrated_selection_defaults.sql`을 추가 적용한다. 이 보정은 요청받은 프로젝트의 표시 플래그만 되돌리며 기존 별점·찜·메모·선택은 보존한다. 다른 프로젝트의 과거 별점 삭제 여부는 현재 0점만으로 판별할 수 없으므로 플래그를 일괄 초기화하지 않는다.
 
@@ -98,9 +103,9 @@ HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 �
 보정본 있음 → 비교, 선택 완료 → 결과, 나머지 → 기존 단계. 조회 실패(null)는 보정본 개수를 단정하지 않고 기존 상태에 따른 경로를 사용한다.
 기존 exported/delivery_count/retouch_done 분기는 과거 프로젝트 호환용으로 유지한다. 앱 배포 전에 위 마이그레이션을 적용해야 한다.
 
-## 하객 사진 모으기 (2026-10-06, 1단계)
+## 하객 사진 모으기 (2026-10-12)
 
-셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`, `20261006010000_guest_media_is_original.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 상세·남은 일은 `customer-select.md`의 "하객 사진 모으기".
+셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`, `20261006010000_guest_media_is_original.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 선택 저장(`guest_media.selected`), `guest_archives`/`guest_archive_parts` 기반 ZIP, DB rate bucket·예약 용량 트리거, `deleting_at`/`cleanup_at` 수명주기가 추가되었다(`20261012000000_guest_album_completion.sql`). FastAPI lifespan에서 `guest_archive_worker`(5초)·`guest_cleanup_worker`(5분)를 실행한다. 정책 6개를 app_settings/admin에 추가했다. 소유자 쓰기는 service-role 전용 `guest_owner_action`에서 소유권과 앨범 잠금을 검증한다. 파일 삭제 성공 전에 DB 행을 제거하지 않는다. 상세·설정·유예 기간은 `customer-select.md`의 "하객 사진 모으기".
 
 ## 작가 추천 편집 (2026-09-18)
 
@@ -456,7 +461,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/admin/settings` | `src/app/admin/settings/page.tsx` + `AdminSettingsForm.tsx` | Settings — 등급별(일반/베타) 이용 한도를 편집 가능한 폼으로 제공(신규, 2026-07-26). `PATCH /api/admin/settings`로 `app_settings` 테이블을 갱신하며, 재배포 없이 즉시 반영된다(§6.3). 관리자 계정(`ADMIN_EMAILS`)은 여전히 읽기 전용 표시(하드코딩 유지). |
 
 - `src/middleware.ts`가 `/admin/**` 렌더링 전에 세션 이메일을 `ADMIN_EMAILS`와 대조한다. 비로그인은 `/`로, 허용되지 않은 이메일은 `/studio/dashboard`로 리다이렉트한다. `src/app/admin/layout.tsx`의 `getAdminUser()`도 확인하며, 별도의 관리자 회원/역할·권한 테이블은 없다.
-- 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/studio/**`의 접기형 사이드바와 달리 데스크톱 전용 고정폭 사이드바로 단순화했다. `metadata.robots.index = false`로 검색엔진 노출 차단.
+- 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/studio/**`의 접기형 사이드바와 달리 `lg`(1024px) 이상은 240px 고정폭 사이드바이고, 페이지 전체가 스크롤되는 동안 `lg:sticky lg:top-0`(화면 높이)로 제자리에 붙어 있다(2026-10-10 — 전에는 콘텐츠와 함께 밀려 올라갔음, 메뉴가 넘치면 메뉴 목록만 스크롤). `lg` 미만은 상단 바 + 슬라이드 드로어. `metadata.robots.index = false`로 검색엔진 노출 차단.
 - **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
 - **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
 - **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx`의 Profile Popover 안(설정/로그아웃과 함께, 2026-08-20부터 — 이전에는 사이드바 하단 상시 노출 버튼)에 "문의하기"로 노출된다.
@@ -661,7 +666,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/guest/[token]/submissions` | POST | 없음(업로드 토큰, 식별 쿠키 발급) | 하객 보내기 묶음(이름·메시지) 생성 |
 | `api/guest/[token]/media/presign` | POST | 업로드 토큰+식별 쿠키 | 파일 하나의 R2 PUT 주소(원본·썸네일·미리보기), 용량 한도 확인, `guest_media` pending(`is_original` — 줄여 보낸 사진이면 false) |
 | `api/guest/[token]/media/complete` | POST | 업로드 토큰+식별 쿠키 | R2 원본 크기 확인 후 ready. 마감됐으면 파일 삭제 후 409 |
-| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 9개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
+| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 15개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
 | `api/photographer/beta-survey/status` | GET | 세션 | 지금 노출해야 할 설문 타입 조회(`{surveyType}`, 없으면 `null`) — §6.1b |
 | `api/photographer/beta-survey` | POST | 세션 | 설문 제출(`action:"submit"`) 또는 "나중에" 기록(`action:"later"`, 24h 재노출 억제). 이미 제출된 설문은 재기록 없이 `alreadySubmitted:true` 반환(멱등) |
 | `api/photographer/beta-survey/skip` | POST | 세션 | 설문 "다시 묻지 않기"(영구 건너뛰기) 기록 |
@@ -902,8 +907,8 @@ sequenceDiagram
 ### 14.1 로컬 개발
 
 - FE: `npm run dev` → `next dev -p 3001` (포트 3001 고정).
-- BE: `uvicorn app.main:app --reload`로 추정되나 로컬 실행 스크립트가 레포에 명시되어 있지 않음(**확인 필요** — `Procfile`은 배포용 커맨드만 정의).
-- CLIP 서비스: 로컬 실행 방법은 `clip-service/README.md`에 근거하나 본 조사에서 실행 커맨드 원문은 확인하지 않음(**확인 필요**).
+- BE: `photo-selection-be`에서 `.venv/bin/uvicorn app.main:app --reload --port 8000`(BE `README.md`). `app/main.py` lifespan이 백그라운드 워커 8개(원본 확정, 멈춘 작업 정리, 업로드 예약 정리, 원본·최종본 ZIP, ZIP 정리, 하객 ZIP, 하객 정리)를 시작하고, 아래 ⚠️처럼 운영 DB·R2에 동작한다. 워커를 끄는 설정은 아직 없다(2026-10-15 기준).
+- CLIP 서비스: `photo-selection-be/clip-service`에서 `.venv/bin/uvicorn app.main:app --port 8001`(`clip-service/README.md` "로컬 실행" — 설치·`.env` 키·주의사항). 로컬 FE는 `CLIP_SERVICE_URL=http://localhost:8001`로 로컬 clip-service를 본다(FE `.env.example`). 배포 전 clip-service 변경은 이렇게 해야 테스트된다. `--reload`는 쓰지 않는다 — AI 정리 실행이 백그라운드로 수십 분 돌다가 재시작되면 끊긴다. 시작 시 도는 작업은 없고 요청이 올 때만 운영 DB와 유료 Gemini를 쓴다.
 - FE→BE 연동을 로컬에서 테스트하려면 `NEXT_PUBLIC_API_URL`/`BACKEND_URL`을 `http://localhost:8000`으로(기본값), CORS 허용 목록(`app/main.py`)에 `localhost:3001`이 이미 포함되어 있음.
 - **⚠️ 현재 `photo-selection-fe/.env.local`과 `photo-selection-be/.env`는 별도 로컬/개발용 Supabase·R2가 아니라 실제 production Supabase/R2를 그대로 가리킨다.** 즉 로컬에서 BE를 띄우면 백그라운드 워커(`original_compress_worker` 등)도 production 테이블/버킷을 대상으로 동작한다. staging 환경 분리 전까지는 로컬에서 대량 benchmark나 destructive QA(대량 생성/삭제, 부하 테스트 등)를 실행하지 않는다 — 소규모 테스트가 필요하면 반드시 전용 테스트 프로젝트를 만들고 실제 삭제 API로 cleanup한다.
 
@@ -1009,3 +1014,11 @@ sequenceDiagram
 - PIN `from`/자동 인증 `to`는 `customerReturnPath`에서 현재 `/c/[token]` 내부 경로만 허용한다. 실패 횟수 조회·기록 오류는 인증을 중단하고 500으로 반환한다.
 - `submit_customer_version_reviews`는 프로젝트와 현재 보정본을 잠근 뒤 전체 대상 검증, 검토 저장, 상태 전환, 초안 삭제, 납품 아카이브 확정을 한 트랜잭션으로 수행한다. 미선택 후보는 검토·결과 조회에서도 제외한다.
 - 배포 전 `20261011010000_atomic_customer_review_submission.sql` 적용이 필요하다. SQL 테스트는 독립 PostgreSQL의 동시 연결·실패 주입으로 검증하며 운영 스키마 전체/RLS 검증을 대체하지 않는다.
+
+### 하객 앨범 추가 API (2026-10-12)
+
+- `PATCH /api/customer-select/guest-albums/[id]`: 소유자 선택 저장/결혼식 날짜 변경. 최초 업로드 제출 이후 날짜 잠금.
+- `DELETE /api/customer-select/guest-albums/[id]`: 소유자 삭제 예약. 접근 차단 후 워커가 R2·DB 삭제.
+- `POST/GET /api/customer-select/guest-albums/[id]/archives`: 소유자 ZIP 스냅샷 요청/파트 상태와 다운로드 서명 주소 조회.
+- FastAPI 내부 `POST /api/guest-upload/archive-urls`: 내부 비밀값과 ZIP 전용 키 패턴 검증, 15분 GET URL.
+- 공개 업로드 세 API는 DB의 기기·IP 분당 한도를 공유한다. pending+ready 예약량으로 동시 업로드 총량을 제한한다.

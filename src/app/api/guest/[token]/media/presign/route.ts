@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { GuestRequestError, authorizeGuest, callGuestStorage, getGuestUploadLimits, guestMediaKey } from "@/lib/guest-album-server";
+import { limitGuestRequest, guestDatabaseError, GuestRequestError, authorizeGuest, callGuestStorage, getGuestUploadLimits, guestMediaKey } from "@/lib/guest-album-server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CONTENT_TYPE = /^(image|video)\/[a-z0-9.+-]{1,60}$/;
@@ -16,6 +16,10 @@ type Derived = { contentType: string; size: number } | null;
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  try { await limitGuestRequest(); } catch (error) {
+    return NextResponse.json({ error: error instanceof GuestRequestError ? error.message : "잠시 후 다시 시도해 주세요." },
+      { status: error instanceof GuestRequestError ? error.status : 503, headers: { "Retry-After": "60" } });
+  }
   const body = await req.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id.toLowerCase() : "";
   const kind = body.kind === "photo" || body.kind === "video" ? body.kind as "photo" | "video" : null;
@@ -59,6 +63,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const { error } = await admin.from("guest_media").upsert({
       id, album_id: album.id, submission_id: submission!.id, kind, filename, content_type: contentType, size_bytes: size,
       duration_seconds: kind === "video" ? duration : null, taken_at: takenAt, is_original: isOriginal,
+      thumb_size_bytes: thumb?.size ?? 0, preview_size_bytes: preview?.size ?? 0,
+      reserved_bytes: size + (thumb?.size ?? 0) + (preview?.size ?? 0), last_presigned_at: new Date().toISOString(),
       original_key: keys.original, thumb_key: keys.thumb, preview_key: keys.preview, status: "pending",
     }, { onConflict: "id" });
     if (error) throw error;
@@ -77,6 +83,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     });
   } catch (error) {
     if (error instanceof GuestRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    const message = guestDatabaseError(error as { message: string });
+    if (message) return NextResponse.json({ error: message, code: (error as { message?: string })?.message?.includes("guest_closed") ? "closed" : "invalid" }, { status: 409 });
     console.error("[guest media presign]", error);
     return NextResponse.json({ error: "잠시 후 다시 시도해 주세요." }, { status: 500 });
   }

@@ -425,7 +425,8 @@ Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
 Management API `/database/query`로 해당 파일만 실행한다.
 
-로컬 테스트 기본값은 BE `8001`, FE `3002`, `BACKEND_URL=http://localhost:8001`이다. 서버를
+로컬 테스트 기본값은 FE `3001`, BE `8000`(`BACKEND_URL=http://localhost:8000`), clip-service `8001`
+(`CLIP_SERVICE_URL=http://localhost:8001`)이다(`architecture.md` §14.1). 서버를
 종료하기 전에 `ps` 또는 `lsof`로 포트 소유 프로세스를 확인한다.
 
 ## 10. 남은 작업
@@ -544,18 +545,19 @@ CSV/TXT 다운로드까지 정상 동작했고 가로 오버플로와 콘솔 오
 - 검수 화면: 사진 전체를 촬영 시간순 썸네일로, 장면별 색 띠·이름·시간대·AI 이름(가장 많은 것)과 함께 보인다. 사진을 누르면 그 사진부터 새 장면, `앞 장면과 합치기`, 이름은 촬영 종류의 이름 목록에서 고르거나 직접 입력. AI가 장면을 나눈 자리는 주황 왼쪽 선. 편집하는 동안 지금 정답 기준 AI 점수를 바로 보여준다.
 - 저장(`POST /api/admin/scene-labels`): `customer_scene_labels`(마이그레이션 `20261002000000_add_customer_scene_labels.sql`, 2026-10-02 운영 DB 적용)에 프로젝트당 한 건(덮어쓰기) — 정답 장면(이름·사진 ID 목록), 그때의 AI 장면, AI 설정(그 장면을 만든 최근 완료 `scene` 실행의 `customer_ai_runs.settings` — 규칙 버전·기준값 전부·이름 목록·이름 모델·프롬프트 버전. 장면 실행 분리 전 장면이면 `LEGACY_AI_SETTINGS`(`gap-v1`)), 메모, 검수자. 프로젝트 사진 전체를 빠짐없이·겹치지 않게 나눈 것만 받는다(사진이 바뀌었으면 409). **서비스 화면의 장면(`customer_scenes`)은 바꾸지 않는다.**
 - AI 정리 실행(2026-10-05): 검수 화면 제목 아래 `AI 정리 실행` — 고객이 아직 정리하지 않은 프로젝트도 운영자가 바로 돌려 검수할 수 있다. `POST /api/admin/scenes/[projectId]/ai`(관리자만)가 고객의 `AI로 정리하고 고르기`와 같은 세 작업(장면·유사컷·흔들림)을 같은 옵션(촬영 종류의 장면 이름 목록·경계 공백·장소 목록)으로 clip-service에 시작하고, `GET`은 세 작업 상태를 돌려준다. **결과는 고객의 실제 장면으로 저장돼 고객 고르기 화면에도 그대로 보이고 AI 비용이 든다** — 누르기 전에 확인 창으로 알린다. 진행 중이면 5초마다 상태를 확인하고 끝나면 화면을 다시 읽어 새 AI 장면을 보여준다. 고객 쪽 보기 설정(유사컷 묶기·흔들림 빼기, 기기별 저장)은 바꾸지 않는다.
+- 전체 다운로드(2026-10-10): 검수 화면 제목 아래 `전체 다운로드` — 고른 폴더에 프로젝트 사진 전부를 저장한다(`AdminSceneDownloadButton.tsx`, 작가 셀렉 다운로드와 같은 `saveFilesToDirectory`를 6장씩 동시에 — `DOWNLOAD_CONCURRENCY=6`, 사진 저장소가 요청마다 0.4~0.9초라 한 장씩이면 1,000장에 15분 넘게 걸림. 폴더 고르기라 PC Chrome·Edge만). 셀프 고객 사진은 원본을 보관하지 않아 미리보기(`customer_photos.preview_url`, 긴 변 1200px JPEG — BE `PREVIEW_MAX_SIZE`)를 받고, 없으면 썸네일. 파일명은 화면과 같은 촬영 순 번호 + 원래 이름 + `.jpg`(`0001_IMG_1234.jpg`), 한 폴더에 모두. 브라우저가 공개 주소(`R2_PUBLIC_URL`)에서 바로 받는다(읽기만, DB 쓰기 없음).
 - 점수(`src/lib/scene-label-score.ts`): 경계 정밀도(AI 경계 중 정답 ±3장 안), 재현율(정답 경계 중 AI가 찾은 비율), 이름 정확도(사진마다 AI 장면 이름 = 정답 이름). 기준값·이름 목록·프롬프트를 바꾼 뒤 다시 정리하고 같은 프로젝트를 검수하면 비교할 수 있다.
 
-## 하객 사진 모으기 (2026-10-06, 1단계 구현 — `feature/guest-album`)
+## 하객 사진 모으기 (2026-10-12, 선택 저장·다운로드·수명주기 구현)
 
-신랑신부가 만든 하객 앨범의 QR·링크로 하객이 로그인 없이 사진·영상을 보내고, 신랑신부가 모인 파일을 보고 셀렉을 시작(업로드 마감)한다. **1단계 범위**: 앨범 생성·관리·QR, 하객 업로드(사진+영상, 원본 그대로), 같은 브라우저 식별, 업로드 마감. **2단계(planned)**: 고른 결과 서버 저장, 선택본 다운로드, 사진 AI 정리 연결, 보관 기간 만료 자동 삭제.
+신랑신부가 만든 하객 앨범의 QR·링크로 하객이 로그인 없이 사진·영상을 보내고, 신랑신부가 모인 파일을 보고 셀렉을 시작(업로드 마감)한다. 앨범 생성·관리·QR, 하객 업로드, 같은 브라우저 식별, 업로드 마감에 더해 선택 서버 저장·선택본 ZIP·자동 삭제·요청 및 앨범 한도를 구현했다. 사진 AI 정리 연결과 A5 안내판은 미구현이다. `20261012000000_guest_album_completion.sql`은 사용자 적용 완료 후 운영 스키마를 읽기 전용으로 확인했다. FE·BE를 함께 배포한다.
 
 | 화면 | 경로 | 동작 |
 |---|---|---|
 | 앨범 만들기 | `/select/new/guest` | 로그인 필요. 필수: 앨범 이름(60자)·결혼식 날짜(지난 날짜 허용). 선택(접힘): 예식 시작 시간·예식장(100자)·하객 인사말(100자, 비우면 `DEFAULT_GUEST_GREETING`). 날짜를 고르면 보관 종료일(`guest_retention_days`)을 보인다. `POST /api/customer-select/guest-albums` → 관리 화면 `?created=1` |
-| 앨범 관리 | `/select/guest/[albumId]` | 레이아웃(서버)이 로그인·소유자를 확인하고 앨범·ready 파일을 읽는다(남의 앨범이면 목록으로). QR(`qrcode` 패키지, 브라우저에서 생성·PNG 저장)·하객 링크 복사/공유(`CustomerShareLinkField`의 `path`)·사진/영상/참여 하객 수(서로 다른 브라우저 수)·보관 종료일·`새로 보기`(router.refresh)·파일 그리드·크게 보기(올린 사람·축하 메시지, 영상 재생)·`셀렉 시작` 확인 → `POST …/[id]/close`(closed_at, 다시 여는 기능 없음) → 셀렉 화면 |
-| 셀렉 | `…/[albumId]/select` | 마감 후에만. 전체/사진/영상/고른 것, 칸·뷰어에서 선택, 영상 재생. **고른 결과는 메모리에만**(새로고침하면 초기화, 화면에 안내). AI 정리는 비활성 자리 |
-| 선택본 다운로드 | `…/[albumId]/download` | 고른 파일 목록·보관 종료일. 다운로드 버튼은 `다운로드 준비 중`(비활성) |
+| 앨범 관리 | `/select/guest/[albumId]` | 레이아웃(서버)이 로그인·소유자를 확인하고 앨범·ready 파일을 읽는다(남의 앨범이면 목록으로). QR(`qrcode` 패키지, 브라우저에서 생성·PNG 저장)·하객 링크 복사/공유(`CustomerShareLinkField`의 `path`)·사진/영상/참여 하객 수(서로 다른 브라우저 수)·보관 종료일·`새로 보기`(router.refresh)·파일 그리드·크게 보기(올린 사람·축하 메시지, 영상 재생)·`셀렉 시작` 확인 → `POST …/[id]/close`(closed_at, 다시 여는 기능 없음) → 셀렉 화면. 업로드 시작 전 결혼식 날짜 수정, 확인창을 거치는 앨범 삭제, 삭제 7일 전부터 남은 날짜 경고 |
+| 셀렉 | `…/[albumId]/select` | 마감 후에만. 전체/사진/영상/고른 것, 칸·뷰어에서 선택, 영상 재생. 소유자만 파일별 `guest_media.selected`를 저장한다. 새로고침·다른 기기에서 복원. 저장 중 선택/다운로드를 잠시 막고 실패 시 되돌린 뒤 재선택 안내. 동시 기기의 같은 파일은 마지막 저장이 반영된다. AI 정리는 비활성 자리 |
+| 선택본 다운로드 | `…/[albumId]/download` | 고른 파일 목록·보관 종료일·만료 경고. 현재 선택으로 ZIP 작업을 만들고 파트별 바이트 진행률·재시도·다운로드 링크를 제공한다. ZIP은 요청 당시 선택 스냅샷이며 선택을 바꾸면 다시 만들기를 누른다 |
 | 하객 업로드 | `/g/[token]` | 서버가 토큰으로 앨범을 읽는다(없으면 안내, 마감이면 마감 화면). 이름/별명 필수(30자), 축하 메시지 선택(300자), 사진·영상 여러 개 선택·미리보기·빼기, 용량 초과·사진/영상 아닌 파일은 고를 때 빼고 안내, `사진 원본으로 보내기` 체크(기본 꺼짐 — 사진을 줄여 보냄, 영상은 항상 원본), 파일별 진행률(동시 4개)·실패·`실패한 N개 다시 보내기`·완료. 보내는 중 페이지 이탈 경고. 올리는 사이 마감되면 마감 화면 |
 | 내가 보낸 사진 | `/g/[token]/mine` | 서버가 이 브라우저 쿠키로 그 하객의 파일만 조회한다(클라이언트에서 거르지 않음). 다른 기기·브라우저에서는 안 보임 |
 | 내 프로젝트 목록 | `/select/projects` | 하객 앨범 카드(`하객 사진 모으기` 칩, 업로드 받는 중/셀렉 중, 결혼식 날짜, 올라온 수, 첫 썸네일)를 프로젝트와 만든 순서로 섞어 보인다. 이름 검색은 적용, `보정 완료` 필터에서는 빠진다. `guest_albums` 조회가 실패하면(마이그레이션 전) 빈 목록 |
@@ -565,9 +567,9 @@ CSV/TXT 다운로드까지 정상 동작했고 가로 오버플로와 콘솔 오
 1. `POST /api/guest/[token]/submissions` {name, message} — 이번 보내기 묶음(`guest_submissions`). 식별 쿠키가 없으면 여기서 심는다.
 2. `사진 원본으로 보내기`를 체크하지 않았으면 사진을 긴 변 3200px JPEG(`compressImageForUpload` 기본값, 600KB 미만·디코딩 실패면 원본)로 줄여 그것을 원본 자리에 올린다(`guest_media.is_original=false`, 파일명 확장자 `.jpg`). 줄인 사진에는 EXIF가 없어 촬영 시각은 줄이기 전 원본에서 읽는다. 신랑신부의 크게 보기·다운로드 목록에 `원본`/`줄인 사진`을 표시한다. 영상은 브라우저에서 줄이지 않는다.
 3. 파일마다 브라우저가 썸네일(480px)·미리보기(1600px) JPEG를 만든다 — 사진은 `compressImageForUpload`, 영상은 0.5초 지점 프레임(`guest-upload-client.ts`). 만들지 못하면 없이 올린다. 사진은 EXIF 촬영 시각(`readTakenAt`, exif일 때만)을 함께 보낸다.
-4. `POST /api/guest/[token]/media/presign` — 묶음 주인(쿠키) 확인, 용량 한도 확인, `guest_media` 행(pending, id는 브라우저 UUID라 재시도해도 같은 행) → FastAPI `POST /api/guest-upload/presign-put`(내부 비밀값 `INTERNAL_PRESIGN_SECRET`)이 R2 PUT 주소를 서명한다. **Content-Type과 크기를 서명에 포함**해 선언과 다른 PUT은 R2가 거절한다.
+4. `POST /api/guest/[token]/media/presign` — 묶음 주인(쿠키) 확인, 용량 한도 확인, `guest_media` 행(pending, id는 브라우저 UUID라 재시도해도 같은 행) → FastAPI `POST /api/guest-upload/presign-put`(내부 비밀값 `INTERNAL_PRESIGN_SECRET`)이 R2 PUT 주소를 서명한다. **Content-Type과 크기를 서명에 포함**해 선언과 다른 PUT은 R2가 거절한다. DB 트리거가 앨범 행을 잠가 동시 요청의 총 파일 수·예약 용량을 검사한다. pending도 한도에 포함하며 원본+썸네일+미리보기 크기를 예약한다. 재시도에서 원본 크기/종류/형식은 바꿀 수 없고 파생 파일 예약량은 줄이지 않는다. 기존 파일의 파생 크기는 기록이 없어 키마다 기존 서명 상한(`DERIVED_MAX_BYTES=5MiB`)을 보수적으로 예약한다.
 5. 브라우저가 R2에 직접 PUT(원본은 XHR 진행률). 썸네일·미리보기 PUT 실패는 원본을 막지 않는다.
-6. `POST /api/guest/[token]/media/complete` — FastAPI `POST /api/guest-upload/head`로 원본 크기가 선언과 같은지 확인한 뒤 ready. 없는 썸네일·미리보기 키는 비운다. 앨범이 마감됐으면 올라간 파일을 지우고(`/api/guest-upload/delete`) 마감을 알린다.
+6. `POST /api/guest/[token]/media/complete` — FastAPI `POST /api/guest-upload/head`로 원본 크기가 선언과 같은지 확인한 뒤 ready. 없는 썸네일·미리보기 키는 비운다. 앨범이 마감됐으면 본인 쿠키를 확인한 pending 파일에 정리 표시를 남기고 마감을 알린다. 이미 발급된 PUT을 고려해 실제 삭제는 주기 워커가 유예 후 처리한다.
 
 R2 키: `guest-albums/{album_id}/{media_id}/(original|thumb|preview)`(FastAPI `GUEST_KEY_PATTERN`만 허용). 버킷이 공개라 화면은 공개 주소(`R2_PUBLIC_URL`, 기본 `https://img.acut.kr`)를 바로 쓴다 — 추측할 수 없는 UUID 키가 보호 수단(기존 셀프 고객 사진과 같음). 영상은 압축하지 않고 원본을 재생한다(아이폰 HEVC는 일부 PC 브라우저에서 재생되지 않을 수 있음 — 문제가 되면 재생용 변환 추가).
 
@@ -577,15 +579,41 @@ R2 키: `guest-albums/{album_id}/{media_id}/(original|thumb|preview)`(FastAPI `G
 
 서버가 심는 httpOnly 쿠키 `acut_guest_device`(무작위 32바이트, 400일). DB에는 `sha256(album_id:key)`만 `guest_submissions.device_hash`로 저장해 앨범끼리 연결되지 않는다. 스크립트 저장소(localStorage)는 Safari가 7일 뒤 지울 수 있어 쓰지 않는다. 쿠키를 지우거나 다른 브라우저면 이전 업로드를 볼 수 없다(본인 전용 링크는 만들지 않기로 함).
 
-### 한도·정책 (임시값, 2026-10-06 사용자 확인)
+### 한도·정책
 
-`app_settings`의 `guest_photo_max_mb`(20)·`guest_video_max_mb`(500)·`guest_retention_days`(90) — `/admin/settings`에서 바꾼다. 보관 기간은 결혼식 날짜 기준이며 **표시만 하고 자동 삭제는 아직 없다**. 앨범 수·앨범당 파일 수·총 용량 한도는 없다. 결혼식 날짜 수정 화면은 아직 없다 — 만들 때 업로드가 시작된 뒤에는 날짜 변경을 막아야 한다(보관 기간 연장 방지).
+모두 `app_settings`와 `/admin/settings`에서 관리한다. 새 기본값은 운영 정책 확정 전 조정 가능하다.
 
-### 남은 일
+| DB 항목 | 기본값 | 의미 |
+|---|---:|---|
+| `guest_photo_max_mb` | 20 | 사진 하나의 업로드 크기 |
+| `guest_video_max_mb` | 500 | 영상 하나의 업로드 크기 |
+| `guest_retention_days` | 90 | 결혼식 날짜부터 보관 일수 |
+| `guest_album_max_files` | 5,000 | pending+ready 파일 합계 |
+| `guest_album_max_mb` | 20,480 | 파일 및 파생 이미지의 예약 용량 합계(MiB) |
+| `guest_device_requests_per_minute` | 120 | 기기 쿠키 기준 분당 공개 API 요청 수 |
+| `guest_ip_requests_per_minute` | 1,200 | IP 기준 분당 공개 API 요청 수 |
+| `guest_pending_hours` | 24 | 마지막 업로드 주소 발급 후 pending 정리 표시까지의 시간(최소 2) |
+| `guest_archive_part_mb` | 1,024 | ZIP 파트 목표 원본 합계(MiB). 큰 단일 영상은 분할하지 않는다 |
 
-- pending으로 남은 행(PUT 중 이탈)과 그 R2 파일 정리 — 아직 없음
-- 앱 전환·화면 잠금으로 끊긴 업로드는 실패로 표시되고 `다시 보내기`에 맡긴다(자동 이어 보내기 없음)
-- 공개 토큰만 있으면 누구나 올릴 수 있다 — 남용 방지(요청 속도·앨범 총량 제한) 없음
+공개 submissions/presign/complete 세 API는 함께 기기·IP 한도를 소비한다. DB의 분 단위 고정 창(`guest_rate_limits`)을 쓰므로 여러 서버에서도 공유된다. IP는 Vercel이 덮어쓰는 `x-vercel-forwarded-for`만 신뢰하고 원문은 저장하지 않는다. 이 헤더가 없으면 보수적으로 하나의 공용 IP 버킷을 사용한다. 다른 프록시로 배포할 때는 신뢰 경계를 먼저 확인해야 한다. 429 응답에는 `Retry-After: 60`과 재시도 안내가 있다. 총량 초과 시 기존 파일은 유지한다.
+
+### 선택본 ZIP과 수명주기
+
+- 소유자 API: `PATCH /api/customer-select/guest-albums/[id]`(파일별 선택/날짜), `DELETE`(삭제 예약), `POST …/[id]/archives`(작업 생성/실패 파트 재시도), `GET …/[id]/archives`(상태/15분 서명 다운로드 주소). 모든 쓰기는 세션 소유자와 DB의 `guest_owner_action`을 통해 검증한다.
+- `guest_archives`는 선택 ID 해시별 스냅샷, `guest_archive_parts`는 manifest·상태·바이트 진행률·lease를 가진다. 같은 선택의 재요청은 같은 작업을 사용한다. 서로 다른 선택의 기존 ZIP은 앨범 삭제/만료까지 남는다(업로드 용량 한도와 별도 저장 공간).
+- FastAPI `guest_archive_worker`가 5초(`POLL_SECONDS`)마다 DB 작업을 claim한다. 파일은 1MiB씩 임시 ZIP으로 스트리밍하고 R2 multipart 업로드를 사용한다. 진행률은 최소 2초 간격, 작업 lease는 15분이며 진행 중 연장한다. 중단된 작업은 lease 만료 후 재선점한다. 누락/크기 불일치 파일은 조용히 빼지 않고 실패시킨다.
+- ZIP 경로는 `guest-albums/{album_id}/archives/{part_id}/{lease_token}.zip`. 안쪽은 `원본/` 또는 `줄인 사진/` 아래 UUID를 붙인 기존 파일명으로 충돌을 피한다. 영상은 원본이며 변환하지 않는다.
+- FastAPI `guest_cleanup_worker`가 5분(`SWEEP_SECONDS`)마다 KST 기준 보관 종료일 **다음 날 0시부터** 만료 표시한다. 날짜 수정은 최초 submissions 생성 시각(`upload_started_at`) 이후 DB에서 잠긴다. pending 정리 뒤에도 이 시각은 남는다.
+- 만료/소유자 삭제는 `deleting_at`으로 접근과 새 업로드를 막는다. 기존 PUT URL(1시간)의 늦은 완료를 고려해 삭제 표시 후 2시간(`DELETE_GRACE_HOURS`)을 기다리고 처리 중 ZIP lease도 확인한다. R2 prefix 전체(원본·썸네일·미리보기·ZIP)를 삭제한 뒤 DB 앨범을 cascade 삭제한다. S3가 개별 삭제 실패를 반환하면 DB를 남기고 다음 주기에 재시도한다.
+- pending은 마지막 presign 후 `guest_pending_hours`가 지나면 `cleanup_at`을 기록하고 같은 2시간 유예 후 파일 prefix와 행을 지운다. 따라서 기본 정리 시점은 약 26시간+워커 주기다.
+- 보관 기간을 줄이면 기존 앨범에도 즉시 적용된다. 오래된 결혼식 날짜의 앨범은 새 워커 배포 후 삭제 대상이 될 수 있으므로 운영 적용 전 확인해야 한다.
+- 업로드 실패를 비동기 React ref로 판단하던 경합을 수정했다. 작업 내부 실패 집계로 실패 화면·`다시 보내기`를 보장한다. 자동 이어 보내기는 없다.
+
+### 검증과 제외 범위
+
+로컬 PostgreSQL/PostgREST + 실제 Next API/FastAPI 워커 + 디스크 저장소 대체물에서 검증한다. 인증과 R2는 테스트 대체물이므로 운영 OAuth·R2 실제 전송 및 iOS/Android 실기기 검증과 같지 않다. 실행 방법/결과는 `guest-album-completion.md`에 기록한다. HEIC·iOS 영상 썸네일·HEVC PC 재생·실제 앱 전환은 미확인이다.
+
+A5 안내판은 이번 구현에 포함하지 않는다(기존 QR PNG 유지). 전체 받기는 **제안만**: 같은 ZIP 경로에 전체 ready 파일을 스냅샷으로 넣는 방식으로 추가할 수 있으나, 의도치 않은 대용량 생성 방지 안내와 테스트가 필요하다. AI 장면 정리는 별도 작업이다.
 
 ### 연속 저장 (2026-10-11)
 

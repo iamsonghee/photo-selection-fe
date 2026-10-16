@@ -396,7 +396,7 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   return all;
 }
 
-/** 프로젝트의 사진 목록 + 선택/태그 상태 (고객 갤러리용) */
+/** 작가 보관함의 사진 목록 + 최종 선택/태그 상태 */
 export async function getPhotosWithSelections(
   projectId: string
 ): Promise<{ photos: Photo[]; selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
@@ -427,7 +427,7 @@ export async function getPhotosWithSelections(
   if (selectionsError) throw selectionsError;
 
   const selections = selectionsData ?? [];
-  const selectedIds = new Set(selections.map((s: { photo_id: string }) => s.photo_id));
+  const selectedIds = new Set(selections.filter((s) => s.is_selected).map((s) => s.photo_id));
   const photoStates: Record<string, PhotoState> = {};
   for (const s of selections as Array<{ photo_id: string; rating: number | null; color_tags: ColorTag[] | null; comment: string | null }>) {
     const colorTags = s.color_tags ?? [];

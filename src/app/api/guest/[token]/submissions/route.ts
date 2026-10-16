@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { GuestRequestError, authorizeGuest, deviceHash, ensureGuestDeviceKey } from "@/lib/guest-album-server";
+import { limitGuestRequest, guestDatabaseError, GuestRequestError, authorizeGuest, deviceHash, ensureGuestDeviceKey } from "@/lib/guest-album-server";
 import { GUEST_MESSAGE_MAX, GUEST_NAME_MAX } from "@/lib/guest-album";
 
 /** POST: 하객이 한 번 보낼 때의 묶음(이름·축하 메시지). 브라우저 식별 쿠키가 없으면 여기서 심는다. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  try { await limitGuestRequest(); } catch (error) {
+    return NextResponse.json({ error: error instanceof GuestRequestError ? error.message : "잠시 후 다시 시도해 주세요." },
+      { status: error instanceof GuestRequestError ? error.status : 503, headers: { "Retry-After": "60" } });
+  }
   const body = await req.json().catch(() => ({}));
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -22,6 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ submissionId: data.id });
   } catch (error) {
     if (error instanceof GuestRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    const message = guestDatabaseError(error as { message: string });
+    if (message) return NextResponse.json({ error: message, code: (error as { message?: string })?.message?.includes("guest_closed") ? "closed" : "invalid" }, { status: 409 });
     console.error("[guest submissions]", error);
     return NextResponse.json({ error: "잠시 후 다시 시도해 주세요." }, { status: 500 });
   }

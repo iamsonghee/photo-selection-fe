@@ -11,6 +11,12 @@ const FIELDS = [
   "beta_default_duration_days",
   "guest_photo_max_mb",
   "guest_video_max_mb",
+  "guest_album_max_files",
+  "guest_album_max_mb",
+  "guest_device_requests_per_minute",
+  "guest_ip_requests_per_minute",
+  "guest_pending_hours",
+  "guest_archive_part_mb",
   "guest_retention_days",
 ] as const;
 
@@ -25,7 +31,7 @@ export async function PATCH(req: NextRequest) {
   const update: Record<string, number> = {};
   for (const field of FIELDS) {
     const value = (body as Record<string, unknown>)[field];
-    if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < (field === "guest_pending_hours" ? 2 : 1) || value > 2147483647) {
       return NextResponse.json({ error: `${field}는 1 이상의 정수여야 합니다.` }, { status: 400 });
     }
     update[field] = value;

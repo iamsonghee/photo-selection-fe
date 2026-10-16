@@ -7,6 +7,8 @@ import QRCode from "qrcode";
 import { ArrowRight, CheckCircle2, Download, ExternalLink, Lock, RefreshCw, Upload } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
+import { GuestRetentionWarning } from "@/components/guest-album/GuestRetentionWarning";
+import { GuestAlbumSettings } from "../_lib/GuestAlbumSettings";
 import { GuestMediaGrid } from "@/components/guest-album/GuestAlbumParts";
 import { countMedia, formatWeddingDateTime, guestUploadPath, mediaSummary, retentionEndDate, weddingMeta, type GuestMediaKind } from "@/lib/guest-album";
 import { CustomerShareLinkField } from "../../_lib/CustomerShareLinkField";
@@ -56,6 +58,7 @@ export default function GuestAlbumManagePage() {
         </p>
       ) : null}
 
+      <GuestRetentionWarning weddingDate={album.weddingDate} days={limits.retentionDays} />
       <header>
         <span className="inline-flex h-7 items-center rounded-full bg-surface-raised px-2.5 text-[12px] font-bold text-muted-foreground">하객 사진 모으기</span>
         <h1 className="mt-2 text-[24px] font-bold tracking-[-0.04em] md:text-[30px]">{album.name}</h1>
@@ -103,6 +106,7 @@ export default function GuestAlbumManagePage() {
         </section>
       </div>
 
+      <GuestAlbumSettings album={album} />
       <section aria-labelledby="files-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="files-title" className="text-[18px] font-bold">올라온 사진·영상 <span className="text-[15px] font-semibold text-subtle-foreground">{media.length.toLocaleString()}</span></h2>

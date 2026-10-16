@@ -19,7 +19,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 export default function GuestAlbumSelectPage() {
   const { albumId } = useParams<{ albumId: string }>();
-  const { album, media, selected, toggle } = useGuestAlbum();
+  const { album, media, selected, toggle, saving, saveError } = useGuestAlbum();
   const closed = album.closed;
   const [filter, setFilter] = useState<Filter>("all");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -43,8 +43,8 @@ export default function GuestAlbumSelectPage() {
         <div>
           <h1 className="text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">사진·영상 고르기</h1>
           <p className="mt-1 text-[14px] text-muted-foreground">마음에 드는 사진과 영상을 골라 주세요. 고른 것만 내려받을 수 있어요.</p>
-          {/* TODO(2단계): 고른 결과 서버 저장 */}
-          <p className="mt-1 text-[12px] font-semibold text-warning">고른 결과는 아직 저장되지 않아 새로고침하면 처음부터 골라야 해요.</p>
+          <p role="status" className="mt-1 text-[13px] text-muted-foreground">{saving ? "선택 저장 중…" : saveError ? "선택을 저장하지 못했어요." : "고른 결과를 저장했어요."}</p>
+          {saveError ? <p role="alert" className="mt-1 text-[13px] text-danger">{saveError}</p> : null}
         </div>
         <Link href={`/select/guest/${albumId}`} className="text-[13px] font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground">앨범 관리</Link>
       </header>
@@ -80,7 +80,7 @@ export default function GuestAlbumSelectPage() {
                   className={`block w-full overflow-hidden rounded-xl ring-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${isSelected ? "ring-[3px] ring-accent" : ""}`}>
                   <MediaThumb media={item} className="aspect-square" />
                 </button>
-                <button type="button" onClick={() => toggle(item.id)} aria-pressed={isSelected} aria-label={`${item.fileName} ${isSelected ? "선택 해제" : "선택"}`}
+                <button type="button" disabled={saving} onClick={() => toggle(item.id)} aria-pressed={isSelected} aria-label={`${item.fileName} ${isSelected ? "선택 해제" : "선택"}`}
                   className={`absolute right-1 top-1 grid size-9 place-items-center rounded-full border-2 transition-colors ${isSelected ? "border-accent bg-accent text-white" : "border-white bg-black/25 text-transparent hover:bg-black/40"}`}>
                   <Check size={18} strokeWidth={3} />
                 </button>
@@ -93,7 +93,7 @@ export default function GuestAlbumSelectPage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_18px_rgba(2,56,82,0.06)]">
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-5 py-3 md:px-8">
           <p className="min-w-0 flex-1 text-[14px]"><strong className="font-bold">{selected.size}개 선택</strong><span className="ml-1.5 text-muted-foreground">{selected.size ? mediaSummary(selectedCounts) : ""}</span></p>
-          {selected.size
+          {selected.size && !saving && !saveError
             ? <Link href={`/select/guest/${albumId}/download`} className="inline-flex h-12 items-center gap-1.5 rounded-lg bg-accent px-5 text-[14px] font-bold text-white hover:bg-[var(--accent-hover)]">선택본 다운로드<ArrowRight size={16} /></Link>
             : <PhotographerLightButton size="work-panel" disabled>선택본 다운로드</PhotographerLightButton>}
         </div>
@@ -106,7 +106,7 @@ export default function GuestAlbumSelectPage() {
           onPrev={openIndex > 0 ? () => setOpenIndex(openIndex - 1) : undefined}
           onNext={openIndex < visible.length - 1 ? () => setOpenIndex(openIndex + 1) : undefined}
           actions={(
-            <button type="button" onClick={() => toggle(open.id)} aria-pressed={selected.has(open.id)}
+            <button type="button" disabled={saving} onClick={() => toggle(open.id)} aria-pressed={selected.has(open.id)}
               className={`inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-lg px-6 text-[15px] font-bold ${selected.has(open.id) ? "bg-accent text-white" : "bg-white text-black"}`}>
               <Check size={18} strokeWidth={3} />{selected.has(open.id) ? "선택됨" : "선택"}
             </button>

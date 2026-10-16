@@ -13,7 +13,13 @@ const FIELD_DEFS: { key: keyof AppSettings; label: string; note?: string; suffix
   { key: "betaDefaultDurationDays", label: "베타 부여 시 기본 이용 기간", note: "종료일을 지정하지 않으면 자동 적용", suffix: "일" },
   { key: "guestPhotoMaxMb", label: "하객 사진 1장 최대 용량", note: "임시값 — 하객 사진 모으기", suffix: "MB" },
   { key: "guestVideoMaxMb", label: "하객 영상 1개 최대 용량", note: "임시값 — 원본 그대로 저장", suffix: "MB" },
-  { key: "guestRetentionDays", label: "하객 앨범 보관 기간", note: "결혼식 날짜부터 — 자동 삭제는 아직 없음", suffix: "일" },
+  { key: "guestAlbumMaxFiles", label: "하객 앨범 최대 파일 수", suffix: "개" },
+  { key: "guestAlbumMaxMb", label: "하객 앨범 총 저장 용량", suffix: "MB" },
+  { key: "guestDeviceRequestsPerMinute", label: "하객 기기당 분당 요청 수", suffix: "회" },
+  { key: "guestIpRequestsPerMinute", label: "하객 IP당 분당 요청 수", suffix: "회" },
+  { key: "guestPendingHours", label: "미완료 업로드 정리 대기 (최소 2시간)", suffix: "시간" },
+  { key: "guestArchivePartMb", label: "하객 ZIP 파트 목표 용량 (단일 파일은 초과 가능)", suffix: "MB" },
+  { key: "guestRetentionDays", label: "하객 앨범 보관 기간", note: "결혼식 날짜부터 — 만료 후 자동 삭제", suffix: "일" },
 ];
 
 function toFormValues(settings: AppSettings): Record<string, string> {
@@ -71,6 +77,7 @@ export function AdminSettingsForm({ initial }: { initial: AppSettings }) {
           </div>
           <div className="flex items-center gap-1.5">
             <input
+              aria-label={label}
               value={values[key]}
               onChange={(e) =>
                 setValues((prev) => ({ ...prev, [key]: e.target.value.replace(/\D/g, "").slice(0, 6) }))

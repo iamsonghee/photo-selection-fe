@@ -291,28 +291,31 @@ export default function CustomerUploadPage() {
 
     let uploaded = 0;
     const failedFiles: File[] = [];
+    // 서버에는 한 번에 한 묶음만 보낸다(BE가 사진 번호·개수를 요청 순서대로 정한다). 대신 한 묶음을 보내는 동안
+    // 다음 묶음을 미리 압축해 둔다 — 압축과 전송이 서로 기다리지 않게. 미리 압축한 묶음은 최대 하나다.
+    const compressBatch = (start: number) => {
+      const rawFiles = selectedFiles.slice(start, start + BATCH_SIZE);
+      return compressImagesInParallel(
+        rawFiles,
+        controller.signal,
+        COMPRESS_POOL_SIZE,
+        { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY },
+        // 압축 진행은 첫 묶음만 막대에 보탠다 — 그 뒤 압축은 전송 뒤에 숨어 있어 더하면 막대가 앞서 나간다.
+        start === 0 ? () => setCompressedInBatch((count) => count + 1) : undefined
+      ).catch(() => rawFiles); // 압축 실패 시 원본 그대로 업로드(작가 화면과 동일한 폴백 원칙). 중단이면 이어지는 전송이 같은 signal로 멈춘다.
+    };
+    let nextBatch = compressBatch(0);
+    // 남은 시간은 묶음이 끝난 간격으로 잰다 — 압축이 전송과 겹치므로 압축 시작부터 재면 실제보다 길어진다.
+    let lastBatchDoneAt = performance.now();
     for (let i = 0; i < selectedFiles.length; i += BATCH_SIZE) {
-      const batchStartedAt = performance.now();
       const rawBatch = selectedFiles.slice(i, i + BATCH_SIZE);
       const batchPending = pending.slice(i, i + BATCH_SIZE);
       const batchIds = new Set(batchPending.map((photo) => photo.id));
       setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, uploadState: "uploading" } : photo));
-      setCompressedInBatch(0);
 
-      let batch: File[];
-      setUploadPhase("compressing");
       const takenAt = takenAtAll.slice(i, i + BATCH_SIZE);
-      try {
-        batch = await compressImagesInParallel(
-          rawBatch,
-          controller.signal,
-          COMPRESS_POOL_SIZE,
-          { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY },
-          () => setCompressedInBatch((count) => count + 1)
-        );
-      } catch {
-        batch = rawBatch; // 압축 실패 시 원본 그대로 업로드(작가 화면과 동일한 폴백 원칙)
-      }
+      const batch = await nextBatch;
+      if (i + BATCH_SIZE < selectedFiles.length) nextBatch = compressBatch(i + BATCH_SIZE);
 
       const formData = new FormData();
       formData.append("project_id", projectId);
@@ -347,6 +350,7 @@ export default function CustomerUploadPage() {
         failedFiles.push(...rejectedFiles);
         uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedFiles.length);
       } catch (e) {
+        controller.abort(); // 미리 압축하던 다음 묶음도 멈춘다(오류로 끝났을 때도 워커가 뒤에서 돌지 않게).
         // 중단·오류 때는 대기 중이던 사진도 다시 시도 목록에 넣는다(아무것도 잃지 않게).
         const remainingFiles = [...carriedFailed, ...failedFiles, ...selectedFiles.slice(i), ...queueRef.current.splice(0)];
         setQueuedCount(0);
@@ -365,10 +369,12 @@ export default function CustomerUploadPage() {
         finishPending();
         return;
       }
+      const batchDoneAt = performance.now();
       uploadTimingSamplesRef.current = [
         ...uploadTimingSamplesRef.current,
-        { milliseconds: performance.now() - batchStartedAt, photoCount: rawBatch.length },
+        { milliseconds: batchDoneAt - lastBatchDoneAt, photoCount: rawBatch.length },
       ].slice(-3);
+      lastBatchDoneAt = batchDoneAt;
       setEstimatedRemainingSeconds(estimateUploadRemainingSeconds(
         uploadTimingSamplesRef.current,
         selectedFiles.length - i - rawBatch.length

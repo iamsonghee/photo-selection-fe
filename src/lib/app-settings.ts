@@ -22,6 +22,12 @@ export interface AppSettings {
   /** 하객 사진 모으기 — 임시값(2026-10-06), guest-album-server의 getGuestUploadLimits와 같은 컬럼 */
   guestPhotoMaxMb: number;
   guestVideoMaxMb: number;
+  guestAlbumMaxFiles: number;
+  guestAlbumMaxMb: number;
+  guestDeviceRequestsPerMinute: number;
+  guestIpRequestsPerMinute: number;
+  guestPendingHours: number;
+  guestArchivePartMb: number;
   guestRetentionDays: number;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -36,6 +42,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   betaDefaultDurationDays: DEFAULT_BETA_DEFAULT_DURATION_DAYS,
   guestPhotoMaxMb: 20,
   guestVideoMaxMb: 500,
+  guestAlbumMaxFiles: 5000,
+  guestAlbumMaxMb: 20480,
+  guestDeviceRequestsPerMinute: 120,
+  guestIpRequestsPerMinute: 1200,
+  guestPendingHours: 24,
+  guestArchivePartMb: 1024,
   guestRetentionDays: 90,
   updatedAt: null,
   updatedBy: null,
@@ -54,7 +66,7 @@ export async function getAppSettings(): Promise<AppSettings> {
         )
         .eq("id", 1)
         .maybeSingle(),
-      admin.from("app_settings").select("guest_photo_max_mb, guest_video_max_mb, guest_retention_days").eq("id", 1).maybeSingle(),
+      admin.from("app_settings").select("guest_photo_max_mb, guest_video_max_mb, guest_album_max_files, guest_album_max_mb, guest_device_requests_per_minute, guest_ip_requests_per_minute, guest_pending_hours, guest_archive_part_mb, guest_retention_days").eq("id", 1).maybeSingle(),
     ]);
 
     if (error || !data) return DEFAULT_APP_SETTINGS;
@@ -68,6 +80,12 @@ export async function getAppSettings(): Promise<AppSettings> {
       betaDefaultDurationDays: data.beta_default_duration_days,
       guestPhotoMaxMb: guest.data?.guest_photo_max_mb ?? DEFAULT_APP_SETTINGS.guestPhotoMaxMb,
       guestVideoMaxMb: guest.data?.guest_video_max_mb ?? DEFAULT_APP_SETTINGS.guestVideoMaxMb,
+      guestAlbumMaxFiles: guest.data?.guest_album_max_files ?? DEFAULT_APP_SETTINGS.guestAlbumMaxFiles,
+      guestAlbumMaxMb: guest.data?.guest_album_max_mb ?? DEFAULT_APP_SETTINGS.guestAlbumMaxMb,
+      guestDeviceRequestsPerMinute: guest.data?.guest_device_requests_per_minute ?? DEFAULT_APP_SETTINGS.guestDeviceRequestsPerMinute,
+      guestIpRequestsPerMinute: guest.data?.guest_ip_requests_per_minute ?? DEFAULT_APP_SETTINGS.guestIpRequestsPerMinute,
+      guestPendingHours: guest.data?.guest_pending_hours ?? DEFAULT_APP_SETTINGS.guestPendingHours,
+      guestArchivePartMb: guest.data?.guest_archive_part_mb ?? DEFAULT_APP_SETTINGS.guestArchivePartMb,
       guestRetentionDays: guest.data?.guest_retention_days ?? DEFAULT_APP_SETTINGS.guestRetentionDays,
       updatedAt: data.updated_at,
       updatedBy: data.updated_by,

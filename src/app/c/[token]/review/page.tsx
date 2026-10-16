@@ -2,7 +2,7 @@
 
 import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useParams, useRouter } from "next/navigation";
@@ -14,29 +14,20 @@ import { isReceiptMode } from "@/lib/review-mode";
 import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
-import { BrandLogoBar } from "@/components/BrandLogo";
-import { PrevNextButton } from "@/components/PrevNextButton";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
-import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
-import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
-import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import type { Project } from "@/types";
 
 /** 검토 목록 격자를 좁히는 상태 필터 — `all`은 필터 해제 */
 type ReviewStatusFilter = "all" | "approved" | "revision_requested" | "pending";
-
-const MONO   = "var(--font-mono)";
-const ACCENT = "var(--accent)";
-const BORDER = "var(--border)";
 
 export default function ReviewRedirectPage() {
   const params  = useParams();
   const router  = useRouter();
   const token   = (params?.token as string) ?? "";
 
-  const { project, loading: selectionLoading, reloadProject } = useSelection();
+  const { project, loading: selectionLoading } = useSelection();
   const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, resetAll } = useReview();
 
   useEffect(() => {
@@ -44,42 +35,20 @@ export default function ReviewRedirectPage() {
     loadReviewPhotos(token, project.id, project.status);
   }, [token, project?.id, project?.status, loadReviewPhotos]);
 
-  const isReceiptOnly =
-    !!project &&
-    project.status === "reviewing_v1" &&
-    (project.maxRevisionCount ?? 0) === 0;
-
   /* 검토할 수 없는 상태로 들어오면 고객 홈으로 돌린다.
    * 예전에는 여기서 데스크탑만 첫 사진으로 자동 이동시켰는데, 상세의 닫기/Esc가 이 경로로
    * 돌아오는 탓에 PC에서는 뷰어를 닫을 수 없고 항상 0번 사진으로 튕겼다. 목록을 두 플랫폼
-   * 모두에 두고(ReviewGalleryView) 진입은 썸네일 탭이 대신한다. */
+   * 모두에 두고(ReviewGalleryView) 진입은 썸네일 탭이 대신한다.
+   * 재보정 0회 상품(수령 확인)도 같은 목록을 쓴다 — 목록은 라이트, 사진 상세만 암실(DESIGN.md). */
   useEffect(() => {
     if (selectionLoading || reviewPhotosLoading) return;
     if (!project) return;
-    if (isReceiptOnly) return; // 재보정 0회: 수령 확인 화면 유지
     const canReview = project.status === "reviewing_v1" || project.status === "reviewing_v2";
     if (!canReview) router.replace(`/c/${token}`);
-  }, [selectionLoading, reviewPhotosLoading, project, token, router, isReceiptOnly]);
+  }, [selectionLoading, reviewPhotosLoading, project, token, router]);
 
   if (selectionLoading || reviewPhotosLoading || !project) {
     return <CustomerPageSkeleton variant="gallery" />;
-  }
-
-  if (isReceiptOnly) {
-    return (
-      <DeliveryReceiptView
-        token={token}
-        project={project}
-        photos={reviewPhotos}
-        onDone={async () => {
-          // 수령 완료로 status가 delivered로 바뀐 뒤 컨텍스트가 옛 상태면 /delivered ↔ /c/[token]
-          // 리다이렉트 루프가 생긴다 — 전체 새로고침 대신 컨텍스트를 새로 받고 이동한다.
-          resetAll();
-          await reloadProject();
-          router.replace(`/c/${token}/delivered`);
-        }}
-      />
-    );
   }
 
   return (
@@ -142,8 +111,7 @@ function ReviewGalleryView({
 
   /* 남은 재보정이 없으면 이 화면의 일은 판단이 아니라 **확인**이다 — 사진마다 확정을 누르게 하는 것은
    * 답이 하나뿐인 질문을 N번 되풀이시키는 것이다. 판단 단계를 걷어내고 CTA 하나로 끝낸다.
-   * (같은 상황인 `재보정 0회 상품`은 아직 `DeliveryReceiptView`가 따로 맡고 있다 — 두 화면을
-   *  하나로 합치는 것은 별도 작업이다.) */
+   * (`재보정 0회 상품`도 같은 상황이라 이 화면이 맡는다.) */
   const receiptMode = isReceiptMode(project);
   /* 수령 모드에서는 판단이라는 단계 자체가 없으므로 "다 봤는지"를 물을 근거도 없다 —
    * 전달 버튼은 처음부터 열려 있다. */
@@ -179,7 +147,6 @@ function ReviewGalleryView({
     { key: "revision_requested", label: "재보정 요청", count: revisionCount, tone: "#b26a00" },
   ];
 
-
   const goToPhoto = useCallback(
     (id: string) => router.push(`/c/${token}/review/${id}`),
     [router, token]
@@ -210,7 +177,7 @@ function ReviewGalleryView({
         for (const p of photos) {
           if (!p.photoVersionId) continue;
           /* 수령 모드에는 사진별 판단 기록이 없다(애초에 묻지 않았다) — 전부 확정으로 보낸다.
-           * `DeliveryReceiptView`의 수령 완료와 같은 페이로드다. */
+           */
           if (receiptMode) {
             reviews.push({
               photo_version_id: p.photoVersionId,
@@ -591,492 +558,6 @@ function ReviewGalleryView({
           onCancel={() => { if (!submitting) { setShowSubmitModal(false); setSubmitError(null); } }}
           onConfirm={() => { void handleSubmit(); }}
         />
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// DeliveryReceiptView — 재보정 0회 프로젝트의 수령 확인 갤러리
-// 단일 [수령 완료] CTA로 모든 사진을 approved 처리해 status=delivered 전환
-// ─────────────────────────────────────────────────────────────────────────
-
-function DeliveryReceiptView({
-  token,
-  project,
-  photos,
-  onDone,
-}: {
-  token: string;
-  project: Project;
-  photos: ReviewPhotoItem[];
-  onDone: () => void;
-}) {
-  const [activeIdx, setActiveIdx] = useState(0);
-  /* 다른 고객 뷰어와 같은 방식 — 꾹 누르는 동안 원본, 사진을 누르면 전체화면 집중 보기.
-   * 원본/보정본 3단 토글과 전체화면 비교 모달을 대신한다. */
-  const swipeStartX = useRef(0);
-  useCustomerLightCanvas();
-  const [holdOriginal, setHoldOriginal] = useState(false);
-  const [focusOpen, setFocusOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [submitting, setSubmitting]   = useState(false);
-  const [errorMsg, setErrorMsg]       = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mql = window.matchMedia("(max-width: 900px)");
-    const apply = (matches: boolean) => {
-      setIsMobile(matches);
-    };
-    apply(mql.matches);
-    const onChange = (e: MediaQueryListEvent) => apply(e.matches);
-    mql.addEventListener?.("change", onChange);
-    return () => mql.removeEventListener?.("change", onChange);
-  }, []);
-
-  // photos가 로딩된 후 activeIdx 안전 보정
-  useEffect(() => {
-    setActiveIdx((cur) => {
-      if (photos.length === 0) return 0;
-      if (cur < 0) return 0;
-      if (cur >= photos.length) return photos.length - 1;
-      return cur;
-    });
-  }, [photos.length]);
-
-  const goPrev = useCallback(() => {
-    setActiveIdx((cur) => {
-      if (photos.length === 0) return cur;
-      return (cur - 1 + photos.length) % photos.length;
-    });
-  }, [photos.length]);
-  const goNext = useCallback(() => {
-    setActiveIdx((cur) => {
-      if (photos.length === 0) return cur;
-      return (cur + 1) % photos.length;
-    });
-  }, [photos.length]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (focusOpen) return;
-      if (hasShortcutModifier(e)) return; // 윈도우 Alt+←/→(뒤로/앞으로 가기)와 겹치지 않게
-      if (e.key === "ArrowLeft")  { e.preventDefault(); goPrev(); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [goPrev, goNext, focusOpen]);
-
-  async function handleConfirmReceipt() {
-    if (submitting) return;
-    setErrorMsg(null);
-    setSubmitting(true);
-    try {
-      const reviews = photos
-        .filter((p) => p.photoVersionId)
-        .map((p) => ({
-          photo_version_id: p.photoVersionId,
-          photo_id: p.id,
-          status: "approved" as const,
-          customer_comment: null,
-        }));
-      if (reviews.length === 0) throw new Error("보정본을 불러오지 못했습니다.");
-      const res = await fetch("/api/c/review/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, reviews }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? `서버 오류 (${res.status})`);
-      onDone();
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "수령 완료에 실패했습니다.");
-      setSubmitting(false);
-    }
-  }
-
-  const currentPhoto = photos[activeIdx] ?? null;
-  const versionLabel = "보정본";
-  const canShowViewer = photos.length > 0 && currentPhoto != null;
-
-
-  const preloadUrlGroups = useMemo(
-    () => photos.map((photo) => [
-      photo.originalUrl,
-      photo.versionUrl,
-    ]),
-    [photos],
-  );
-  useAdjacentImagePreload(preloadUrlGroups, canShowViewer ? activeIdx : null, {
-    wrap: true,
-    desktopBefore: 1,
-    desktopAfter: 1,
-    desktopMaxDecoded: 6,
-    mobileMaxDecoded: 4,
-  });
-
-  const filename = useMemo(() => {
-    if (!currentPhoto) return "";
-    return currentPhoto.originalFilename?.split("/").pop() ?? `사진 ${activeIdx + 1}`;
-  }, [currentPhoto, activeIdx]);
-
-  return (
-    <div
-      style={{
-        /* 사진을 보는 화면이라 암실 — 셸의 Light 토큰 대신 이 화면 안에서는 공용 토큰을 암실 값으로 되돌린다. */
-        ["--background" as string]: "var(--darkroom-stage)",
-        ["--foreground" as string]: "var(--darkroom-text)",
-        ["--muted-foreground" as string]: "var(--darkroom-muted)",
-        ["--surface" as string]: "var(--darkroom-surface)",
-        ["--surface-raised" as string]: "var(--darkroom-raised)",
-        ["--border" as string]: "var(--darkroom-border)",
-        colorScheme: "dark",
-        minHeight: "100dvh",
-        background: "var(--background)",
-        color: "var(--foreground)",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "'Pretendard Variable',-apple-system,sans-serif",
-      }}
-    >
-      {/* Header */}
-      <header
-        style={{
-          position: "sticky", top: 0, zIndex: 40,
-          background: "rgba(10,10,12,0.95)",
-          backdropFilter: "blur(12px)",
-          borderBottom: `1px solid ${BORDER}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 16px", minHeight: 56,
-          paddingTop: "env(safe-area-inset-top,0px)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          {/* 수령 확인 모드에서도 검토 목록과 동일하게 로고가 초대 기본 화면을 연다.
-            * 서버 진입 검증을 다시 거치도록 일반 링크를 사용한다. */}
-          <a
-            href={token ? `/c/${token}` : "#"}
-            aria-label="처음 화면으로"
-            style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, textDecoration: "none", ["--brand-logo-ink" as string]: "var(--foreground)" }}
-          >
-            <BrandLogoBar size="sm" />
-          </a>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {project.name}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              color: ACCENT,
-              background: "rgba(var(--accent-rgb), 0.1)",
-              border: "1px solid rgba(var(--accent-rgb), 0.3)",
-              padding: "3px 8px",
-              borderRadius: 6,
-              letterSpacing: "0.05em",
-            }}
-          >
-            수령 대기
-          </span>
-        </div>
-      </header>
-
-      {/* Title + intro */}
-      <section
-        style={{
-          padding: "20px 16px 12px",
-          borderBottom: `1px solid ${BORDER}`,
-          background: "rgba(5,5,8,0.6)",
-        }}
-      >
-        <h1 style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)", margin: 0, lineHeight: 1.35 }}>
-          {filename}
-        </h1>
-        <p style={{ fontSize: 13, color: "var(--muted-foreground)", margin: "8px 0 0", lineHeight: 1.6 }}>
-          작가가 보정한 사진을 확인해 주세요. 확인이 끝나면 아래 [수령 완료]를 눌러 알려 주세요.
-        </p>
-      </section>
-
-      {/* Viewer + thumbnails */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {/* Stage */}
-        <div style={{ flex: 1, minHeight: 0, padding: 12, display: "flex", gap: 10, overflow: "hidden" }}>
-          {canShowViewer ? (
-            <div
-              style={{ flex: 1, minWidth: 0, display: "flex", gap: 10, position: "relative" }}
-              onTouchStart={(event) => { swipeStartX.current = event.touches[0].clientX; }}
-              onTouchEnd={(event) => {
-                const dx = swipeStartX.current - event.changedTouches[0].clientX;
-                if (Math.abs(dx) > 50) { if (dx > 0) goNext(); else goPrev(); }
-              }}
-            >
-              {/* 일반 상세에서는 화면 폭과 관계없이 이동 버튼을 유지하고, 사진 집중 보기에서만 숨긴다. */}
-              <div style={{ display: "contents" }}>
-                <PrevNextButton direction="prev" onClick={goPrev} size="md" />
-                <PrevNextButton direction="next" onClick={goNext} size="md" />
-              </div>
-              {/* 카운터 오버레이 */}
-              {photos.length > 0 && (
-                <div style={{
-                  position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-                  zIndex: 10, fontFamily: MONO, fontSize: 12, color: "rgba(255,255,255,0.7)",
-                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
-                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 99,
-                  padding: "3px 12px", pointerEvents: "none", userSelect: "none",
-                }}>
-                  {activeIdx + 1} / {photos.length}
-                </div>
-              )}
-
-              {/* 꾹 눌러 원본 — 검토 화면과 같은 방식(터치는 탭 토글) */}
-              <button
-                type="button"
-                aria-pressed={holdOriginal}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (isMobile) setHoldOriginal((v) => !v);
-                }}
-                onPointerDown={(event) => {
-                  if (isMobile) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setHoldOriginal(true);
-                }}
-                onPointerUp={() => !isMobile && setHoldOriginal(false)}
-                onPointerLeave={() => !isMobile && setHoldOriginal(false)}
-                onPointerCancel={() => !isMobile && setHoldOriginal(false)}
-                style={{
-                  position: "absolute", top: 12, right: 12, zIndex: 10,
-                  height: 34, padding: "0 13px", borderRadius: 999,
-                  border: holdOriginal ? "1px solid #fff" : "1px solid rgba(255,255,255,.28)",
-                  background: holdOriginal ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.6)",
-                  color: holdOriginal ? "#fff" : "rgba(255,255,255,.82)",
-                  cursor: "pointer",
-                  font: "600 12px/1 var(--font-sans)",
-                  userSelect: "none", WebkitUserSelect: "none", touchAction: "none",
-                  transition: "background .15s ease, border-color .15s ease, color .15s ease",
-                }}
-              >
-                {holdOriginal ? "원본 보는 중" : isMobile ? "원본과 비교" : "꾹 눌러 원본"}
-              </button>
-
-              <div
-                style={{
-                  flex: 1,
-                  border: `1px solid ${BORDER}`,
-                  background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)",
-                  position: "relative",
-                  overflow: "hidden",
-                  borderRadius: 12,
-                  cursor: "zoom-in",
-                }}
-                onClick={() => setFocusOpen(true)}
-                aria-label="사진 크게 보기"
-              >
-                <div style={{ position: "absolute", top: 10, left: 10, zIndex: 2, display: "flex", gap: 8, pointerEvents: "none" }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.28)", padding: "4px 9px", borderRadius: 999 }}>
-                    {holdOriginal ? "원본" : versionLabel}
-                  </span>
-                </div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={holdOriginal ? currentPhoto.originalUrl : currentPhoto.versionUrl}
-                  alt={holdOriginal ? "원본" : "보정본"}
-                  decoding="async"
-                  fetchPriority="high"
-                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div role="status" aria-label="보정본을 불러오는 중" aria-busy="true" className="skeleton-block" style={{ flex: 1, borderRadius: 12 }} />
-          )}
-        </div>
-
-        {/* Thumbnails strip */}
-        <div style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(5,5,8,0.7)", padding: "10px 12px 110px" }}>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
-            {photos.map((p, i) => {
-              const thumbSrc = p.versionThumbUrl ?? p.versionUrl ?? p.originalUrl;
-              const isActive = i === activeIdx;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setActiveIdx(i)}
-                  style={{
-                    width: 86,
-                    flexShrink: 0,
-                    borderRadius: 12,
-                    border: `1px solid ${isActive ? "rgba(var(--accent-rgb), 0.55)" : BORDER}`,
-                    background: "var(--background)",
-                    overflow: "hidden",
-                    cursor: "pointer",
-                    padding: 0,
-                    position: "relative",
-                  }}
-                  aria-label={`사진 ${i + 1} 선택`}
-                >
-                  <div style={{ position: "relative", paddingBottom: "75%" }}>
-                    {thumbSrc && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={thumbSrc}
-                        alt=""
-                        loading={isActive ? "eager" : "lazy"}
-                        decoding="async"
-                        fetchPriority={isActive ? "high" : "low"}
-                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.7 }}
-                      />
-                    )}
-                    <span style={{ position: "absolute", top: 6, left: 7, fontFamily: MONO, fontSize: 12, color: "rgba(255,255,255,0.85)", background: "rgba(0,0,0,0.55)", padding: "1px 5px", borderRadius: 4 }}>
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom CTA */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0, left: 0, right: 0,
-          zIndex: 50,
-          background: "rgba(5,5,8,0.97)",
-          backdropFilter: "blur(12px)",
-          borderTop: `1px solid rgba(var(--accent-rgb), 0.25)`,
-          padding: "12px 16px",
-          paddingBottom: "calc(12px + env(safe-area-inset-bottom,0px))",
-        }}
-      >
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <button
-            type="button"
-            onClick={() => setConfirmOpen(true)}
-            disabled={submitting || photos.length === 0}
-            style={{
-              width: "100%",
-              height: 50,
-              background: ACCENT,
-              border: "none",
-              borderRadius: 12,
-              color: "#fff",
-              fontFamily: "var(--font-sans)",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: submitting || photos.length === 0 ? "not-allowed" : "pointer",
-              opacity: submitting || photos.length === 0 ? 0.6 : 1,
-              transition: "all 0.2s",
-            }}
-          >
-            {submitting ? "처리 중…" : "수령 완료"}
-          </button>
-        </div>
-      </div>
-
-      {/* Lightbox modal */}
-      {canShowViewer && (
-        <PhotoFocusOverlay
-          open={focusOpen}
-          /* 집중 보기는 항상 보정본에서 시작하고, 원본은 길게 누르는 동안에만 겹친다. */
-          src={currentPhoto.versionUrl}
-          originalSrc={currentPhoto.originalUrl}
-          alt="보정본"
-          onClose={() => setFocusOpen(false)}
-          onPrev={photos.length > 1 ? goPrev : undefined}
-          onNext={photos.length > 1 ? goNext : undefined}
-        />
-      )}
-
-      {/* Confirm modal */}
-      {confirmOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="rcpt-confirm-title"
-          onClick={() => { if (!submitting) setConfirmOpen(false); }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 90,
-            background: "rgba(0,0,0,0.78)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 380,
-              background: "var(--surface)",
-              border: `1px solid ${BORDER}`,
-              borderRadius: 16,
-              padding: 22,
-            }}
-          >
-            <h3 id="rcpt-confirm-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--foreground)" }}>
-              보정본 수령 완료
-            </h3>
-            <p style={{ margin: "10px 0 18px", fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6, wordBreak: "keep-all" }}>
-              수령 완료 시 프로젝트가 납품 완료 상태로 바뀌고, 더 이상 변경할 수 없습니다.
-            </p>
-            {errorMsg && (
-              <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--danger)" }}>{errorMsg}</p>
-            )}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(false)}
-                disabled={submitting}
-                style={{
-                  flex: 1, height: 44,
-                  border: `1px solid ${BORDER}`,
-                  background: "var(--background)",
-                  color: "var(--muted-foreground)",
-                  fontSize: 13, fontWeight: 600,
-                  borderRadius: 10,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.5 : 1,
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReceipt}
-                disabled={submitting}
-                style={{
-                  flex: 1, height: 44,
-                  background: ACCENT,
-                  border: "none",
-                  color: "#fff",
-                  fontSize: 13, fontWeight: 700,
-                  borderRadius: 10,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.7 : 1,
-                }}
-              >
-                {submitting ? "처리 중…" : "수령 완료"}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
