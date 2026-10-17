@@ -8,14 +8,14 @@ type DeviceHints = {
   connection?: { saveData?: boolean; effectiveType?: string; downlink?: number };
 };
 
-/** Browser hints are conservative heuristics; unsupported hints do not classify a device as slow. */
+/** 4GB/4코어·3G 힌트만으로 일반 모바일의 연출을 차단하지 않는다. */
 export function shouldUseStaticLanding(device: DeviceHints): boolean {
   const connection = device.connection;
+  const veryLowMemory = device.deviceMemory !== undefined && device.deviceMemory > 0 && device.deviceMemory <= 2;
+  const veryLowCpu = device.hardwareConcurrency !== undefined && device.hardwareConcurrency > 0 && device.hardwareConcurrency <= 2;
   return connection?.saveData === true
-    || ["slow-2g", "2g", "3g"].includes(connection?.effectiveType ?? "")
-    || (connection?.downlink !== undefined && connection.downlink > 0 && connection.downlink <= 1.5)
-    || (device.deviceMemory !== undefined && device.deviceMemory > 0 && device.deviceMemory <= 4)
-    || (device.hardwareConcurrency !== undefined && device.hardwareConcurrency > 0 && device.hardwareConcurrency <= 4);
+    || ["slow-2g", "2g"].includes(connection?.effectiveType ?? "")
+    || (veryLowMemory && veryLowCpu);
 }
 
 type StartAnimation = (root: HTMLElement) => () => void;

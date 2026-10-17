@@ -91,3 +91,23 @@ test("낮은 CPU·메모리에서는 정적 예시 전환과 원본 비교를 �
   await page.locator("#hold2").dispatchEvent("pointerup");
   await expect(page.locator("#h2lab")).toHaveText("보정본");
 });
+
+
+test("일반 모바일의 4GB·4코어·3G 힌트에서도 세 랜딩 연출을 표시한다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperties(navigator, {
+      deviceMemory: { configurable: true, value: 4 },
+      hardwareConcurrency: { configurable: true, value: 4 },
+      connection: { configurable: true, value: { saveData: false, effectiveType: "3g", downlink: 1.5 } },
+    });
+  });
+  for (const route of ["/", "/select", "/studio"]) {
+    await page.goto(route);
+    await expect(page.locator('[data-landing-mode="animated"]')).toBeVisible();
+    await expect(page.locator(route === "/" ? "#sheet .cell" : route === "/select" ? "#sTiles .tile" : "#ggrid .g").first()).toBeAttached();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.locator('#flist button[data-s="stack"]').click();
+  await expect(page.locator('#cs')).toHaveAttribute("data-s", "stack");
+});
