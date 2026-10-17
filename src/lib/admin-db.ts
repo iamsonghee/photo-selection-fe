@@ -426,6 +426,7 @@ export const BETA_APPLICATION_STATUS_LABELS: Record<BetaApplicationStatus, strin
 export type AdminBetaApplicationSummary = {
   id: string;
   name: string;
+  studioName: string | null;
   phone: string;
   email: string | null;
   genre: string;
@@ -458,6 +459,7 @@ function mapBetaApplicationSummary(row: BetaApplicationRow): AdminBetaApplicatio
   return {
     id: row.id,
     name: row.name,
+    studioName: (row.additional_answers as BetaAdditionalAnswers | null)?.studio_name ?? null,
     phone: row.phone,
     email: row.email,
     genre: row.genre,

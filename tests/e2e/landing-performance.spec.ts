@@ -66,7 +66,7 @@ test("데이터 절약 모드에서는 세 랜딩이 이미지로 표시되고 �
     await page.waitForTimeout(200);
     await expect(page.locator('[data-landing-mode="animated"]')).toHaveCount(0);
     const start = route === "/" ? page.getByRole("link", { name: "로그인", exact: true })
-      : page.getByRole("link", { name: route === "/select" ? "내 사진 셀렉 시작하기" : "무료로 시작하기", exact: true }).first();
+      : page.getByRole("link", { name: route === "/select" ? "내 사진 셀렉 시작하기" : "바로 체험하기", exact: true }).first();
     await start.click();
     await expect(page.getByRole("dialog")).toBeVisible();
   }

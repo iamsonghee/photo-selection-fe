@@ -17,7 +17,7 @@ const PIC = (n: string) => `/landing/studio/${n}.jpg`;
 
 /** 링크 미리보기 카드 — 히어로와 마무리에 같은 카드가 나온다. 히어로 카드만 id를 달아 움직인다. "링크 공유"(제품 업로드 화면의 버튼 이름)는 아이콘만, 이름은 aria-label. */
 function LinkCard({ hero }: { hero?: boolean }) {
-  return <div className={`lcard${hero ? "" : " on"}`} id={hero ? "pill" : undefined}><img src={PIC("p05")} alt="" loading={hero ? "eager" : "lazy"} /><div><b>민서 ♥ 지훈 커플 스냅</b><small>사진 812장 · 셀렉 기한 10월 23일 (금)</small><div className="u">acut.kr/c/minseo-jihun</div><span className={`sent${hero ? "" : " on"}`} id={hero ? "sent" : undefined} aria-label="링크 공유"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg></span></div></div>;
+  return <div className="lcard on" id={hero ? "pill" : undefined}><img src={PIC("p05")} alt="" loading={hero ? "eager" : "lazy"} /><div><b>민서 ♥ 지훈 커플 스냅</b><small>사진 812장 · 셀렉 기한 10월 23일 (금)</small><div className="u">acut.kr/c/minseo-jihun</div><span className="sent on" id={hero ? "sent" : undefined} aria-label="링크 공유"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg></span></div></div>;
 }
 
 /** 히어로 배경의 작가 업무 조각 — 시안과 같은 자리·흔들림 값(CSS 변수). 2.2초마다 차례로 선명해짐(motion.ts) */
@@ -33,7 +33,7 @@ const FRAGS: { cls: string; pos: string; ch: string; icon: string; sm?: string; 
 const fragStyle = (pos: string) => { const [left, top, r, d, dx, dy] = pos.split("|"); return { left, top, "--r": r, "--d": d, "--dx": dx, "--dy": dy } as React.CSSProperties; };
 
 /** 화면 구조와 문구는 design/landing-preview/studio 시안을 그대로 옮겼다. 움직임은 ./motion.ts. */
-export function StudioLanding({ loggedIn, maxProjects, maxPhotos }: { loggedIn: boolean; maxProjects: number; maxPhotos: number }) {
+export function StudioLanding({ loggedIn, maxProjects, maxPhotos, betaMaxProjects, betaMaxPhotos }: { loggedIn: boolean; maxProjects: number; maxPhotos: number; betaMaxProjects: number; betaMaxPhotos: number }) {
   const root = useRef<HTMLDivElement>(null);
   const animated = useLandingAnimation(root, loadMotion);
   const [preview, setPreview] = useState<"rec" | "stack" | "quality" | "family">("rec");
@@ -42,17 +42,18 @@ export function StudioLanding({ loggedIn, maxProjects, maxPhotos }: { loggedIn: 
 
   // data-acut-light-canvas: html·body도 밝은 캔버스로(globals.css) — 전역 바탕이 다크라 러버밴드·로딩 순간에 검게 비침
   return <LandingAuth loggedIn={loggedIn}><div ref={root} data-acut-light-canvas data-landing-mode={animated ? "animated" : "static"} className={`stl ${landingFontVars}`}>
-    <nav className="nav" aria-label="서비스 메뉴"><div className="in"><Link className="logo" href="/">A-CUT<i>.</i></Link><Link className="on" href="/studio" aria-current="page">작가·스튜디오</Link><Link className="hide-m" href="/select">내 사진 셀렉</Link><Link className="hide-m" href={loggedIn ? "/workspaces" : "/login"}>{loggedIn ? "내 작업" : "로그인"}</Link><Link className="btn o" href={start}>무료로 시작하기</Link></div></nav>
+    <nav className="nav" aria-label="서비스 메뉴"><div className="in"><Link className="logo" href="/">A-CUT<i>.</i></Link><Link className="on" href="/studio" aria-current="page">작가·스튜디오</Link><Link className="hide-m" href="/select">내 사진 셀렉</Link><Link className="hide-m" href={loggedIn ? "/workspaces" : "/login"}>{loggedIn ? "내 작업" : "로그인"}</Link><Link className="btn o" href={start}>바로 체험하기</Link></div></nav>
 
     <section className="heroL" id="top" aria-label="히어로: 링크 하나로 보내고, 고르고, 확정하고, 전달까지">
       <div className="stage" id="lStage">
-        {animated ? (<div className="frags" id="frags" aria-hidden="true">{FRAGS.map((f) => <div key={f.tx} className={`frag ${f.cls}`} style={fragStyle(f.pos)}><i className={`ch-${f.ch}`}>{f.icon}</i><div>{f.sm && <small>{f.sm}</small>}{f.tx}</div></div>)}</div>) : (<LandingPoster name="studio-hero" alt="" eager className="landing-poster-bg"/>)}
+        {!animated && <LandingPoster name="studio-hero" alt="" eager className="landing-poster-bg"/>}
         <div className="top" id="lTop">
           <div className="eb">스냅 작가를 위한 셀렉</div>
           <h1 id="h1"><s id="strike">카톡·드라이브</s> 대신,<br /><em>A-CUT 링크 하나로.</em></h1>
           <p className="sub">원본 업로드부터 최종본 전달까지, 한곳에서 관리하세요.</p>
           <div className="lwrap"><LinkCard hero /></div>
-          <div className="ctas"><Link className="btn o" href={start}>무료로 시작하기</Link><Link className="btn w" href="/beta/apply" prefetch={false}>베타 참여 신청하기</Link></div>
+          <div className="ctas"><Link className="btn o" href={start}>바로 체험하기</Link><Link className="btn w" href="/beta/apply" prefetch={false}>무료 베타 신청하기</Link></div>
+          <div className="frags" id="frags" aria-hidden="true">{FRAGS.map((f, i) => <div key={f.tx} className={`frag ${f.cls}${i === 0 ? " s0" : i === FRAGS.length - 1 ? " s1" : i === FRAGS.length - 2 ? " s2" : ""}`} style={fragStyle(f.pos)}><i className={`ch-${f.ch}`}>{f.icon}</i><div>{f.sm && <small>{f.sm}</small>}{f.tx}</div></div>)}</div>
         </div>
         {animated && (<div className="scrollcue" id="cue" aria-hidden="true">스크롤하면 링크가 열려요 ↓</div>)}
         {animated && (<div className="gal" id="gal" aria-hidden="true">
@@ -123,8 +124,24 @@ export function StudioLanding({ loggedIn, maxProjects, maxPhotos }: { loggedIn: 
 
     <section className="use" id="use" aria-label="이용 안내와 자주 묻는 질문">
       <div className="wrap">
-        <h2 className="sec-h">지금은 무료로 써볼 수 있어요.</h2>
-        <div className="box1"><b>프로젝트 {maxProjects.toLocaleString()}개, 프로젝트당 {maxPhotos.toLocaleString()}장까지 바로 시작해요.</b><span>더 많은 프로젝트와 사진이 필요하다면 클로즈드 베타에 신청해 주세요. 검토 후 승인되면 베타 이용 한도가 적용돼요.</span><div style={{ marginTop: 16 }}><Link className="btn w" href="/beta/apply" prefetch={false}>베타 참여 신청하기</Link></div></div>
+        <div className="trial-start">
+          <h2 className="sec-h">다음 촬영으로, 무료로 시작해 보세요.</h2>
+          <p className="trial-limits">프로젝트 {maxProjects.toLocaleString()}개 · 프로젝트당 최대 {maxPhotos.toLocaleString()}장</p>
+          <p>승인 없이 바로 이용할 수 있어요.</p>
+          <Link className="btn o" href={start}>바로 체험하기</Link>
+        </div>
+        <div className="box1">
+          <h3>더 많은 촬영을 관리하고 싶다면</h3>
+          <p className="beta-intro">무료 클로즈드 베타에 참여해 보세요.</p>
+          <ul className="beta-benefits">
+            <li>프로젝트 최대 <strong>{betaMaxProjects.toLocaleString()}개</strong></li>
+            <li>프로젝트당 최대 <strong>{betaMaxPhotos.toLocaleString()}장</strong></li>
+            <li><strong>AI 유사컷 분석</strong> 포함</li>
+          </ul>
+          <Link className="btn w" href="/beta/apply" prefetch={false}>무료 베타 신청하기</Link>
+          <span className="beta-approval">신청 검토·승인 후 무료로 이용할 수 있어요.</span>
+        </div>
+
         <h3 style={{ fontSize: 20, margin: "0 0 6px" }}>자주 묻는 질문</h3>
         <details><summary>고객도 가입해야 하나요?</summary><p>아니요. 받은 링크를 열면 바로 고를 수 있어요. PIN을 걸었다면 PIN만 입력하면 돼요.</p></details>
         <details><summary>고객이 기한을 넘기면 어떻게 되나요?</summary><p>대시보드의 &quot;기한 지난 고객&quot;에 따로 모여서, 연락이 필요한 촬영을 놓치지 않아요.</p></details>
@@ -140,7 +157,7 @@ export function StudioLanding({ loggedIn, maxProjects, maxPhotos }: { loggedIn: 
       <div className="wrap">
         <div className="fcard"><LinkCard /></div>
         <h2>다음 촬영부터,<br />링크 하나로 시작하세요.</h2>
-        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 8 }}><Link className="btn o" href={start}>무료로 시작하기</Link><Link className="btn w" href="/beta/apply" prefetch={false}>베타 참여 신청하기</Link></div>
+        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 8 }}><Link className="btn o" href={start}>바로 체험하기</Link><Link className="btn w" href="/beta/apply" prefetch={false}>무료 베타 신청하기</Link></div>
       </div>
     </section>
     <footer><BusinessInfo><Link href="/terms">이용약관</Link> · <Link href="/privacy">개인정보처리방침</Link></BusinessInfo></footer>

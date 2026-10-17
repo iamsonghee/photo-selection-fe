@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const {
       name,
+      studio_name: studioName,
       phone,
       genres,
       genre_other: genreOther,
@@ -89,6 +90,12 @@ export async function POST(req: NextRequest) {
 
     if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "이름을 입력해 주세요." }, { status: 400 });
+    }
+    if (typeof studioName !== "string" || !studioName.trim()) {
+      return NextResponse.json({ error: "스튜디오·업체명을 입력해 주세요." }, { status: 400 });
+    }
+    if (studioName.trim().length > 100) {
+      return NextResponse.json({ error: "스튜디오·업체명은 100자 이내로 입력해 주세요." }, { status: 400 });
     }
     if (typeof phone !== "string" || !isValidKoreanPhone(phone)) {
       return NextResponse.json({ error: "휴대폰번호 형식이 올바르지 않습니다." }, { status: 400 });
@@ -158,6 +165,7 @@ export async function POST(req: NextRequest) {
     const workflowSummary = workflowMethods.map((k: string) => workflowLabel(k)).join(", ");
 
     const additionalAnswers: BetaAdditionalAnswers = {
+      studio_name: studioName.trim(),
       genres,
       ...(genres.includes("other") && genreOther?.trim() ? { genre_other: genreOther.trim() } : {}),
       monthly_project_range: monthlyProjectRange,

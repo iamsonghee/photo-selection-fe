@@ -8,9 +8,9 @@
 
 `feat/landing-entry-flow`에서 `/`(통합), `/studio`(스튜디오), `/select`(내 사진 셀렉) 랜딩을 제공한다. 로고는 A-CUT, 메뉴는 작가·스튜디오/내 사진 셀렉이다. 가격표 변경은 포함하지 않는다.
 
-2026-10-16: `/`·`/select`·`/studio`는 확정 시안(`design/landing-preview/<main|select|studio>`, 셀렉·스튜디오 아티팩트 BFr7SpsVVbFuKnm92whnjR·NqZtmWdwPdr1gz9pYQnyfz)을 옮긴 새 랜딩(`src/app/_landing/`, `src/app/<select|studio>/_landing/`)을 렌더한다. `/`의 버튼·입구 카드는 `/studio`·`/select`로, 하객 띠는 `/select#guest`로 간다. 마크업은 `*Landing.tsx`, 움직임은 `motion.ts`(언마운트 때 타이머·관찰자 정리), CSS는 `scripts/landing-preview-css.mjs`로 시안에서 생성해 `.mnl`/`.sl`/`.stl` 안으로 한정한다(튕기는 easing은 부드러운 감속으로 바꿈). 시작하기 버튼은 비로그인이면 `/login?next=<작업 공간>`, 로그인 상태면 작업 공간(`/select/projects`, `/studio/dashboard`)으로 간다. 셀렉 랜딩의 하객 앨범 버튼은 `/select/new/guest`로 간다. 셀렉 FAQ의 하객 사진 보관 일수는 `app_settings.guest_retention_days`, 스튜디오 무료 이용 한도는 `general_max_projects`·`general_max_photos_per_project`를 읽는다. `EntryPage`는 이제 `/login`·`/workspaces`의 틀로만 쓴다.
+2026-10-16: `/`·`/select`·`/studio`는 확정 시안(`design/landing-preview/<main|select|studio>`, 셀렉·스튜디오 아티팩트 BFr7SpsVVbFuKnm92whnjR·NqZtmWdwPdr1gz9pYQnyfz)을 옮긴 새 랜딩(`src/app/_landing/`, `src/app/<select|studio>/_landing/`)을 렌더한다. `/`의 버튼·입구 카드는 `/studio`·`/select`로, 하객 띠는 `/select#guest`로 간다. 마크업은 `*Landing.tsx`, 움직임은 `motion.ts`(언마운트 때 타이머·관찰자 정리), CSS는 `scripts/landing-preview-css.mjs`로 시안에서 생성해 `.mnl`/`.sl`/`.stl` 안으로 한정한다(튕기는 easing은 부드러운 감속으로 바꿈). 시작하기 버튼은 비로그인이면 `/login?next=<작업 공간>`, 로그인 상태면 작업 공간(`/select/projects`, `/studio/dashboard`)으로 간다. 셀렉 랜딩의 하객 앨범 버튼은 `/select/new/guest`로 간다. 셀렉 FAQ의 하객 사진 보관 일수는 `app_settings.guest_retention_days`, 스튜디오 체험 한도는 `general_max_projects`·`general_max_photos_per_project`, 베타 한도는 `beta_max_projects_total`·`beta_max_photos_per_project`를 읽는다. `EntryPage`는 이제 `/login`·`/workspaces`의 틀로만 쓴다.
 
-- 작가 랜딩 `/studio`의 첫 화면·이용 안내·하단에서 “베타 참여 신청하기”로 `/beta/apply`에 바로 진입한다. 비로그인은 현재 랜딩 위의 로그인 모달에서 로그인 후 신청 페이지로 이동하며, 제출·관리자 심사·승인 후 한도 적용 정책은 그대로다. 정적 이미지 모드에서도 신청 링크를 제공한다(2026-10-17).
+- 작가 랜딩 `/studio`는 “바로 체험하기”를 첫 번째 주요 버튼으로 제공하고, 첫 화면·이용 안내·하단의 보조 “무료 베타 신청하기”로 `/beta/apply`에 바로 진입한다. 비로그인은 현재 랜딩 위의 로그인 모달에서 로그인 후 신청 페이지로 이동하며, 제출·관리자 심사·승인 후 한도 적용 정책은 그대로다. 정적 이미지 모드에서도 신청 링크를 제공한다. 이용 안내는 승인 없는 일반 한도와 “바로 체험하기”를 먼저 보여 주고, 다음에 무료 베타의 프로젝트·사진 한도와 AI 유사컷 분석 및 승인 후 적용 안내를 제공한다(2026-10-17).
 - 공통 로그인은 `/login`, 로그인 후 일반 진입은 `/workspaces`다. 마지막 공간이 있으면 해당 작업 화면으로, 없거나 값이 잘못됐으면 공간 선택으로 이동한다. 기존 `/select/login`은 개인 목록을 목적지로 지정한 공통 로그인으로 연결한다. `/landing`은 기존대로 `/`로 리다이렉트한다.
 - 세 랜딩 사이를 메뉴·버튼으로 이동하면 히어로부터 표시한다. `#guest` 같은 섹션 링크와 로그인 모달 열기·닫기는 스크롤 초기화 대상에서 제외한다(2026-10-17).
 - 랜딩에서 로그인·시작·베타 신청 링크를 일반 클릭하면 현재 랜딩 위에 로그인 모달을 연다. 닫으면 랜딩과 스크롤 위치가 유지되고, 로그인 성공 시 해당 목적지로 이동한다. 새 탭·JS 없는 접근은 링크의 기존 경로를 사용한다(2026-10-17).
@@ -982,3 +982,11 @@ PC 프로젝트 목록은 고객명 옆에 촬영장소가 등록된 경우에�
 PIN 확인 후에는 같은 고객 링크 내부로만 이동한다. 서버 오류는 틀린 비밀번호와 구분해 다시 시도하도록 안내한다. 셀프 고객의 같은 사진 선택·찜·메모는 재시도까지 입력 순서대로 저장한다. 작가 고객의 미선택 후보 기록은 보존하지만 보정 검토·결과 목록에는 최종 선택 사진만 표시한다.
 
 2026-10-17 모바일 연출: 일반 4GB·4코어 기기 및 3G 힌트에서도 랜딩 연출을 표시한다. 데이터 절약 설정·2G 수준 망·메모리 2GiB 이하와 CPU 2개 이하가 모두 확인되는 기기만 자동 이미지 모드를 사용한다.
+
+## 베타 신청 업체명 (2026-10-17)
+
+신규 베타 신청은 스튜디오·업체명(`studio_name`)을 필수로 받는다. 고객에게 사용하는 스튜디오 또는 브랜드명을 입력하며, 앞뒤 공백을 제거한 1~100자만 폼과 제출 API에서 허용한다. 기존 `beta_applications.additional_answers.studio_name`에 저장하고 관리자 목록·상세에 표시하며 업체명 검색을 지원한다. 기존 신청은 업체명 미입력으로 표시한다. 개인정보 수집 항목에도 업체명을 명시한다.
+
+2026-10-17 스튜디오 히어로: 가운데 링크 카드와 공유 아이콘은 서버 HTML부터 표시하고 애니메이션 모듈 로드 후에도 표시 상태를 유지한다. 초기 카드 재등장 지연은 제거했으며 스크롤에 따른 갤러리 전환은 유지한다.
+
+2026-10-17 모바일 스튜디오 히어로의 메시지는 정적 배경 이미지 대신 버튼 아래 일반 레이아웃으로 처음부터 표시한다. 애니메이션은 메시지 순서만 바꾸며 버튼 좌표를 읽어 배치하는 지연 처리는 제거했다.

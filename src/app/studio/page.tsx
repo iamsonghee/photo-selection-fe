@@ -8,5 +8,5 @@ export const viewport = { width: "device-width", initialScale: 1, maximumScale: 
 export default async function StudioLandingPage() {
   const supabase = await createClient();
   const [{ data: { user } }, settings] = await Promise.all([supabase.auth.getUser(), getAppSettings()]);
-  return <StudioLanding loggedIn={!!user} maxProjects={settings.generalMaxProjects} maxPhotos={settings.generalMaxPhotosPerProject} />;
+  return <StudioLanding loggedIn={!!user} maxProjects={settings.generalMaxProjects} maxPhotos={settings.generalMaxPhotosPerProject} betaMaxProjects={settings.betaMaxProjectsTotal} betaMaxPhotos={settings.betaMaxPhotosPerProject} />;
 }

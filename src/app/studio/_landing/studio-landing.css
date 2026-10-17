@@ -60,9 +60,12 @@
 @media (max-width:700px){.stl .frag{font-size:12.5px;padding:7px 10px;gap:7px;border-radius:12px}.stl .frag i{width:24px;height:24px;font-size:10px;border-radius:7px}.stl .frag small{font-size:10.5px}.stl .frag.dk2,.stl .frag.tp{display:none}.stl .frag.m1{left:4%!important;top:auto!important;bottom:24%!important}.stl .frag.m2{left:auto!important;right:4%!important;top:auto!important;bottom:10%!important}}   /* 휴대폰은 글 아래 빈 곳의 조각만, 서로 겹치지 않게 */
 @media (max-height:860px){.stl .frag.tall{display:none}}   /* 낮은 화면에선 제목 위 조각을 숨김 */
 @media (prefers-reduced-motion: reduce){.stl .frag{animation:none;transition:none;filter:blur(1px);opacity:.8}.stl .frags{transition:none}}
-/* 휴대폰: 업무 조각은 버튼 아래 빈 곳에 잠금화면 알림처럼 겹쳐 쌓고 차례로 새 알림이 내려옴(2026-10-16) — 위치는 스크립트가 "무료로 시작하기" 아래로 */
+/* 메시지를 버튼과 같은 레이아웃에 두어 초기 표시와 글꼴 로딩 때 위치가 바뀌지 않게 한다. */
+.stl .heroL .top > .frags{z-index:-1}
+[data-landing-mode="static"].stl .frags{display:none}
 @media (max-width:700px){
-  .stl .frags{top:var(--fy,auto);bottom:auto;left:16px;right:16px;height:110px;inset-inline:16px}
+  .stl .heroL .top > .frags{display:block;position:relative;inset:auto;width:100%;height:110px;flex-shrink:0;margin-top:28px;z-index:1}
+  .stl .heroL .landing-poster-bg{display:none}
   .stl .frag,.stl .frag.dk2,.stl .frag.tp,.stl .frag.tall,.stl .frag.m1,.stl .frag.m2{display:flex;left:0!important;right:0!important;top:0!important;bottom:auto!important;margin:0 auto;width:min(300px,100%);animation:none;filter:none;opacity:0;scale:1;transform:translateY(-14px);transition:opacity .45s,transform .5s cubic-bezier(.22,1,.36,1);box-shadow:0 10px 26px rgba(2,56,82,.16)}
   .stl .frag.s0{opacity:1;transform:none;z-index:3;background:#fff}
   .stl .frag.s1 > *,.stl .frag.s2 > *{opacity:0}   /* 뒤 카드는 테두리만 — 글자가 비치지 않게 */
@@ -302,3 +305,17 @@
 
 /* 시안은 브라우저 기본 제목 굵기에 기댄다 — 프로젝트의 Tailwind 기본 스타일이 지운 것을 되돌림 */
 .stl h1,.stl h2,.stl h3{font-weight:700}
+
+/* 무료 체험을 먼저 강조하고 베타는 간결한 보조 안내로 제공한다. */
+.stl .use .box1{margin:0 0 48px;padding:28px 32px}
+.stl .use .box1 h3{margin:0;font-size:22px;line-height:1.4;letter-spacing:-.02em;word-break:keep-all}
+.stl .beta-intro{margin:8px 0 0;color:var(--muted);font-size:16px;line-height:1.7}
+.stl .beta-benefits{display:flex;flex-wrap:wrap;gap:8px 28px;margin:20px 0 24px;padding:0;list-style:none;font-size:16px;line-height:1.7;color:var(--muted)}
+.stl .beta-benefits strong{color:var(--ink)}
+.stl .use .box1 .beta-approval{display:block;margin-top:12px;font-size:13px;line-height:1.7}
+.stl .trial-start{padding:0 0 40px}
+.stl .trial-start .sec-h{max-width:22em;margin:0 0 20px;letter-spacing:-.035em;text-wrap:balance}
+.stl .trial-start p{margin:6px 0 0;font-size:16px;color:var(--muted);line-height:1.7}
+.stl .trial-start .trial-limits{font-size:18px;font-weight:600;color:var(--ink)}
+.stl .trial-start .btn{margin-top:24px}
+@media(max-width:700px){.stl .use .box1{padding:24px 20px}.stl .use .box1 h3{font-size:20px}.stl .beta-benefits{flex-direction:column;gap:6px}.stl .trial-start{padding-bottom:32px}.stl .trial-start .trial-limits{font-size:16px}}

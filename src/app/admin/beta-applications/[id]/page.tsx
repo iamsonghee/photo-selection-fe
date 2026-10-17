@@ -46,6 +46,10 @@ export default async function AdminBetaApplicationDetailPage({
       <div className="mt-6 rounded-xl border border-border bg-surface p-5">
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">스튜디오·업체명</dt>
+            <dd className="mt-1 break-words text-sm text-foreground">{application.studioName ?? "미입력(기존 신청)"}</dd>
+          </div>
+          <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">휴대폰</dt>
             <dd className="mt-1 text-sm text-foreground">{formatPhone(application.phone)}</dd>
           </div>
