@@ -11,10 +11,14 @@ new Function("require", "module", "exports", compiled.outputText)(require, compi
 const { shouldUseStaticLanding } = compiledModule.exports;
 for (const hints of [
   { connection: { saveData: true } },
-  ...["slow-2g", "2g", "3g"].map((effectiveType) => ({ connection: { effectiveType } })),
-  { connection: { downlink: 1.5 } }, { deviceMemory: 4 }, { hardwareConcurrency: 4 },
+  ...["slow-2g", "2g"].map((effectiveType) => ({ connection: { effectiveType } })),
+  { deviceMemory: 2, hardwareConcurrency: 2 },
 ]) assert.equal(shouldUseStaticLanding(hints), true, JSON.stringify(hints));
 for (const hints of [
+  { connection: { effectiveType: "3g", downlink: 1.5 } },
+  { deviceMemory: 4, hardwareConcurrency: 4, connection: { effectiveType: "4g", downlink: 1.5 } },
+  { deviceMemory: 2, hardwareConcurrency: 8 }, { deviceMemory: 8, hardwareConcurrency: 2 },
+  { deviceMemory: 2 }, { hardwareConcurrency: 2 },
   {}, { deviceMemory: 0, hardwareConcurrency: 0, connection: { downlink: 0 } },
   { deviceMemory: 8, hardwareConcurrency: 8, connection: { effectiveType: "4g", downlink: 10 } },
 ]) assert.equal(shouldUseStaticLanding(hints), false, JSON.stringify(hints));
