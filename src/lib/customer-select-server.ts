@@ -11,6 +11,7 @@ import { customerShareCookieName } from "@/lib/customer-select-share-auth";
 import { isAdminEmail } from "@/lib/admin-emails";
 import { CUSTOMER_PHOTO_LIMIT } from "@/app/select/_lib/upload-limit";
 import type { ColorTag, PeopleKind, Photo, StarRating } from "@/types";
+import { captureOrder } from "@/lib/customer-scenes";
 
 export async function getCurrentCustomerAuthUser(): Promise<User | null> {
   const supabase = await createClient();
@@ -188,18 +189,19 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
 export type AiScene = { name: string | null; start: string | null; end: string | null; photoIds: string[] };
 type CustomerSceneRow = { id: string; scene_index: number; name: string | null; start_at: string | null; end_at: string | null };
 
+const toOrderable = (photo: CustomerPhotoRow) => ({ orderIndex: photo.order_index, takenAt: photo.taken_at, takenAtSource: photo.taken_at_source, filename: photo.filename });
+
 export function toAiScenes(scenes: CustomerSceneRow[], assignments: { id: string; scene_id: string | null }[], photos: CustomerPhotoRow[]): AiScene[] | null {
   if (!scenes.length) return null;
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
-  // 파일 수정 시각은 촬영 시각이 아니라 뺀다(장면 나누기 sceneTime과 같은 기준) — 시각 없는 보정본은 업로드(파일명) 순서로.
-  const time = (id: string) => { const photo = photoById.get(id)!; return (photo.taken_at_source === "file" ? null : photo.taken_at) ?? "\uffff"; };
-  const order = (id: string) => photoById.get(id);
+  // 장면 안 사진은 촬영 순서로 — clip-service와 같은 규칙(`captureOrder`: 파일 수정 시각 제외, 시각 없는 보정본은 파일명 연번).
+  const rank = new Map(captureOrder(photos, toOrderable).map((photo, index) => [photo.id, index]));
   return scenes.slice().sort((a, b) => a.scene_index - b.scene_index).map((scene) => ({
     name: scene.name,
     start: scene.start_at,
     end: scene.end_at,
     photoIds: assignments.filter((row) => row.scene_id === scene.id && photoById.has(row.id)).map((row) => row.id)
-      .sort((a, b) => time(a).localeCompare(time(b)) || order(a)!.order_index - order(b)!.order_index),
+      .sort((a, b) => rank.get(a)! - rank.get(b)!),
   }));
 }
 

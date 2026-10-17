@@ -21,6 +21,10 @@
 
 작가 업로드 화면은 세션 종료 시 집계 report 한 건을 `POST /api/photographer/upload-performance`로 전송한다. 로그인 세션에서 확인한 작가 ID와 배포 커밋 SHA를 붙여 service role로 `upload_performance_logs`에 저장한다. 테이블은 RLS를 켜고 일반 사용자 정책을 두지 않으며 `created_at` 인덱스 하나만 사용한다. 브라우저 report에는 파일명·파일 객체·프로젝트 ID·R2 key·URL·토큰이 없다. FastAPI `/photos`와 `/originals/confirm`은 추가 조회 없이 `time.perf_counter()`로 단계별 시간을 Railway 로그에 남긴다. 저장·로그 실패는 업로드 결과를 바꾸지 않는다. 상세 필드와 분석 쿼리는 `upload-flow.md` 및 `photographer-upload-performance-analysis.md`를 따른다.
 
+## 웨딩 본식 촬영 단계 장면 (2026-10-14, 브랜치 `feat/wedding-ceremony-scenes`, 미배포)
+
+셀프 고객 웨딩 본식의 AI 장면을 고정 단계 14개로 나눈다(상세 `customer-select.md` §2.1.1 "단계 기준 장면", 설계·실측 `wedding-ceremony-scene-plan.md`, 화면 `wedding-ceremony-scene-prd.md`). FE→clip-service `/analyze/customer/{scene|quality}` 요청에 `place_basis`(`place`|`stage`)와 `place_hints`(단계 이름 → 판단 기준)가 추가됐고, 본식은 `scene` 요청에도 `place_names`와 `place_main_stages`(본식 단계, 2026-10-15)를 보낸다. 고객 경로는 Next API 라우트(`/api/customer-select/projects/[id]/ai/[kind]`)가 목록에 있는 이름·200자 이하 문자열만 넘기고(본식 단계는 목록에 있는 이름만), 관리자 경로(`/api/admin/scenes/[projectId]/ai`)는 FE 카탈로그에서 직접 만든다. 단계 판정은 흔들림 실행 안에서 흔들림 호출과 따로, 촬영 순서로 이어진 사진 10장을 한 Gemini 호출(낮은 해상도)로 묻고 흔들림 판정 행의 `raw_response.place`에 함께 저장한다(2026-10-15, `judge_stages`). 본식 장면 실행은 같은 정리의 흔들림 실행과 유사컷 실행이 끝날 때까지 `processing`으로 기다렸다가, 유사컷 임베딩으로 다듬고(카메라별로 내보낸 파일은 카메라마다 다듬어 합침) 단계 장면만 저장한다. FE는 장면 안·고르기 화면·관리자 검수 화면의 사진을 clip-service와 같은 촬영 순서(`captureOrder` — EXIF 시각, 없으면 파일명 연번, 아니면 업로드 순)로 놓는다. FastAPI(BE)·DB 스키마 변경은 없다. FE와 clip-service는 함께 배포한다 — FE만 먼저 나가면 clip-service가 새 필드를 무시해 지금 동작(내용 기준 장면)이 유지되고, clip-service만 먼저 나가면 FE가 필드를 보내지 않아 변화가 없다. 셀프 고객 업로드는 고른 파일을 파일명 자연 정렬로 올린다(`upload-flow.md`).
+
 ## 초대 고객 셀렉 협업 (2026-10-10)
 
 2026-10-14 작가 보관함 집계 보정: `getPhotosWithSelections()`는 `selections.is_selected=true`인 사진만 최종 선택 목록에 포함한다. 미선택 행의 찜·별점·메모는 `photoStates`에 보존한다. 작가 셀렉 장수·목록·내보내기와 해당 목록을 사용하는 보정 작업 대상이 이 선택 목록을 공유한다. DB·고객 API·FastAPI 변경은 없다.
@@ -934,7 +938,7 @@ sequenceDiagram
 | 백엔드 연동 | `NEXT_PUBLIC_API_URL`, `API_URL`, `BACKEND_URL` | — |
 | CLIP | `CLIP_SERVICE_URL`, `CLIP_INTERNAL_TOKEN` | `CLIP_INTERNAL_TOKEN`, `CLIP_SIMILARITY_THRESHOLD`, `CLIP_MODEL_NAME`, `CLIP_MODEL_PRETRAINED`, `DOWNLOAD_CONCURRENCY`, `EMBEDDING_BATCH_SIZE`, `MAX_CONCURRENT_PROJECTS` |
 | Gemini Embedding — 베타 유사컷 분석 엔진 (2026-07-28 도입, 같은 날 베타 전환) | (FE는 `CLIP_SERVICE_URL`/`CLIP_INTERNAL_TOKEN` 재사용, 별도 FE 전용 값 없음) | `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL`, `GEMINI_EMBEDDING_DIMENSION`, `GEMINI_EMBEDDING_VERSION`(베타 전환 시 추가, 기본 `v1` — 캐시 키에 포함되어 올리면 기존 임베딩과 충돌 없이 새로 계산됨), `GEMINI_SIMILARITY_THRESHOLD`, `GEMINI_CONCURRENCY`, `GEMINI_MAX_RETRIES`, `GEMINI_TIMEOUT_SECONDS`, `GEMINI_IMAGE_PRICE_USD` |
-| Gemini Flash 품질 판정 POC (2026-07-28 추가) | (위와 동일, 별도 FE 전용 값 없음) | `GEMINI_FLASH_MODEL`, `GEMINI_QUALITY_PROMPT_VERSION`, `GEMINI_QUALITY_CONCURRENCY`, `GEMINI_QUALITY_MAX_RETRIES`, `GEMINI_QUALITY_TIMEOUT_SECONDS`, `GEMINI_FLASH_INPUT_PRICE_PER_1M`, `GEMINI_FLASH_OUTPUT_PRICE_PER_1M` |
+| Gemini Flash 품질 판정 POC (2026-07-28 추가) | (위와 동일, 별도 FE 전용 값 없음) | `GEMINI_FLASH_MODEL`, `GEMINI_QUALITY_PROMPT_VERSION`, `GEMINI_QUALITY_CONCURRENCY`, `GEMINI_QUALITY_MAX_RETRIES`, `GEMINI_QUALITY_TIMEOUT_SECONDS`, `GEMINI_STAGE_TIMEOUT_SECONDS`(셀프 고객 웨딩 본식 단계 판정 10장 한 호출, 기본 90초, 10~300, 2026-10-15), `GEMINI_FLASH_INPUT_PRICE_PER_1M`, `GEMINI_FLASH_OUTPUT_PRICE_PER_1M` |
 | PIN 인증 | `PIN_COOKIE_SECRET` | — |
 | 스토리지 | `R2_HOST`(URL 파싱 화이트리스트, 쉼표로 여러 개 — 공개 주소를 바꾼 뒤 예전 `r2.dev` 주소도 함께 허용) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `R2_LEGACY_PUBLIC_URLS`(예전 공개 주소, 쉼표 구분 — DB에 남은 예전 주소의 key 허용), `GCS_CREDENTIALS_JSON`, `GCS_BUCKET_NAME`(미사용 추정) |
 | 서비스 간 시크릿 | `INTERNAL_PRESIGN_SECRET` | `INTERNAL_PRESIGN_SECRET` |

@@ -181,6 +181,12 @@
 .quickItem em.done { color: var(--success); }
 .quickItem:hover { background: var(--surface-raised); color: var(--foreground); }
 .quickItem[aria-current="true"] { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--foreground); font-weight: 800; }
+/* 웨딩 본식 장면 구획(식 전 / 본식 / 식 후) — 사이드바·모바일 장면 시트 공통. 구획 사이 구분선, 지금 장면이 있는 구획 제목은 강조색. */
+.phaseGroup { flex: none; display: flex; flex-direction: column; gap: 2px; }
+.phaseGroup + .phaseGroup { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.phaseHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 10px 4px; color: var(--foreground); font-size: 12px; font-weight: 800; }
+.phaseHead em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--subtle-foreground); }
+.phaseGroup:has([aria-current="true"]) .phaseHead span { color: var(--accent); }
 .quickNotice { padding: 6px 10px; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 600; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .quickChat { height: 34px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .quickChat[aria-pressed="true"] { color: var(--accent); }
@@ -195,6 +201,8 @@
 .floatItem[data-state="some"] i { background: var(--muted-foreground); }
 .floatItem[data-state="done"] i { background: var(--success); }
 .floatItem[aria-current="true"] { color: var(--foreground); font-weight: 800; }
+.floatPhase { flex: none; height: 18px; margin-top: 4px; padding: 0 8px; display: flex; align-items: center; gap: 10px; color: var(--subtle-foreground); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.floatPhase::before { content: ""; flex: none; width: 16px; height: 1px; background: var(--border-strong); }
 .floatItem[aria-current="true"] i { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .floatItem em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--subtle-foreground); }
 .floatLabel { opacity: 0; transition: opacity 120ms ease; }
@@ -226,12 +234,15 @@
   /* 소유자 장면 보기: 위 줄은 지금 장면(누르면 장면 목록), 아래 줄은 전체 진행 문장 + 선택 완료. */
   .bottomBar[data-stacked] { flex-wrap: wrap; row-gap: 8px; }
   .bottomBar[data-stacked] .barScene { flex: 0 0 100%; flex-direction: row; align-items: center; gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border-subtle); }
-  .bottomBar[data-stacked] .barScene strong { flex: none; max-width: 60%; font-size: 13px; }
-  .bottomBar[data-stacked] .barScene span { flex: 1; text-align: right; }
+  .bottomBar[data-stacked] .barScene strong { flex: 1 1 auto; max-width: none; font-size: 13px; }
+  .bottomBar[data-stacked] .barScene span { flex: 0 1 auto; min-width: 0; text-align: right; }
   .bottomBar[data-stacked] .barMetaWithDock { display: flex; }
   .bottomBar { gap: 8px; }
   .barScene { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 0; border: 0; background: none; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
-  .barScene strong { max-width: 100%; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; }
+  .barScene strong { min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; }
+  /* 장면 이름만 말줄임 — 점·▲(장면 목록 열기)는 항상 보인다(긴 이름 "식 전 · 신랑신부 연출촬영 (이어서)"). */
+  .barScene strong b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: inherit; }
+  .barScene strong svg { flex: none; }
   .barScene strong i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--accent); }
   .barScene strong em { flex: none; color: var(--subtle-foreground); font-size: 12px; font-style: normal; font-weight: 700; }
   .barScene span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: 12px; }

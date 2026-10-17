@@ -23,6 +23,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { UploadConnectionHint } from "@/components/UploadConnectionHint";
 import { isRetryableStatus, retryUpload, RetryableUploadError } from "@/lib/upload-resume";
 import { readTakenAt } from "@/lib/exif-taken-at";
+import { sortFilesByName } from "@/lib/filename-order";
 import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
@@ -216,7 +217,8 @@ export default function CustomerUploadPage() {
       });
       const skipped = selectedFiles.length - newFiles.length;
       setSkippedCount((count) => (carriedUploaded > 0 || carriedFailed.length > 0 ? count : 0) + skipped);
-      selectedFiles = newFiles;
+      // 파일명순으로 올린다 — 촬영 시각 없는 보정본은 올린 순서(order_index)가 곧 사진 순서다(`sortFilesByName`).
+      selectedFiles = sortFilesByName(newFiles);
       if (selectedFiles.length === 0) {
         if (carriedUploaded > 0 && carriedFailed.length === 0) {
           setJustUploaded(carriedUploaded);

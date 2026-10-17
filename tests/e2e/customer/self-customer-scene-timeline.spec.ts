@@ -55,26 +55,26 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
 
     // 장면 개요 없이, 아직 덜 고른 첫 장면에서 바로 시작한다(첫 장면은 목표 3장 중 2장만 고름).
     await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready`);
-    await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
+    await expect(page.locator('[class*="barMeta"]').first()).toContainText("웨딩홀·디테일");
     await expect(page.getByRole("heading", { name: "장면별로 골라볼까요?" })).toHaveCount(0);
 
     // 퀵메뉴(PC 오른쪽 목록 / 모바일 떠 있는 버튼 → 장면 시트)로 장면을 바꾼다.
     if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
-    await page.getByRole("button", { name: /^입장/ }).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: /^메이크업·준비/ }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/scene=1/);
-    await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
+    await expect(page.locator('[class*="barMeta"]').first()).toContainText("메이크업·준비");
 
     // 장면 끝에는 다음 장면 이름만 얇게, 마지막 장면 끝에는 "마지막 장면이에요"만(버튼은 하단 바).
     const gallery = page.locator('[class*="selectGallery"]').first();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
+    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("신부대기실");
     if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
-    await page.getByRole("button", { name: /^예식/ }).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: /^신부대기실/ }).filter({ visible: true }).first().click();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("축가·축하 무대");
+    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("로비·하객 맞이");
     // 100장 데이터의 마지막(네 번째) 장면.
     if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
-    await page.getByRole("button", { name: /^축가·축하 무대/ }).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: /^로비·하객 맞이/ }).filter({ visible: true }).first().click();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
     await expect(page.getByText("마지막 장면", { exact: false }).filter({ visible: true })).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -98,7 +98,7 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
 
   // 조금 당기면 다음 장면이 드러나지만, 놓으면 제자리로 돌아온다.
   await page.mouse.wheel(0, 30);
-  await expect(page.locator('[class*="pullReveal"]')).toContainText("입장");
+  await expect(page.locator('[class*="pullReveal"]')).toContainText("메이크업·준비");
   await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
   await expect(page).toHaveURL(/scene=0/);
 
@@ -113,7 +113,7 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   await page.waitForTimeout(300);
   for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 100);
   await expect(page).toHaveURL(/scene=1/);
-  await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
+  await expect(page.locator('[class*="barMeta"]').first()).toContainText("메이크업·준비");
   await context.close();
 });
 
@@ -132,7 +132,7 @@ test("desktop: pulling past the top of a scene moves to the end of the previous 
 
   // 위로도 아래와 같은 고무줄: 조금 당기면 이전 장면이 드러나지만, 놓으면 제자리로 돌아온다.
   await page.mouse.wheel(0, -30);
-  await expect(page.locator('[class*="pullReveal"]')).toContainText("입장");
+  await expect(page.locator('[class*="pullReveal"]')).toContainText("메이크업·준비");
   await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
   await expect(page).toHaveURL(/scene=2/);
 
@@ -140,7 +140,7 @@ test("desktop: pulling past the top of a scene moves to the end of the previous 
   await page.waitForTimeout(300);
   for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -100);
   await expect(page).toHaveURL(/scene=1/);
-  await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
+  await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("신부대기실");
   // 연달아 올려도 한 번에 두 장면을 건너뛰지 않는다.
   for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, -60); await page.waitForTimeout(40); }
   await expect(page).toHaveURL(/scene=1/);
@@ -154,8 +154,8 @@ test("desktop: sample photos shot in one burst are still split into scenes in mo
   // 60장이 20초 간격으로 이어져 촬영 시각만으로는 장면이 하나뿐이다.
   await mock(page, project([[11, 0], [11, 10]]));
   await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
-  await page.getByRole("button", { name: /^입장/ }).filter({ visible: true }).first().click();
+  await expect(page.locator('[class*="barMeta"]').first()).toContainText("웨딩홀·디테일");
+  await page.getByRole("button", { name: /^메이크업·준비/ }).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/scene=1/);
   await context.close();
 });
@@ -371,7 +371,7 @@ test("detail continues across scene boundaries in both directions", async ({ bro
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/scene=1/);
   await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "입장" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "메이크업·준비" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
   await expect(page).toHaveURL(/scene=0/);
   await expect(page.getByRole("dialog", { name: "S_29.jpg 상세 보기" })).toBeVisible();
@@ -408,7 +408,7 @@ test("review detail follows the displayed scene order", async ({ browser }) => {
   await page.getByRole("button", { name: "S_29.jpg 크게 보기" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "다음 장면 · 입장" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "다음 장면 · 메이크업·준비" })).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("dialog", { name: "S_60.jpg 상세 보기" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
@@ -640,8 +640,8 @@ test("filter bar: scope segments without counts, liked view by heart count, and 
   await expect(page.locator(".gl-photo-card[data-photo-id]").first()).toHaveAttribute("data-photo-id", "p4");
   // 장면 목록: 분수·추천 장수 없이 `N장 골랐어요` (찜 수는 보이지 않는다).
   const rail = page.getByRole("navigation", { name: "장면" }).first();
-  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("2장 골랐어요");
-  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).not.toContainText("♥");
+  await expect(rail.getByRole("button", { name: /웨딩홀·디테일/ })).toContainText("2장 골랐어요");
+  await expect(rail.getByRole("button", { name: /웨딩홀·디테일/ })).not.toContainText("♥");
   await context.close();
 });
 
@@ -677,9 +677,20 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
   await page.getByRole("button", { name: "정리 시작" }).click();
   await expect.poll(() => started.length).toBeGreaterThan(0);
   // 장면 정리는 별도 실행(scene)이고 장면 이름 목록은 그 요청에만 실린다.
-  const scene = started.find((item) => item.kind === "scene")?.body as { sceneNames: string[] };
-  expect(scene.sceneNames).toContain("식전·신부 대기실");
+  type LabelBody = { sceneNames?: string[]; placeNames?: string[]; placeBasis?: string; placeHints?: Record<string, string>; placeMainStages?: string[] };
+  const scene = started.find((item) => item.kind === "scene")?.body as LabelBody;
+  expect(scene.sceneNames).toContain("신부대기실");
   expect(started.map((item) => item.kind).sort()).toEqual(["quality", "scene", "similarity"]);
+  // 웨딩 본식: 흔들림 확인이 사진마다 단계를 판정하고 장면 정리가 그 판정으로 나눈다 — 두 요청에 같은 단계 목록·판단 기준이 실린다.
+  const quality = started.find((item) => item.kind === "quality")?.body as LabelBody;
+  for (const body of [scene, quality]) {
+    expect(body.placeBasis).toBe("stage");
+    expect(body.placeNames).toEqual(scene.sceneNames);
+    expect(body.placeHints?.["예식"]).toContain("단상");
+  }
+  // 본식 단계는 장면 정리가 카메라별 본식 범위를 정하는 데 쓴다.
+  expect(scene.placeMainStages).toEqual(["화촉점화·혼주 입장", "신랑 입장", "신부 입장", "예식", "축가·축하공연", "행진·퇴장"]);
+  expect((started.find((item) => item.kind === "similarity")?.body ?? {}) as LabelBody).not.toHaveProperty("placeNames");
   await context.close();
 });
 
@@ -704,6 +715,56 @@ test("analysis banner shows each running step separately", async ({ browser }) =
   await expect(banner).toContainText("흔들림·눈 감음 확인 중 · 60 / 90장");
   await context.close();
 });
+
+test("wedding ceremony: the scene step waits for the stage check, and the bar follows that check", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  // 본식 장면 정리는 이름 붙일 장면 수가 없다(image_count 0) — 흔들림 확인(60 / 90장)이 끝나야 함께 끝난다.
+  await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => {
+    const kind = new URL(route.request().url()).pathname.split("/").pop()!;
+    const run = kind === "scene" ? { image_count: 0, processed_count: 0 } : RUNNING[kind];
+    return route.fulfill({ json: { status: "processing", run } });
+  });
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
+  const banner = page.getByRole("status").filter({ hasText: "AI가 장면을 나누고 있어요" });
+  await expect(banner).toContainText("장면 단계 나누는 중 · 흔들림 확인 뒤 끝나요");
+  await expect(banner).toContainText("흔들림·눈 감음 확인 중 · 60 / 90장");
+  await expect(banner.locator("i > b")).toHaveAttribute("style", /width: 67%/);
+  await context.close();
+});
+
+// 2026-10-15 짱쭌 본식 AI 장면 이름(저장된 그대로) — 화면에서는 식 전 / 본식 / 식 후로 묶고, 번호 대신 "(이어서)".
+const CEREMONY_STORED = ["신랑신부 연출촬영 1", "원판·단체 기념촬영 1", "신랑신부 연출촬영 2", "신부대기실", "신랑 입장", "신부 입장", "예식 1",
+  "축가·축하공연", "예식 2", "행진·퇴장 1", "예식 3", "신랑신부 연출촬영 3", "행진·퇴장 2", "원판·단체 기념촬영 2", "신랑신부 연출촬영 4"];
+
+for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
+  test(`${viewport.name}: wedding ceremony scenes are grouped by phase and repeats read (이어서)`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+    const page = await context.newPage();
+    await loginAsPhotographer(page);
+    const data = project() as ReturnType<typeof project> & { aiScenes?: unknown };
+    data.aiScenes = CEREMONY_STORED.map((name, i) => {
+      const photos = data.photos.slice(i * 6, i === CEREMONY_STORED.length - 1 ? data.photos.length : (i + 1) * 6);
+      return { name, start: null, end: null, photoIds: photos.map((photo) => photo.id) };
+    });
+    await mock(page, data);
+    await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => route.fulfill({ json: { status: "completed", run: { image_count: 0, processed_count: 0, failed_count: 0 } } }));
+    await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off&scene=0`);
+    if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
+    const list = viewport.name === "mobile" ? page.getByRole("dialog", { name: "장면" }) : page.getByRole("navigation", { name: "장면" }).first();
+    await expect(list.locator('[class*="phaseHead"] > span')).toHaveText(["식 전", "본식", "식 후"]);
+    await expect(list.locator('[class*="phaseHead"] > em')).toHaveText(["4개 장면", "9개 장면", "2개 장면"]);
+    await expect(list.getByRole("button", { name: /^예식 \(이어서\)/ })).toHaveCount(2);
+    await expect(list.getByRole("button", { name: /^신랑신부 연출촬영 \(이어서\)/ })).toHaveCount(1);
+    const names = await list.locator('[class*="quickItem"] > span').allInnerTexts();
+    expect(names).toHaveLength(CEREMONY_STORED.length);
+    expect(names.filter((name) => / \d+$/.test(name))).toEqual([]); // 저장된 반복 번호는 화면에 보이지 않는다
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await context.close();
+  });
+}
 
 test("scenes show before similar-photo grouping finishes", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -750,10 +811,13 @@ test("a step that fails to start is named, and runs that finish before the first
   });
   await page.goto(`/select/${PROJECT_ID}/select?mockAnalysis=off`);
   await page.getByRole("button", { name: "AI로 장면 정리" }).click();
+  await expect(page.getByRole("dialog", { name: "AI로 사진 정리" })).toContainText("본식은 신부대기실·입장·예식처럼 단계별로 나눠요.");
+  // 시작 직전 읽은 횟수 — 시작한 작업이 첫 조회에서 이미 끝나 있어도 프로젝트를 한 번 더 읽어야 한다(안내가 뜨기 전에 읽을 수도 있다).
+  const readsBeforeStart = projectReads;
   await page.getByRole("button", { name: "정리 시작" }).click();
-  await expect(page.getByRole("dialog", { name: "AI로 사진 정리" }).getByRole("alert")).toContainText("흔들림·눈 감음 확인을(를) 시작하지 못했어요. 나머지는 진행 중이에요.");
-  const readsAfterStart = projectReads;
-  await expect.poll(() => projectReads).toBeGreaterThan(readsAfterStart);
+  // 프로젝트를 다시 읽고 나면 시트 제목이 "AI로 다시 정리"로 바뀔 수 있다 — 제목과 상관없이 안내를 본다.
+  await expect(page.getByRole("dialog", { name: /^AI로 (사진|다시) 정리$/ }).getByRole("alert")).toContainText("흔들림·눈 감음 확인을(를) 시작하지 못했어요. 나머지는 진행 중이에요.");
+  await expect.poll(() => projectReads).toBeGreaterThan(readsBeforeStart);
   await context.close();
 });
 

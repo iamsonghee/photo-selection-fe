@@ -35,3 +35,30 @@ test("photos added while uploading are queued and uploaded right after", async (
   await expect.poll(() => uploads).toEqual([2, 3]);
   await expect(page.getByText("5장 올렸어요").filter({ visible: true }).first()).toBeVisible();
 });
+
+// 보정본은 촬영 시각이 없어 올린 순서가 곧 사진 순서다 — 고른 순서와 상관없이 파일명 자연 정렬(0002 < 0010) 순서로 올린다.
+test("selected photos are uploaded in natural filename order", async ({ page }) => {
+  await loginAsPhotographer(page);
+  let photoCount = 0;
+  const sent: string[][] = [];
+  await page.route("**/api/customer-upload/photos", async (route) => {
+    const body = route.request().postDataBuffer()?.toString("utf8") ?? "";
+    const names = body.match(/name="original_filenames"\r\n\r\n(.*)\r\n/)?.[1];
+    const batch = names ? JSON.parse(names) as string[] : [];
+    sent.push(batch);
+    photoCount += batch.length;
+    await route.fulfill({ json: { uploaded: batch.length, rejected: [] } });
+  });
+  await page.route("**/api/customer-select/usage", (route) => route.fulfill({ json: { photoCount, limit: 2000, remaining: 2000 - photoCount } }));
+  await page.route("**/api/customer-select/projects/order-check**", (route) => route.fulfill({ json: { isOwner: true, project: {
+    id: "order-check", name: "업로드 순서", photoCount, target: 30, photos: [], selectedIds: [], photoStates: {}, participantOpinions: {},
+    participantDone: {}, participantNicknames: { red: "테스트" }, shareToken: "", shareEnabled: true, exported: false,
+  } } }));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/select/order-check/upload");
+  await expect(page.getByRole("heading", { name: "업로드 순서" })).toBeVisible();
+
+  const file = (name: string) => ({ name, mimeType: "image/jpeg", buffer: Buffer.from(name) });
+  await page.locator('input[type="file"]').setInputFiles([file("0010_SJ8_1404.jpg"), file("0002_SJ7_3214.jpg"), file("0001_SJ7_3213.jpg")]);
+  await expect.poll(() => sent.flat()).toEqual(["0001_SJ7_3213.jpg", "0002_SJ7_3214.jpg", "0010_SJ8_1404.jpg"]);
+});

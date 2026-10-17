@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { splitScenes, type Scene } from "@/lib/customer-scenes";
-import { customerPlaceNames, customerSceneCatalog, customerSceneGapSeconds, OTHER_SCENE } from "@/lib/customer-shoot-scenes";
+import { customerSceneCatalog, customerSceneGapSeconds, customerSceneLabelBasis, customerSceneMainStages, OTHER_SCENE } from "@/lib/customer-shoot-scenes";
+import { phaseScenes, type ScenePhase } from "@/lib/scene-phases";
 import type { Photo } from "@/types";
 import { startAiTidy, type AiTidyKind } from "./AiTidySheet";
 import type { ProjectView } from "../../_lib/real-store";
 
-export type NamedScene = Scene & { name: string | null };
+/** phase: 웨딩 본식 장면 목록의 묶음(식 전 / 본식 / 식 후). 이름은 화면 표시용(번호 대신 "(이어서)", `scene-phases.ts`). */
+export type NamedScene = Scene & { name: string | null; phase?: ScenePhase };
 
 /**
  * 장면 정리 상태. AI 정리는 사용자가 시작할 때만 돈다.
@@ -28,9 +30,11 @@ export type AiTask = { kind: AiTidyKind; status: "processing" | "completed" | "f
 
 const TASK_LABELS: Record<AiTidyKind, string> = { scene: "장면 이름 붙이기", similarity: "비슷한 사진 묶기", quality: "흔들림·눈 감음 확인" };
 
-/** 진행 중인 작업 한 줄: "장면 이름 붙이는 중 · 3 / 6", "비슷한 사진 묶는 중 · 840 / 2,000장". */
-export function taskProgressText(task: AiTask): string {
+/** 진행 중인 작업 한 줄: "장면 이름 붙이는 중 · 3 / 6", "비슷한 사진 묶는 중 · 840 / 2,000장".
+ *  byStage(웨딩 본식): 장면 정리는 흔들림 확인의 단계 판정을 기다렸다가 끝나므로 그렇게 알린다. */
+export function taskProgressText(task: AiTask, byStage = false): string {
   const count = `${task.done.toLocaleString()} / ${task.total.toLocaleString()}`;
+  if (task.kind === "scene" && byStage && !task.total) return "장면 단계 나누는 중 · 흔들림 확인 뒤 끝나요";
   if (task.kind === "scene") return task.total ? `장면 이름 붙이는 중 · ${count}` : "장면 나누는 중";
   return `${task.kind === "similarity" ? "비슷한 사진 묶는 중" : "흔들림·눈 감음 확인 중"}${task.total ? ` · ${count}장` : ""}`;
 }
@@ -46,6 +50,8 @@ export type SceneAnalysisControl = SceneAnalysis & {
   newPhotoCount: number;
   /** 정리를 시작한다. 시작 요청이 받아들여지지 않으면 오류 문구를 돌려준다. */
   start: (kinds: AiTidyKind[]) => Promise<string | null>;
+  /** 촬영 단계로 나누는 종류(웨딩 본식) — 장면 정리가 흔들림 확인을 기다리므로 진행 문구·막대가 흔들림 진행을 따른다. */
+  byStage: boolean;
 };
 
 const POLL_MS = 5_000;
@@ -86,10 +92,14 @@ function mockNamedScenes(scenes: Scene[] | null, shootType: string): NamedScene[
 
 const NEW_PHOTOS_SCENE = "새로 올린 사진";
 
-/** 저장된 AI 장면 → 화면 장면. 정리 뒤 새로 올린(어느 장면에도 없는) 사진은 마지막 "새로 올린 사진" 장면으로 모은다. */
-function namedFromAi(aiScenes: NonNullable<ProjectView["aiScenes"]>, photos: Photo[]): { scenes: NamedScene[]; newCount: number } {
+/** 저장된 AI 장면 → 화면 장면. 정리 뒤 새로 올린(어느 장면에도 없는) 사진은 마지막 "새로 올린 사진" 장면으로 모은다.
+ *  웨딩 본식은 식 전 / 본식 / 식 후로 묶고 반복 번호를 "(이어서)"로 바꾼다(빈 장면을 거르기 전, 저장된 순서 기준). */
+function namedFromAi(aiScenes: NonNullable<ProjectView["aiScenes"]>, photos: Photo[], shootType: string): { scenes: NamedScene[]; newCount: number } {
   const known = new Set(photos.map((photo) => photo.id));
-  const scenes: NamedScene[] = aiScenes.map((scene, index) => ({ index, name: scene.name, start: scene.start, end: scene.end, photoIds: scene.photoIds.filter((id) => known.has(id)) }));
+  const stored: NamedScene[] = aiScenes.map((scene, index) => ({ index, name: scene.name, start: scene.start, end: scene.end, photoIds: scene.photoIds.filter((id) => known.has(id)) }))
+    .filter((scene) => scene.photoIds.length); // 사진이 모두 지워진 장면은 묶음·"(이어서)" 계산 전에 뺀다
+  const mainStages = customerSceneMainStages(shootType);
+  const scenes = mainStages ? phaseScenes(stored, customerSceneCatalog(shootType), mainStages) : stored;
   const assigned = new Set(scenes.flatMap((scene) => scene.photoIds));
   const fresh = photos.filter((photo) => !assigned.has(photo.id)).sort((a, b) => (a.takenAt ?? "￿").localeCompare(b.takenAt ?? "￿") || a.orderIndex - b.orderIndex);
   if (fresh.length) scenes.push({ index: scenes.length, name: NEW_PHOTOS_SCENE, start: fresh[0].takenAt ?? null, end: fresh.at(-1)?.takenAt ?? null, photoIds: fresh.map((photo) => photo.id) });
@@ -133,7 +143,7 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   const gapSeconds = customerSceneGapSeconds(shootType);
   const realTimeScenes = useMemo(() => splitScenes(photos, gapSeconds && gapSeconds * 1000), [photos, gapSeconds]);
   const timeScenes = useMemo(() => (mock ? mockScenes(photos, realTimeScenes) : realTimeScenes), [mock, photos, realTimeScenes]);
-  const ai = useMemo(() => (aiScenes?.length ? namedFromAi(aiScenes, photos) : null), [aiScenes, photos]);
+  const ai = useMemo(() => (aiScenes?.length ? namedFromAi(aiScenes, photos, shootType) : null), [aiScenes, photos, shootType]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);
 
   // 실제 상태(장면 정리 실행 상태 API): 진행 중이면 analyzing, 완료면 AI 장면(없으면 시간 장면), 실패면 시간 장면+다시 시도, 기록이 없으면 none.
@@ -142,7 +152,9 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   // 장면·유사컷·흔들림 각 최근 실행 — clip-service가 진행하면서 처리 수를 기록한다.
   const [tasks, setTasks] = useState<AiTask[]>([]);
   const [pollKey, setPollKey] = useState(0);
-  const byPlace = Boolean(customerPlaceNames(shootType));
+  const labelBasis = customerSceneLabelBasis(shootType);
+  const byPlace = labelBasis === "place";
+  const byStage = labelBasis === "stage";
   // 이 화면에서 흔들림 확인(장소 판정)이 끝나 장면이 장소별로 바뀌었는지 — 보던 장면 구성이 바뀐 이유를 한 줄로 알린다.
   const [refined, setRefined] = useState(false);
   // 이 화면에서 방금 시작한 작업 — 첫 조회 전에 끝나도(캐시를 다 재사용하는 등 몇 초 만에) 결과를 다시 읽게 진행 중으로 셈한다.
@@ -225,6 +237,6 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       : { status: "none", scenes: null };
     const shownTasks: AiTask[] = mock === "analyzing" && mockDone < 1
       ? [{ kind: "scene", status: "processing", done: Math.round(6 * mockDone), total: 6, failed: 0 }] : mock ? [] : tasks;
-    return { ...result, tasks: shownTasks, notice: noticeOf(result, shownTasks, byPlace, refined), photos: mock && result.status === "ready" ? mockAiPhotos : photos, newPhotoCount: mock ? 0 : ai?.newCount ?? 0, start };
-  }, [ai, byPlace, mock, mockAiPhotos, mockDone, photos, refined, remote, tasks, shootType, start, timeScenes, unnamed]);
+    return { ...result, tasks: shownTasks, notice: noticeOf(result, shownTasks, byPlace, refined), photos: mock && result.status === "ready" ? mockAiPhotos : photos, newPhotoCount: mock ? 0 : ai?.newCount ?? 0, start, byStage };
+  }, [ai, byPlace, byStage, mock, mockAiPhotos, mockDone, photos, refined, remote, tasks, shootType, start, timeScenes, unnamed]);
 }
