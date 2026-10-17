@@ -31,12 +31,18 @@ export function startSelectLanding(root: HTMLElement): () => void {
   const SC_D: Scene[] = [["본식", 910, 12], ["플라워 포토월", 620, 9], ["캔들 테이블", 430, 6], ["스튜디오", 520, 8], ["계단·창가", 380, 5]];
   const SC_M: Scene[] = [["본식", 910, 12], ["플라워 포토월", 620, 9], ["캔들 테이블", 430, 6], ["스튜디오·창가", 900, 11]];
   type Tile = { el: HTMLElement; k: number; pick: boolean; pile: { x: number; y: number; r: number; d: number }; scene: { x: number; y: number } };
+  let builtMobile: boolean | null = null;
   let SC = SC_D, tiles: Tile[] = [], labs: HTMLElement[] = [], L: { s: number; kP: number; kS: number; cx: number; cy: number; rx: number; ry: number } | null = null, seedS = 9;
   const rndS = () => (seedS = (seedS * 16807) % 2147483647) / 2147483647;
   const tileHtml = (mobile: boolean, k: number, j: number) => { const set = (mobile ? HERO_M : HERO_D)[k]; return `<div class="in"><img src="${PF(set[(j + k * 2) % set.length])}" alt="" loading="lazy"></div><span class="ck">✓</span>`; };
   function buildS() {
-    tilesEl.innerHTML = ""; stage.querySelectorAll(".slab").forEach((e) => e.remove()); tiles = []; labs = []; seedS = 9;
     const W = stage.clientWidth, H = stage.clientHeight, mobile = W < 700;
+    if (mobile !== builtMobile) {
+      tilesEl.innerHTML = ""; stage.querySelectorAll(".slab").forEach((e) => e.remove()); builtMobile = mobile;
+    }
+    const previousTiles = [...tilesEl.children] as HTMLElement[];
+    const previousLabs = [...stage.querySelectorAll<HTMLElement>(".slab")];
+    tiles = []; labs = []; seedS = 9; labelStage = headingStage = lastProgress = -1;
     SC = mobile ? SC_M : SC_D; stage.classList.toggle("mob", mobile);
     const rel = (el: Element) => el.getBoundingClientRect().bottom - stage.getBoundingClientRect().top;
     if (!mobile) {
@@ -48,11 +54,11 @@ export function startSelectLanding(root: HTMLElement): () => void {
       const pileS = Math.min(W, 1000) * .09; // 더미는 작게, 정리된 장면은 크게
       for (let i = 0; i < per * SC.length; i++) {
         const k = Math.floor(i / per), j = i % per;
-        const t = document.createElement("div"); t.className = "tile"; t.style.width = t.style.height = s + "px";
-        t.innerHTML = tileHtml(mobile, k, j); tilesEl.appendChild(t);
+        const t = previousTiles[i] ?? document.createElement("div"); t.className = "tile"; t.style.width = t.style.height = s + "px";
+        if (!previousTiles[i]) { t.innerHTML = tileHtml(mobile, k, j); tilesEl.appendChild(t); }
         tiles.push({ el: t, k, pick: (j * 7 + k * 3) % per < Math.round(per * SC[k][2] / 12 * .35) + 1, pile: { x: rndS(), y: Math.min(1, Math.max(0, ((i % 5) + .5) / 5 + (rndS() - .5) * .18)), r: (rndS() - .5) * 44, d: rndS() }, scene: { x: left + j * (s + gap) + s / 2, y: top + k * rowH + s / 2 } });
       }
-      SC.forEach((_, k) => { const l = document.createElement("div"); l.className = "slab"; l.style.left = (left - labelW) + "px"; l.style.top = (top + k * rowH + s / 2 - 18) + "px"; stage.appendChild(l); labs.push(l); });
+      SC.forEach((_, k) => { const l = previousLabs[k] ?? document.createElement("div"); l.className = "slab"; l.style.left = (left - labelW) + "px"; l.style.top = (top + k * rowH + s / 2 - 18) + "px"; if (!previousLabs[k]) stage.appendChild(l); labs.push(l); });
       // 사진 더미 윗변을 버튼 바로 아래에 붙인다(화면이 높아도 여백이 벌어지지 않게)
       const pTop = rel($('.head[data-h="0"]')) + 16, ry = Math.max(40, (H * .9 - pTop - pileS / 2) / 2);
       L = { s, kP: pileS / s, kS: 1, cx: W / 2, cy: H * .9 - ry, rx: Math.min(W * .46, 620), ry };
@@ -68,11 +74,11 @@ export function startSelectLanding(root: HTMLElement): () => void {
     const pileS = Math.min(W * .24, 96);
     for (let i = 0; i < per * SC.length; i++) {
       const k = Math.floor(i / per), j = i % per;
-      const t = document.createElement("div"); t.className = "tile"; t.style.width = t.style.height = pileS + "px";
-      t.innerHTML = tileHtml(mobile, k, j); tilesEl.appendChild(t);
+      const t = previousTiles[i] ?? document.createElement("div"); t.className = "tile"; t.style.width = t.style.height = pileS + "px";
+      if (!previousTiles[i]) { t.innerHTML = tileHtml(mobile, k, j); tilesEl.appendChild(t); }
       tiles.push({ el: t, k, pick: (j + k) % 4 < 2 || (k === 1 && j === 3), pile: { x: Math.min(1, Math.max(0, ((i % 4) + .5) / 4 + (rndS() - .5) * .2)), y: Math.min(1, Math.max(0, (Math.floor(i / 4) + .5) / 4 + (rndS() - .5) * .16)), r: (rndS() - .5) * 26, d: rndS() }, scene: { x: left + j * (s + gap) + s / 2, y: sTop + k * rowH + labelH + s / 2 } });
     }
-    SC.forEach((_, k) => { const l = document.createElement("div"); l.className = "slab"; l.style.left = left + "px"; l.style.top = (sTop + k * rowH) + "px"; stage.appendChild(l); labs.push(l); });
+    SC.forEach((_, k) => { const l = previousLabs[k] ?? document.createElement("div"); l.className = "slab"; l.style.left = left + "px"; l.style.top = (sTop + k * rowH) + "px"; if (!previousLabs[k]) stage.appendChild(l); labs.push(l); });
     const pTop = hb0 + 20, pBot = H - 84; // 바닥에서 띄움
     msgcard.style.top = (hb0 + 10) + "px"; msgcard.style.bottom = "auto";
     L = { s: pileS, kP: 1, kS: s / pileS, cx: W / 2, cy: (pTop + pBot) / 2, rx: Math.max(10, (W - pileS) / 2 - 12), ry: Math.max(8, (pBot - pTop - pileS) / 2 - 6) };
@@ -80,32 +86,50 @@ export function startSelectLanding(root: HTMLElement): () => void {
   }
   const easeS = (t: number) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const clampS = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v));
-  let tNow = 0;
+  let labelStage = -1, headingStage = -1, lastProgress = -1;
   function renderS(p: number) {
     if (!L) return; const { s, kP, kS, cx, cy, rx, ry } = L;
     tiles.forEach((t, i) => {
       const local = easeS(clampS((p - .12 - (i % 25) * .006) / .32));
-      const breathe = REDUCED ? 0 : Math.sin(tNow / 900 + t.pile.d * 6) * 6 * (1 - local);
-      const px = cx + (t.pile.x - .5) * 2 * rx, py = cy + (t.pile.y - .5) * 2 * ry + breathe;
+      const px = cx + (t.pile.x - .5) * 2 * rx, py = cy + (t.pile.y - .5) * 2 * ry;
       const x = px + (t.scene.x - px) * local, y = py + (t.scene.y - py) * local;
       t.el.style.transform = `translate(${x - s / 2}px,${y - s / 2}px) rotate(${t.pile.r * (1 - local)}deg) scale(${kP + (kS - kP) * local})`;
       t.el.style.zIndex = String(local > .5 ? 2 : 2 + Math.round(t.pile.d * 10));
       t.el.classList.toggle("pick", p > .66 && t.pick); t.el.classList.toggle("dim", p > .7 && !t.pick);
     });
-    labs.forEach((l, k) => { l.style.opacity = p > .44 ? "1" : "0"; l.innerHTML = `${SC[k][0]}<small>${p > .66 ? `<b>${SC[k][2]}장</b> 골랐어요` : `${SC[k][1].toLocaleString()}장`}</small>`; });
+    const label = p > .66 ? 2 : p > .44 ? 1 : 0;
+    if (label !== labelStage) {
+      labelStage = label;
+      labs.forEach((l, k) => { l.style.opacity = label ? "1" : "0"; l.innerHTML = `${SC[k][0]}<small>${label === 2 ? `<b>${SC[k][2]}장</b> 골랐어요` : `${SC[k][1].toLocaleString()}장`}</small>`; });
+    }
     const h = p < .26 ? 0 : p < .64 ? 1 : 2;
-    stage.classList.toggle("past", h > 0);
-    heads.forEach((el, k) => el.classList.toggle("on", k === h)); sprog.forEach((el, k) => el.classList.toggle("on", k <= h));
-    cnt.innerHTML = h === 0 ? "받은 사진 <b>2,860</b>장" : h === 1 ? `장면 <b>${SC.length}</b>개로 나눔` : "고른 사진 <b>40</b>장";
+    if (h !== headingStage) {
+      headingStage = h;
+      stage.classList.toggle("past", h > 0);
+      heads.forEach((el, k) => el.classList.toggle("on", k === h)); sprog.forEach((el, k) => el.classList.toggle("on", k <= h));
+      cnt.innerHTML = h === 0 ? "받은 사진 <b>2,860</b>장" : h === 1 ? `장면 <b>${SC.length}</b>개로 나눔` : "고른 사진 <b>40</b>장";
+    }
     sendp.classList.toggle("on", p > .84);
     msgcard.style.opacity = (1 - clampS((p - .06) / .12)).toFixed(3);
   }
-  const progS = () => { const r = heroS.getBoundingClientRect(); return clampS(-r.top / (r.height - innerHeight)); };
-  function loopS(t: number) { tNow = t; const r = heroS.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) renderS(REDUCED ? 0 : progS()); raf = frame(loopS); }
+  // 스크롤이 멈추면 사진·텍스트도 멈춘다. 화면 밖에서는 렌더하지 않는다.
+  function updateHero() {
+    raf = 0;
+    if (document.hidden) return;
+    const r = heroS.getBoundingClientRect();
+    if (r.bottom <= 0 || r.top >= innerHeight) return;
+    const p = REDUCED ? 1 : clampS(-r.top / (r.height - innerHeight));
+    if (p === lastProgress) return;
+    lastProgress = p; renderS(p);
+  }
+  const scheduleHero = () => { if (!raf) raf = frame(updateHero); };
+  const rebuildHero = () => { buildS(); scheduleHero(); };
   if (REDUCED) { heroS.style.height = "auto"; stage.style.position = "relative"; }
-  buildS(); raf = frame(loopS);
-  document.fonts?.ready.then(() => alive && buildS());
-  let rtS = 0; on(window, "resize", () => { clearTimeout(rtS); rtS = window.setTimeout(() => alive && buildS(), 250); });
+  rebuildHero();
+  window.addEventListener("scroll", scheduleHero, { passive: true, signal: ac.signal });
+  on(document, "visibilitychange", scheduleHero);
+  document.fonts?.ready.then(() => alive && rebuildHero());
+  let rtS = 0; on(window, "resize", () => { clearTimeout(rtS); rtS = window.setTimeout(() => alive && rebuildHero(), 250); });
 
   /* 2-1 올리자마자: 화면에 들어오면 재생, 섹션을 벗어나면 처음 상태로 — 돌아오면 다시 재생 */
   const upNum = $("#upNum"), upBar = $("#upBar"), upDone = $("#upDone");

@@ -1,0 +1,142 @@
+{
+  "main-hero": {
+    "desktop": {
+      "width": 1440,
+      "height": 900
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "main-still": {
+    "desktop": {
+      "width": 360,
+      "height": 166
+    },
+    "mobile": {
+      "width": 358,
+      "height": 121
+    }
+  },
+  "select-hero": {
+    "desktop": {
+      "width": 1440,
+      "height": 901
+    },
+    "mobile": {
+      "width": 390,
+      "height": 845
+    }
+  },
+  "select-checks": {
+    "desktop": {
+      "width": 520,
+      "height": 209
+    },
+    "mobile": {
+      "width": 350,
+      "height": 196
+    }
+  },
+  "select-scenes": {
+    "desktop": {
+      "width": 672,
+      "height": 506
+    },
+    "mobile": {
+      "width": 350,
+      "height": 544
+    }
+  },
+  "select-phone": {
+    "desktop": {
+      "width": 334,
+      "height": 678
+    },
+    "mobile": {
+      "width": 318,
+      "height": 643
+    }
+  },
+  "select-send": {
+    "desktop": {
+      "width": 537,
+      "height": 431
+    },
+    "mobile": {
+      "width": 350,
+      "height": 480
+    }
+  },
+  "select-tidy": {
+    "desktop": {
+      "width": 640,
+      "height": 231
+    },
+    "mobile": {
+      "width": 350,
+      "height": 191
+    }
+  },
+  "studio-hero": {
+    "desktop": {
+      "width": 1440,
+      "height": 901
+    },
+    "mobile": {
+      "width": 390,
+      "height": 845
+    }
+  },
+  "studio-board": {
+    "desktop": {
+      "width": 1120,
+      "height": 578
+    },
+    "mobile": {
+      "width": 328,
+      "height": 633
+    }
+  },
+  "studio-phone-rec": {
+    "desktop": {
+      "width": 334,
+      "height": 678
+    },
+    "mobile": {
+      "width": 300,
+      "height": 609
+    }
+  },
+  "studio-phone-stack": {
+    "desktop": {
+      "width": 334,
+      "height": 678
+    },
+    "mobile": {
+      "width": 300,
+      "height": 609
+    }
+  },
+  "studio-phone-quality": {
+    "desktop": {
+      "width": 334,
+      "height": 678
+    },
+    "mobile": {
+      "width": 300,
+      "height": 609
+    }
+  },
+  "studio-phone-family": {
+    "desktop": {
+      "width": 334,
+      "height": 678
+    },
+    "mobile": {
+      "width": 300,
+      "height": 609
+    }
+  }
+}

@@ -1,12 +1,14 @@
 # 시스템 아키텍처
 
-## 작업 주소 이전 (2026-10-11, 로컬 브랜치)
+## 작업 주소 이전 (2026-10-11 구현)
 
 작가·스튜디오 작업 화면은 `/studio/**`, 내 사진 셀렉 작업 화면은 `/select/**`를 사용한다. 이전 `/photographer/**`, `/customer-select/**` 요청은 middleware에서 307로 연결하며 하위 경로·쿼리·HTTP 메서드를 보존한다. 로그인 복귀 경로도 동일 규칙으로 변환한다. 공개 결과 공유 `/customer-select/result/**`는 기존 경로에 묶인 인증 쿠키를 유지하기 위해 이전하지 않는다. `/c/**`, `/g/**`, `/api/**`, OAuth `/auth/callback`도 유지한다. 새 작업 화면은 noindex 대상이며 권한·PIN·공유 토큰 검증은 기존 정책대로 적용한다.
 
 ## 공통 진입 구조 (2026-10-11, feat/landing-entry-flow)
 
 - 소개 랜딩: `/`, `/studio`, `/select`(2026-10-16 확정 시안으로 교체, `src/app/_landing`·`src/app/<select|studio>/_landing`) → 공통 `/login` → 기존 작업 공간(`/studio/dashboard`, `/select/projects`). 일반 복귀 `/workspaces`는 검증된 현재 사용자의 `user_metadata.acut_last_workspace`만 읽어 공간을 결정한다. 기억 값이 없거나 잘못됐으면 선택 화면을 표시한다.
+- 세 랜딩은 서버 HTML에 압축된 PC·모바일 WebP 시연 이미지를 먼저 포함한다(`LandingPoster`, `public/landing/posters`). `useLandingAnimation`이 브라우저 힌트를 확인해 데이터 절약, slow-2g/2g/3g, 0 초과 1.5Mbps 이하 downlink, 0 초과 4GiB 이하 deviceMemory, 0 초과 논리 CPU 4개 이하 중 하나면 정적 이미지를 유지하고 연출 모듈을 import하지 않는다. 지원하지 않는 힌트는 저사양으로 간주하지 않는다. 일반 환경은 연출 모듈 로딩이 끝난 뒤 기존 DOM 시연으로 전환하며, 모듈 로딩 실패 시 이미지를 유지한다. 아래 시연 이미지는 지연 로딩한다. 통합 홈의 찜 숫자 강조는 강제 `offsetWidth` 읽기 없이 Web Animations로 재생한다(2026-10-17).
+- `/select`·`/studio`의 스크롤 시연은 상시 RAF 루프를 사용하지 않고 passive scroll 이벤트를 프레임당 한 번으로 합쳐 갱신한다. 같은 장면 이름·장수는 DOM을 다시 만들지 않으며, 화면 밖·숨겨진 탭에서는 갱신하지 않는다. 셀렉 히어로의 계속 떠다니는 동작은 제거하고 스크롤에 따른 정리·선택은 유지한다. 폰트 로딩과 같은 화면 구간의 resize에서는 사진 DOM을 재사용하고, 움직임 축소 설정은 완료 장면을 정적으로 표시한다(2026-10-17).
 - `src/lib/workspaces.ts`는 두 공간의 명칭·착지 경로와 기억 키를 정의한다. `WorkspaceMemory`는 인증된 공간 진입 시 기존 Supabase `auth.updateUser`로 해당 설정만 갱신한다. 새 DB 테이블·Next API·결제 의존성은 추가하지 않는다. 사용자 메타데이터는 사용자 수정 가능하므로 프로젝트 권한·과금에 절대로 사용하지 않는다.
 - OAuth 목적지는 기존 `acut_post_login_redirect` 쿠키(10분)를 재사용한다. 기본값은 `/workspaces`이며 쿠키가 없을 때 쿼리 `next`를 보조로 사용한다. 외부 주소·제어 문자·로그인/API/콜백 복귀 경로를 거절한다. 인증 실패/취소도 쿠키를 지우고 원래 목적지를 지정한 `/login?error=oauth`로 재시도한다.
 - 기존 공통 `photographers` 행 생성·베타 초대 처리·신청 매칭은 유지한다. 작가 이용 지표는 명시적인 `/studio/**`·`/beta/apply` 로그인에만 기록하고 일반 로그인·개인 셀렉·공유 링크를 작가 지표에 섞지 않는다. 일반 로그인 후 스튜디오를 선택하는 동작 자체는 OAuth 지표 이벤트를 새로 만들지 않는다.
@@ -1022,3 +1024,7 @@ sequenceDiagram
 - `POST/GET /api/customer-select/guest-albums/[id]/archives`: 소유자 ZIP 스냅샷 요청/파트 상태와 다운로드 서명 주소 조회.
 - FastAPI 내부 `POST /api/guest-upload/archive-urls`: 내부 비밀값과 ZIP 전용 키 패턴 검증, 15분 GET URL.
 - 공개 업로드 세 API는 DB의 기기·IP 분당 한도를 공유한다. pending+ready 예약량으로 동시 업로드 총량을 제한한다.
+
+2026-10-17: 세 공개 랜딩은 `LandingAuth`에서 비로그인 사용자의 `/login`·`/beta/apply` 일반 클릭을 처리해 기존 `AuthModal`을 현재 랜딩 위에 표시한다. 로그인 후 목적지는 기존 redirect 유틸을 사용하고, 닫을 때 대기 목적지를 정리한다. 직접 URL 진입·새 탭은 기존 로그인/신청 경로를 유지한다.
+
+`LandingAuth`는 일반 클릭으로 `/`·`/studio`·`/select` 사이를 이동할 때 스크롤을 즉시 맨 위로 초기화한다. 해시 링크와 수정 키를 사용한 새 탭 열기는 기존 브라우저 동작을 유지한다(2026-10-17).

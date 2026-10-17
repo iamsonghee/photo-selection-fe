@@ -1,3 +1,5 @@
+import { cellHTML, PH } from "./hero-cells";
+
 /**
  * 통합 랜딩(/)의 움직임 — design/landing-preview/main 시안의 스크립트를 그대로 옮겼다.
  * 화면을 떠나면(언마운트) 반환된 함수가 타이머·관찰자·이벤트·애니메이션을 모두 정리한다.
@@ -20,11 +22,7 @@ export function startMainLanding(root: HTMLElement): () => void {
   };
 
   const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const POOL = ["k01", "k06", "k02", "k07", "k08", "k09", "k03", "k11", "k14", "k16", "k17", "k04", "k18", "k19", "k20", "k05", "k22", "k23", "k24", "k25", "k10", "k26", "k27", "k28", "k12", "k29", "k30", "k13", "k15", "k21"]; // 주황 니트 커플 30장 — 서 있는 컷 사이에 앉은·누운 컷을 섞음
-  const PH = (i: number) => `/landing/main/${POOL[i % POOL.length]}.jpg`;
-  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.6 4.5c2.1 0 3.6 1.2 5.4 3.2 1.8-2 3.3-3.2 5.4-3.2 3.6 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21z"/></svg>';
-  const cellHTML = (src: string) => `<div class="m"><img src="${src}" alt="" draggable="false"><span class="ck">${CHECK}</span><span class="hv">${HEART}<span>1</span></span></div>`;
+
 
   /* 1 히어로 — 가족이 찜하고, 나만 최종 선택, 고른 사진이 한곳에 모임 */
   const hero = $("top"), sheet = $("sheet"), tray = $("tray"), slots = $("slots"), trayN = $("trayN"), copy = root.querySelector<HTMLElement>(".copy")!;
@@ -34,7 +32,13 @@ export function startMainLanding(root: HTMLElement): () => void {
     const cw = (w - 28 - (cols - 1) * 10) / cols, ch = cw * 1.25 + 10;
     const rows = Math.ceil(h / (ch + 10)) + 2;
     sheet.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    sheet.innerHTML = Array.from({ length: cols * rows }, (_, i) => `<figure class="cell">${cellHTML(PH(i))}</figure>`).join("");
+    // 첫 HTML의 이미지를 보존하고 화면 크기에 필요한 장수만 조정한다.
+    const count = cols * rows;
+    while (sheet.children.length > count) sheet.lastElementChild!.remove();
+    for (let i = sheet.children.length; i < count; i++) {
+      const cell = document.createElement("figure");
+      cell.className = "cell"; cell.innerHTML = cellHTML(PH(i)); sheet.appendChild(cell);
+    }
     cells = [...sheet.children] as HTMLElement[];
   }
   const rel = (el: Element) => { const r = el.getBoundingClientRect(), b = hero.getBoundingClientRect(); return { x: r.left - b.left, y: r.top - b.top, w: r.width, h: r.height }; };
@@ -68,7 +72,9 @@ export function startMainLanding(root: HTMLElement): () => void {
   const setLike = (i: number, n: number) => {
     const c = cells[i], hv = c.querySelector<HTMLElement>(".hv")!; const up = c.classList.contains("liked");
     c.classList.add("liked"); hv.querySelector("span")!.textContent = String(n);
-    if (up) { hv.classList.remove("bump"); void hv.offsetWidth; hv.classList.add("bump"); }
+    if (up && !REDUCED) {
+      animate(hv.querySelector("span")!, [{ transform: "scale(1)" }, { transform: "scale(1.35)" }, { transform: "scale(1)" }], { duration: 300, easing: "cubic-bezier(.22,1,.36,1)" });
+    }
   };
   function fill(picks: number[]) {
     slots.innerHTML = picks.map((i) => `<span class="slot"><img src="${cells[i].querySelector("img")!.src}" alt=""></span>`).join("");
@@ -177,7 +183,6 @@ export function startMainLanding(root: HTMLElement): () => void {
   }
   layoutMobile(); build(); setVeil(); makeCursors();
   document.fonts?.ready.then(() => { if (alive) { layoutMobile(); setVeil(); } });
-  frame(() => $("h1").classList.add("in"));
   let inView = false;
   if (REDUCED) frame(finalState);
   else watch(hero, { threshold: .3 }, (e) => { inView = e.isIntersecting; if (inView) play(); else { run++; reset(); } });

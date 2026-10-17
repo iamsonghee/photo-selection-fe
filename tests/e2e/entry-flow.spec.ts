@@ -15,13 +15,19 @@ test("세 랜딩과 명시적 로그인 목적지 · 모바일 표시", async ({
     await expect(page).toHaveURL(/\/studio$/);
     await page.getByRole("link", { name: "무료로 시작하기", exact: true }).first().click(); // 메뉴·히어로·마무리에 같은 버튼
     await expect(page.getByRole("dialog")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("next")).toBe("/studio/dashboard");
+    await expect(page).toHaveURL(/\/studio$/);
+    await expect(page.getByRole("link", { name: "무료로 시작하기", exact: true }).first()).toHaveAttribute("href", "/login?next=%2Fstudio%2Fdashboard");
     await page.getByRole("button", { name: "로그인 닫기" }).click();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await page.getByRole("region", { name: "이용 안내와 자주 묻는 질문" }).getByRole("link", { name: "베타 참여 신청하기", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page).toHaveURL(/\/studio$/);
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await page.goto("/select");
     await page.getByRole("link", { name: "내 사진 셀렉 시작하기", exact: true }).first().click(); // 히어로·마무리에 같은 버튼
     await expect(page.getByRole("dialog")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("next")).toBe("/select/projects");
+    await expect(page).toHaveURL(/\/select$/);
     await page.screenshot({ path: testInfo.outputPath(`login-${width}.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
@@ -143,4 +149,40 @@ test("기존 작업 주소는 쿼리를 보존하고 새 작업 화면은 검색
   }
   const response = await request.get("/studio/projects", { maxRedirects: 0 });
   expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+});
+
+
+test("랜딩 모달은 로그인 목적지를 보존한다", async ({ page }) => {
+  for (const [path, label, destination] of [
+    ["/", "로그인", "/workspaces"],
+    ["/studio", "무료로 시작하기", "/studio/dashboard"],
+    ["/studio", "베타 참여 신청하기", "/beta/apply"],
+    ["/select", "내 사진 셀렉 시작하기", "/select/projects"],
+  ]) {
+    await page.goto(path);
+    await page.route("**/auth/v1/authorize**", (route) => route.abort());
+    await page.getByRole("link", { name: label, exact: true }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe(path);
+    await page.getByRole("button", { name: "Google로 시작하기" }).click();
+    await expect.poll(async () => (await page.context().cookies()).find((c) => c.name === "acut_post_login_redirect")?.value).toBe(encodeURIComponent(destination));
+  }
+});
+
+
+test("랜딩 메뉴로 재진입하면 히어로부터 보인다", async ({ page }) => {
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 850 });
+    for (const [path, entrance] of [["/studio", "작가·스튜디오 →"], ["/select", "내 사진 셀렉 →"]]) {
+      await page.goto(path);
+      await page.getByRole("contentinfo").scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => scrollY)).toBeGreaterThan(500);
+      await page.getByRole("navigation").locator('a[href="/"]').click();
+      await expect(page).toHaveURL(/\/$/);
+      await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+      await page.getByRole("link", { name: entrance, exact: true }).first().click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(path);
+      await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    }
+  }
 });

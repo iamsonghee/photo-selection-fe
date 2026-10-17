@@ -48,7 +48,13 @@ const out = `/* ${cfg.name} — design/landing-preview/${space} 시안에서 옮
 // 시안에서 고쳐 쓰는 규칙 — 찾는 문자열이 시안에서 사라지면 멈춘다(시안이 바뀌었으니 다시 확인할 것).
 const FIXES = {
   select: [],
-  main: [],
+  main: [
+    // 서버 HTML의 사진판도 hydration 전부터 같은 반응형 열 구성을 사용한다.
+    [".sheet{position:absolute;inset:0;display:grid;gap:10px;padding:14px;align-content:center}", ".sheet{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);gap:10px;padding:14px;align-content:center}"],
+    [".mnl .cell{position:relative;margin:0;", "@media (max-width:999px){.mnl .sheet{grid-template-columns:repeat(5,1fr)}}\n@media (max-width:599px){.mnl .sheet{grid-template-columns:repeat(3,1fr)}}\n.mnl .cell{position:relative;margin:0;"],
+    [";filter:blur(8px);opacity:.3;transition:filter .9s,opacity .9s", ""],
+    [".mnl .copy h1.in{filter:none;opacity:1}\n", ""],
+  ],
   studio: [
     // 고객 셀렉 화면 항목 설명: max-height·margin 애니메이션(레이아웃 다시 계산) → grid 행 0fr→1fr과 row-gap으로 같은 펼침
     [".flist button{all:unset;cursor:pointer;display:block;", ".flist button{all:unset;cursor:pointer;display:grid;grid-template-rows:auto 0fr;row-gap:0;"],

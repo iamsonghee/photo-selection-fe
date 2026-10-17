@@ -2,23 +2,34 @@
 
 /* eslint-disable @next/next/no-img-element -- 시안 그대로의 정적 샘플 사진 */
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { BusinessInfo } from "@/components/landing/BusinessInfo";
+import { LandingAuth } from "@/components/landing/LandingAuth";
+import { useRef } from "react";
 import { landingFontVars } from "@/lib/landing-fonts";
 import { WORKSPACES } from "@/lib/workspaces";
-import { startSelectLanding } from "./motion";
+import { useLandingAnimation } from "@/components/landing/use-landing-animation";
+import { LandingPoster } from "@/components/landing/LandingPoster";
 import "./select-landing.css";
+
+const loadMotion = () => import("./motion").then((module) => module.startSelectLanding);
+
+const setStaticOriginal = (element: HTMLElement, shown: boolean) => {
+  element.classList.toggle("press", shown);
+  const label = element.querySelector("#h2lab");
+  if (label) label.textContent = shown ? "원본" : "보정본";
+};
 
 const CHECK = <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>;
 
 /** 화면 구조와 문구는 design/landing-preview/select 시안을 그대로 옮겼다. 움직임은 ./motion.ts. */
 export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; retentionDays: number }) {
   const root = useRef<HTMLDivElement>(null);
-  useEffect(() => startSelectLanding(root.current!), []);
+  const animated = useLandingAnimation(root, loadMotion);
   const start = loggedIn ? WORKSPACES.select.path : `/login?next=${encodeURIComponent(WORKSPACES.select.path)}`;
   const guest = loggedIn ? "/select/new/guest" : `/login?next=${encodeURIComponent("/select/new/guest")}`;
 
   // data-acut-light-canvas: html·body도 밝은 캔버스로(globals.css) — 전역 바탕이 다크라 러버밴드·로딩 순간에 검게 비침
-  return <div ref={root} data-acut-light-canvas className={`sl ${landingFontVars}`}>
+  return <LandingAuth loggedIn={loggedIn}><div ref={root} data-acut-light-canvas data-landing-mode={animated ? "animated" : "static"} className={`sl ${landingFontVars}`}>
     <nav className="nav" aria-label="서비스 메뉴"><div className="in"><Link className="logo" href="/">A-CUT<i>.</i></Link><Link className="hide-m" href="/studio">작가·스튜디오</Link><Link className="on" href="/select" aria-current="page">내 사진 셀렉</Link><Link className="hide-m" href={loggedIn ? "/workspaces" : "/login"}>{loggedIn ? "내 작업" : "로그인"}</Link><Link className="btn o" href={start}>시작하기</Link></div></nav>
 
     <section className="heroS" id="top" aria-label="히어로: 수천 장이 장면별로 정리되는 장면">
@@ -33,7 +44,7 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
           <div className="head" data-h="1"><h2>장면별로<br /><em>나눠 드렸어요.</em></h2><p className="sub">촬영 흐름대로 나눈 장면을, 한 번에 하나씩 보면 돼요.</p></div>
           <div className="head" data-h="2"><h2>장면마다 몇 장씩,<br /><em>40장</em>이 모였어요.</h2><p className="sub">고른 사진은 파일명과 함께 링크 하나로 작가님께 보내요.</p></div>
         </div>
-        <div id="sTiles" />
+        {animated ? (<div id="sTiles" />) : (<LandingPoster name="select-hero" alt="결혼식 사진과 작가님의 셀렉 안내 예시" eager className="landing-poster-bg"/>)}
         <div className="msgcard" id="msgcard"><span className="app"><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4C6.5 4 2 7.5 2 11.8c0 2.8 1.9 5.2 4.7 6.6L5.8 22l4.1-2.7c.7.1 1.4.2 2.1.2 5.5 0 10-3.5 10-7.8S17.5 4 12 4z" /></svg></i>카카오톡<small>오후 3:12</small></span><b>본식 스냅 작가님</b>원본 2,860장 전달드립니다.<br />2주 안에 40장 골라서 파일명 보내주세요 :)</div>
         <div className="cnt" id="cnt">받은 사진 <b>2,860</b>장</div>
         <div className="sendp" id="sendp">작가님께 보내기 · 40장 · 파일명 포함</div>
@@ -42,17 +53,17 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
 
     <section className="upl" aria-label="올리기">
       <div className="wrap">
-        <p className="num" id="upNum">0<small>장</small></p>
-        <div className="bar"><span id="upBar" /></div>
-        <p className="upst" id="upSt">올리는 중…</p>
-        <span className="aibtn" id="aiBtn" aria-hidden="true">AI로 정리하고 고르기 →</span>
+        <p className="num" id="upNum">{animated ? "0" : "2,860"}<small>장</small></p>
+        <div className="bar"><span id="upBar" style={animated ? undefined : { width: "100%" }} /></div>
+        <p className={`upst${animated ? "" : " ok"}`} id="upSt">{animated ? "올리는 중…" : "2,860장 올렸어요"}</p>
+        <span className={`aibtn${animated ? "" : " on go"}`} id="aiBtn" aria-hidden="true">AI로 정리하고 고르기 →</span>
         <h2>올리자마자, <span style={{ whiteSpace: "nowrap" }}>A-CUT이</span> 셀렉을 도와요.</h2>
         <p className="upd">버튼 하나로 비슷한 컷을 묶고, 장면을 나눠 드려요.</p>
-        <ul className="chk" id="chk">
+        {animated ? (<ul className="chk" id="chk">
           <li data-n="438" data-u="묶음"><span className="ic">{CHECK}</span><span className="lb">비슷한 컷 묶기</span><span className="ld" /><span className="n">0<small>묶음</small></span><span className="cut" id="cut">넘겨볼 사진 <s>2,860장</s> → <b id="cutN">2,860</b>장</span></li>
           <li data-n="5" data-u="개"><span className="ic">{CHECK}</span><span className="lb">장면 나누고 이름 붙이기</span><span className="ld" /><span className="n">0<small>개</small></span><span className="sc"><span>본식</span><span>플라워 포토월</span><span>캔들 테이블</span><span>스튜디오</span><span>계단·창가</span></span></li>
-        </ul>
-        <span className="done" id="upDone">✓ 정리 완료</span>
+        </ul>) : (<LandingPoster name="select-checks" alt="2,860장의 사진에서 비슷한 컷을 묶고 다섯 장면으로 정리한 예시" />)}
+        <span className={`done${animated ? "" : " on"}`} id="upDone">✓ 정리 완료</span>
       </div>
     </section>
 
@@ -67,14 +78,14 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
             <li><i>5</i>장면마다 몇 장 골랐는지 보여요</li>
           </ul>
         </div>
-        <div className="sview">
+        {animated ? (<div className="sview">
           <div className="top"><b>스튜디오</b><small>520장</small><span className="cnt2" id="sCnt">이 장면에서 5장 골랐어요</span></div>
           <div className="sbody" id="sBody">
             <div className="sw" id="swRow"><button type="button" role="switch" aria-checked="false" id="blurSw" aria-label="흔들린 사진·눈 감은 사진 빼고 보기" /><span id="swTxt">흔들린 사진·눈 감은 사진 빼고 보기</span></div>
             <div className="sgrid" id="sGrid" />
             <div className="simi" id="simi"><div className="h"><button type="button" id="simiClose">← 장면으로</button><span>⧉ 비슷한 사진 5장</span></div><div className="row" id="simiRow" /><div className="msg" id="simiMsg">마음에 드는 사진을 눌러 보세요. 여러 장 골라도 돼요.</div></div>
           </div>
-        </div>
+        </div>) : (<LandingPoster name="select-scenes" alt="비슷한 컷을 묶고 흔들린 사진과 눈 감은 사진을 표시한 셀렉 화면 예시" />)}
       </div>
     </section>
 
@@ -90,15 +101,15 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
           </ul>
         </div>
         <div>
-          <div className="devwrap"><div className="device"><div className="device-frame"><div className="device-screen" id="scr">
+          {animated ? (<div className="devwrap"><div className="device"><div className="device-frame"><div className="device-screen" id="scr">
             <div className="st"><span>9:41</span><span className="ic"><b /><i /></span></div>
             <div className="ap"><span className="back">‹</span><b>민서 ♥ 지훈 본식</b><span className="with"><span className="av"><i style={{ background: "var(--p1)" }}>나</i><i style={{ background: "var(--p2)" }}>지</i><i style={{ background: "var(--p3)" }}>엄</i></span>함께 3</span></div>
             <div className="tabs3" role="tablist" id="tabs3"><button role="tab" aria-selected="false" data-v="all">모두</button><button role="tab" aria-selected="true" data-v="like">♥ 찜</button><button role="tab" aria-selected="false" data-v="pick">✓ 최종 선택</button></div>
             <div className="pg" id="pg" />
             <div className="talkb" id="talkb"><b>엄마</b>이거 액자로 하자!</div>
             <div className="bb"><div><b id="bbN">지금까지 12장 골랐어요</b><small>40장 정도 골라주세요</small></div><span>선택 완료 →</span></div>
-          </div></div><div className="device-stripe" /><div className="device-header" /><div className="device-sensors" /><div className="device-btns" /><div className="device-power" /></div></div>
-          <div className="phone-cap">위 탭을 눌러 보세요 · 찜이 많은 사진부터 보여요</div>
+          </div></div><div className="device-stripe" /><div className="device-header" /><div className="device-sensors" /><div className="device-btns" /><div className="device-power" /></div></div>) : (<LandingPoster name="select-phone" alt="가족이 함께 찜하고 최종 선택하는 휴대폰 화면 예시" className="landing-poster-phone"/>)}
+          <div className="phone-cap">{animated ? "위 탭을 눌러 보세요 · 찜이 많은 사진부터 보여요" : "가족이 함께 찜한 사진을 모아 보는 화면 예시"}</div>
         </div>
       </div>
     </section>
@@ -111,7 +122,7 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
             <h2>파일명 하나하나<br />적어 보내지 마세요.</h2>
             <p><span className="dk">고른 사진은 링크 하나로 작가님께 보내요. 작가님은 가입 없이 고른 사진과 파일명, 메모를 확인해요. 다시 고르면 같은 링크에 바로 반영돼요.</span><span className="mb">고른 사진은 링크 하나로 작가님께 보내요.</span></p>
           </div>
-          <div className="sendvis" id="sendVis">
+          {animated ? (<div className="sendvis" id="sendVis">
             <div className="ptabs" aria-hidden="true"><span className="pt on" id="ptA">지금까지</span><span className="pt" id="ptB">A-CUT에서는</span></div>
             <div className="stg stA" id="stA">
               <div className="chatw"><div className="top">작가님 (본식 스냅)</div><div className="body"><div className="bub">원본 전달드렸어요. 40장 골라서 파일명 보내주세요 :)</div></div><div className="inp" id="inp"><span id="inpT" /><span className="cr" /></div><div className="cnt3" id="cnt3">0 / 40개 입력 중…</div></div>
@@ -123,12 +134,20 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
             </div>
             <div className="shut t" /><div className="shut b" />
             <button type="button" className="replay2" id="replay2">다시 보기</button>
-          </div>
+          </div>) : (<LandingPoster name="select-send" alt="고른 사진의 파일명과 메모를 링크 하나로 작가님께 보내는 화면 예시" />)}
         </div>
         <div className="weeks">몇 주 뒤, 보정본이 도착하면</div>
         <div className="row b">
           <div className="cmpbig">
-            <div className="hold2" id="hold2" role="button" tabIndex={0} aria-label="누르고 있는 동안 원본 보기"><img src="/landing/select/r-simple5.jpg" alt="보정본" /><img className="orig" src="/landing/select/o-simple5.jpg" alt="원본" /><span className="lab" id="h2lab">보정본</span><span className="hint">누르고 있으면 원본</span></div>
+            <div className="hold2" id="hold2"
+              onPointerDown={animated ? undefined : (event) => setStaticOriginal(event.currentTarget, true)}
+              onPointerUp={animated ? undefined : (event) => setStaticOriginal(event.currentTarget, false)}
+              onPointerCancel={animated ? undefined : (event) => setStaticOriginal(event.currentTarget, false)}
+              onPointerLeave={animated ? undefined : (event) => setStaticOriginal(event.currentTarget, false)}
+              onKeyDown={animated ? undefined : (event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setStaticOriginal(event.currentTarget, true); } }}
+              onKeyUp={animated ? undefined : (event) => { if (event.key === " " || event.key === "Enter") setStaticOriginal(event.currentTarget, false); }}
+              onBlur={animated ? undefined : (event) => setStaticOriginal(event.currentTarget, false)}
+              role="button" tabIndex={0} aria-label="누르고 있는 동안 원본 보기"><img src="/landing/select/r-simple5.jpg" loading="lazy" alt="보정본" /><img className="orig" src="/landing/select/o-simple5.jpg" loading="lazy" alt="원본" /><span className="lab" id="h2lab">보정본</span><span className="hint">누르고 있으면 원본</span></div>
             <div className="arrive"><b>보정본 38 / 40장 도착</b><span>2장은 아직이에요</span></div>
           </div>
           <div className="txt">
@@ -167,12 +186,12 @@ export function SelectLanding({ loggedIn, retentionDays }: { loggedIn: boolean; 
 
     <section className="final" aria-label="마무리">
       <div className="wrap">
-        <div className="tidy" id="tidy" aria-hidden="true" />
+        {animated ? (<div className="tidy" id="tidy" aria-hidden="true" />) : (<LandingPoster name="select-tidy" alt="고른 사진이 정리된 예시" className="landing-poster-tidy"/>)}
         <h2>받은 원본, 미루지 말고 올려 두세요.<br />고르기 쉽게 A-CUT이 정리해 드릴게요.</h2>
         <Link className="btn o" href={start}>내 사진 셀렉 시작하기</Link>
-        <Link className="alt" href={guest}>결혼식을 앞두고 있다면 <b>하객 앨범 만들기 →</b></Link>
+        <div><Link className="alt" href={guest}>결혼식을 앞두고 있다면 <b>하객 앨범 만들기 →</b></Link></div>
       </div>
     </section>
-    <footer><Link href="/terms">이용약관</Link> · <Link href="/privacy">개인정보처리방침</Link> · 문의 <a href="mailto:multihatter@gmail.com">multihatter@gmail.com</a><span className="biz">상호: 순한설기 · 대표: 심효순 · 사업자등록번호: 890-18-01386 · 주소: 경기도 여주시 영릉로35-12 · 전화: 031-885-4355</span></footer>
-  </div>;
+    <footer><BusinessInfo><Link href="/terms">이용약관</Link> · <Link href="/privacy">개인정보처리방침</Link></BusinessInfo></footer>
+  </div></LandingAuth>;
 }

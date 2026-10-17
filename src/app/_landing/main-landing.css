@@ -41,7 +41,9 @@
 
 /* 1 히어로 — 밝은 밀착 인화지: 찜이 모이고 → ✓ → 한곳에 */
 .mnl .hero{position:relative;height:max(640px,100svh);overflow:hidden;background:#eef3f4;user-select:none}
-.mnl .sheet{position:absolute;inset:0;display:grid;gap:10px;padding:14px;align-content:center}
+.mnl .sheet{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);gap:10px;padding:14px;align-content:center}
+@media (max-width:999px){.mnl .sheet{grid-template-columns:repeat(5,1fr)}}
+@media (max-width:599px){.mnl .sheet{grid-template-columns:repeat(3,1fr)}}
 .mnl .cell{position:relative;margin:0;background:#fff;border-radius:4px;padding:5px;box-shadow:0 2px 8px rgba(2,56,82,.12)}
 .mnl .cell .m{position:relative;overflow:hidden;border-radius:2px}
 .mnl .cell img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;transition:filter .2s}
@@ -71,9 +73,8 @@
 @keyframes mnl-bump{50%{transform:scale(1.35)}}
 .mnl .veil{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 44% 40% at 50% 46%,rgba(238,243,244,.97) 38%,rgba(238,243,244,.66) 68%,rgba(238,243,244,.1))}
 .mnl .copy{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);text-align:center;width:min(640px,calc(100% - 32px));z-index:3}
-.mnl .copy h1{font-size:clamp(34px,6vw,64px);line-height:1.12;letter-spacing:-.045em;margin:0 0 .3em;text-wrap:balance;filter:blur(8px);opacity:.3;transition:filter .9s,opacity .9s}
+.mnl .copy h1{font-size:clamp(34px,6vw,64px);line-height:1.12;letter-spacing:-.045em;margin:0 0 .3em;text-wrap:balance}
 .mnl .copy h1 em{font-style:normal;color:var(--orange)}
-.mnl .copy h1.in{filter:none;opacity:1}
 .mnl .copy .sub{color:var(--muted);font-size:clamp(15px,1.7vw,18px);margin:0 auto 22px;max-width:30em}
 .mnl .copy .ctas{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .mnl .tray{position:absolute;left:50%;bottom:22px;z-index:4;transform:translate(-50%,20px);opacity:0;transition:opacity .45s,transform .45s cubic-bezier(.2,.9,.3,1);width:min(520px,calc(100% - 32px));background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 14px 10px 10px;display:flex;align-items:center;gap:12px;box-shadow:0 20px 50px rgba(2,56,82,.2)}

@@ -4,7 +4,7 @@
  */
 export function startStudioLanding(root: HTMLElement): () => void {
   const ac = new AbortController(), timers: number[] = [], observers: IntersectionObserver[] = [];
-  let alive = true, raf = 0, raf2 = 0, fragTimer = 0;
+  let alive = true, raf = 0, fragTimer = 0;
   const $ = (id: string) => root.querySelector<HTMLElement>("#" + id)!;
   const on = (el: EventTarget, ev: string, fn: (e: Event) => void) => el.addEventListener(ev, fn, { signal: ac.signal });
   const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => alive && fn(), ms); timers.push(t); return t; };
@@ -22,9 +22,11 @@ export function startStudioLanding(root: HTMLElement): () => void {
   const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const ease = (t: number) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const heroL = $("top"), lStage = $("lStage"), gal = $("gal"), pill = $("pill"), lTop = $("lTop"), ggrid = $("ggrid"), gcount = $("gcount"), cue = $("cue"), gcard = $("gcard"), frags = $("frags");
-  let gCells: HTMLElement[] = [];
+  let gCells: HTMLElement[] = [], galleryColumns = 0;
   function buildG() {
     const W = innerWidth, cols = W < 700 ? 3 : W < 1000 ? 4 : 6;
+    if (cols === galleryColumns) return;
+    galleryColumns = cols;
     ggrid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
     ggrid.innerHTML = Array.from({ length: cols * 5 }, (_, i) => `<div class="g"><img src="${i ? PH(i + Math.floor(i / 12) * 5) : "/landing/studio/p05.jpg"}" alt="" loading="lazy"><span class="ck">✓</span><span class="hv">♥ ${1 + (i % 3)}</span></div>`).join("");
     gCells = [...ggrid.children] as HTMLElement[];
@@ -32,14 +34,18 @@ export function startStudioLanding(root: HTMLElement): () => void {
   async function intro() {
     if (REDUCED) { frags.classList.add("faded"); $("strike").classList.add("on"); pill.classList.add("on"); $("sent").classList.add("on"); return; }
     await sleep(900); $("strike").classList.add("on"); frags.classList.add("faded"); await sleep(600); pill.classList.add("on"); await sleep(550); $("sent").classList.add("on");
+    cardR = null; lastProgress = -1; scheduleScroll();
   }
   function target(mobile: boolean) {
     const H0 = lStage.clientHeight;
     if (mobile) return { l: 0, t: 64, w: innerWidth, h: H0 - 64, r: 0 };
     const w = Math.min(1080, innerWidth - 80); return { l: (innerWidth - w) / 2, t: 84, w, h: H0 - 84 - 24, r: 18 };
   }
+  let lastProgress = -1, lastCount = "";
   let cardR: { l: number; t: number; w: number; h: number } | null = null;
   function renderL(p: number) {
+    if (p === lastProgress) return;
+    lastProgress = p;
     const mobile = innerWidth < 700;
     const m = ease(clamp((p - .02) / .22));
     const T = target(mobile), sr = lStage.getBoundingClientRect();
@@ -57,14 +63,13 @@ export function startStudioLanding(root: HTMLElement): () => void {
     const likeP = clamp((p - .26) / .14), pickP = clamp((p - .3) / .25);
     gCells.forEach((g, i) => { g.classList.toggle("liked", i / gCells.length < likeP && i % 3 !== 2); g.classList.toggle("pick", (i * 7 % gCells.length) / gCells.length < pickP && i % 2 === 0); });
     const total = Math.round(40 * clamp((p - .3) / .25));
-    gcount.innerHTML = p > .55 ? "셀렉 완료 · <b>40</b> / 40장" : `고객이 고르는 중 · <b>${total}</b> / 40장`;
+    const count = p > .55 ? "셀렉 완료 · <b>40</b> / 40장" : `고객이 고르는 중 · <b>${total}</b> / 40장`;
+    if (count !== lastCount) { lastCount = count; gcount.innerHTML = count; }
     const done = p > .6; $("gdim").classList.toggle("on", done); $("noti").classList.toggle("on", done);
   }
-  const progressOf = (sec: HTMLElement) => { const r = sec.getBoundingClientRect(); return clamp(-r.top / (r.height - innerHeight)); };
   buildG(); intro();
   if (REDUCED) { heroL.style.height = "auto"; lStage.style.position = "relative"; frame(() => renderL(1)); }
-  else { const loopL = () => { const r = heroL.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) renderL(progressOf(heroL)); raf = frame(loopL); }; raf = frame(loopL); }
-  let rtL = 0; on(window, "resize", () => { clearTimeout(rtL); rtL = later(buildG, 250); });
+  let rtL = 0; on(window, "resize", () => { clearTimeout(rtL); rtL = later(() => { buildG(); cardR = null; lastProgress = -1; scheduleScroll(); }, 250); });
 
   // 배경 업무 조각 — 평소엔 흐리게, 2.2초마다 차례로 선명하게(PC는 왼쪽·오른쪽 한 장씩, 휴대폰은 한 장씩)
   const fragEls = [...frags.children] as HTMLElement[];
@@ -139,7 +144,24 @@ export function startStudioLanding(root: HTMLElement): () => void {
   const fitB = () => { bfit.style.setProperty("--bs", "1"); const room = bStage.clientHeight - (bfit.getBoundingClientRect().top - bStage.getBoundingClientRect().top) - 12; bfit.style.setProperty("--bs", Math.min(1, room / bfit.offsetHeight).toFixed(3)); };
   setB(0); fitB(); on(window, "resize", fitB); document.fonts?.ready.then(() => alive && fitB());
   if (REDUCED) { board2.style.height = "auto"; bStage.style.position = "relative"; setB(4); }
-  else { const loopB = () => { const r = board2.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) { const p = progressOf(board2); setB(p < .14 ? 0 : p < .34 ? 1 : p < .54 ? 2 : p < .74 ? 3 : 4); } raf2 = frame(loopB); }; raf2 = frame(loopB); }
+  // 스크롤이 바뀐 프레임에만 읽고, 멈춰 있는 동안에는 다시 그리지 않는다.
+  function updateScroll() {
+    raf = 0;
+    if (document.hidden) return;
+    const heroRect = heroL.getBoundingClientRect(), boardRect = board2.getBoundingClientRect();
+    if (heroRect.bottom > 0 && heroRect.top < innerHeight) {
+      renderL(REDUCED ? 1 : clamp(-heroRect.top / (heroRect.height - innerHeight)));
+    }
+    if (!REDUCED && boardRect.bottom > 0 && boardRect.top < innerHeight) {
+      const p = clamp(-boardRect.top / (boardRect.height - innerHeight));
+      setB(p < .14 ? 0 : p < .34 ? 1 : p < .54 ? 2 : p < .74 ? 3 : 4);
+    }
+  }
+  function scheduleScroll() { if (!raf) raf = frame(updateScroll); }
+  window.addEventListener("scroll", scheduleScroll, { passive: true, signal: ac.signal });
+  on(window, "resize", scheduleScroll); on(document, "visibilitychange", scheduleScroll);
+  document.fonts?.ready.then(() => { if (alive) { cardR = null; lastProgress = -1; scheduleScroll(); } });
+  scheduleScroll();
 
   /* 3 고객 셀렉 화면 — 항목을 누르면 화면이 바뀜 */
   const AMARK = '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2 21 9 3h6l3.1 8-2.8.8.7 2 2.9-.8L22 21h-5l-1.5-4h-7L7 21H2Zm8-8h4l-2-6-2 6Z"/></svg>';
@@ -164,7 +186,7 @@ export function startStudioLanding(root: HTMLElement): () => void {
   if (!REDUCED) watch(cs, { threshold: .45 }, (e) => { fOn = e.isIntersecting; if (fOn && !fManual) later(() => { if (fOn && !fManual) fNext(); }, 1000); else clearTimeout(fTimer); });
 
   return () => {
-    alive = false; ac.abort(); cancelAnimationFrame(raf); cancelAnimationFrame(raf2); clearInterval(fragTimer);
+    alive = false; ac.abort(); cancelAnimationFrame(raf); clearInterval(fragTimer);
     timers.forEach(clearTimeout); observers.forEach((o) => o.disconnect());
   };
 }

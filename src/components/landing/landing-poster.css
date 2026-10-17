@@ -1,0 +1,24 @@
+.landing-poster{display:block;width:100%}
+.landing-poster>img{display:block;width:100%;height:auto}
+.landing-poster-bg{position:absolute;inset:0;height:100%;pointer-events:none}
+.landing-poster-bg>img{height:100%;object-fit:cover}
+.landing-poster-phone{max-width:340px;margin-inline:auto}
+.landing-poster-still{max-width:360px;margin:0 auto 40px}
+[data-landing-mode="static"].sl .heroS,[data-landing-mode="static"].stl .heroL{height:100svh;min-height:600px}
+[data-landing-mode="static"].sl .heroS>.stage,[data-landing-mode="static"].stl .heroL>.stage{height:100%;min-height:600px;position:relative}
+[data-landing-mode="static"].stl .board2{height:auto;padding:80px 20px}
+[data-landing-mode="static"].stl .board2>.stage{position:relative;height:auto;min-height:0;overflow:visible}
+[data-landing-mode="static"].stl .board2 .ttl{position:static;margin:0 auto 32px;padding:0}
+[data-landing-mode="static"].stl .board2 .landing-poster{max-width:1160px;margin-inline:auto}
+[data-landing-mode="static"].stl .heroL h1{filter:none;opacity:1}
+[data-landing-mode="static"].stl .heroL .lcard{opacity:1;transform:none}
+[data-landing-mode="static"].stl .heroL .lcard .sent{transform:none}
+[data-landing-mode="static"].stl .heroL h1 s::after{transform:scaleX(1)}
+
+.landing-poster-tidy{max-width:640px;margin:0 auto 34px}
+[data-landing-mode="static"].sl #msgcard,[data-landing-mode="static"].sl .sprog,[data-landing-mode="static"].sl #cnt,[data-landing-mode="static"].sl #sendp{display:none}
+[data-landing-mode="static"].stl .board2>.stage{padding:0}
+@media(max-width:700px){.landing-poster-phone{max-width:317px}}
+@media(max-width:700px){
+  [data-landing-mode="static"].mnl .veil{background:radial-gradient(ellipse 92% 30% at 50% 44%,rgba(238,243,244,.98) 40%,rgba(238,243,244,.85) 65%,rgba(238,243,244,0) 100%)}
+}
