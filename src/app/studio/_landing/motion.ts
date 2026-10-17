@@ -32,8 +32,8 @@ export function startStudioLanding(root: HTMLElement): () => void {
     gCells = [...ggrid.children] as HTMLElement[];
   }
   async function intro() {
-    if (REDUCED) { frags.classList.add("faded"); $("strike").classList.add("on"); pill.classList.add("on"); $("sent").classList.add("on"); return; }
-    await sleep(900); $("strike").classList.add("on"); frags.classList.add("faded"); await sleep(600); pill.classList.add("on"); await sleep(550); $("sent").classList.add("on");
+    if (REDUCED) { frags.classList.add("faded"); $("strike").classList.add("on"); return; }
+    await sleep(900); $("strike").classList.add("on"); frags.classList.add("faded");
     cardR = null; lastProgress = -1; scheduleScroll();
   }
   function target(mobile: boolean) {
@@ -75,9 +75,7 @@ export function startStudioLanding(root: HTMLElement): () => void {
   const fragEls = [...frags.children] as HTMLElement[];
   let fragK = 0;
   function litNext() {
-    if (innerWidth <= 700) {   // 휴대폰: "무료로 시작하기" 아래에 잠금화면 알림처럼 겹쳐 쌓고 7개를 차례로 — 맨 앞(s0) 선명, 뒤 두 장(s1·s2)은 테두리만
-      const cta = root.querySelector("#lTop .ctas")!;
-      frags.style.setProperty("--fy", (cta.getBoundingClientRect().bottom - lStage.getBoundingClientRect().top + 28) + "px");
+    if (innerWidth <= 700) {   // 위치는 버튼 아래 레이아웃이 정하고, 여기서는 메시지 순서만 바꾼다.
       const n = fragEls.length;
       fragEls.forEach((f, i) => { const d = (fragK - i + n * 9) % n; f.classList.toggle("s0", d === 0); f.classList.toggle("s1", d === 1); f.classList.toggle("s2", d === 2); f.classList.remove("lit"); });
       fragK++; return;
@@ -94,7 +92,8 @@ export function startStudioLanding(root: HTMLElement): () => void {
     fragEls.forEach((f) => f.classList.toggle("lit", lit.includes(f)));
     fragK++;
   }
-  if (REDUCED) litNext(); else { later(litNext, 400); fragTimer = window.setInterval(() => { if (alive && !document.hidden && parseFloat(frags.style.opacity || "1") > .05) litNext(); }, 2200); }
+  if (REDUCED || innerWidth <= 700) litNext();
+  if (!REDUCED) { if (innerWidth > 700) later(litNext, 400); fragTimer = window.setInterval(() => { if (alive && !document.hidden && parseFloat(frags.style.opacity || "1") > .05) litNext(); }, 2200); }
 
   /* 2 모든 촬영의 진행과 기한 — 오늘(10월 20일 월 → 24일 금)이 스크롤로 넘어가며 6칸 막대와 기한 표시가 바뀜 */
   const board2 = $("board2"), bStage = $("bStage"), bfit = $("bfit"), bRows = $("bRows");

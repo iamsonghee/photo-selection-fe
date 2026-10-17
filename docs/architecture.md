@@ -1032,3 +1032,7 @@ sequenceDiagram
 2026-10-17: 세 공개 랜딩은 `LandingAuth`에서 비로그인 사용자의 `/login`·`/beta/apply` 일반 클릭을 처리해 기존 `AuthModal`을 현재 랜딩 위에 표시한다. 로그인 후 목적지는 기존 redirect 유틸을 사용하고, 닫을 때 대기 목적지를 정리한다. 직접 URL 진입·새 탭은 기존 로그인/신청 경로를 유지한다.
 
 `LandingAuth`는 일반 클릭으로 `/`·`/studio`·`/select` 사이를 이동할 때 스크롤을 즉시 맨 위로 초기화한다. 해시 링크와 수정 키를 사용한 새 탭 열기는 기존 브라우저 동작을 유지한다(2026-10-17).
+
+## 베타 신청 업체명 (2026-10-17)
+
+`POST /api/beta/applications`는 신규 `studio_name`을 필수 검증(문자열·공백 제거 후 1~100자)하고 기존 `beta_applications.additional_answers` JSONB에 저장한다. 클라이언트도 동일 기준으로 검증하며 관리자 목록·상세는 `studioName`으로 매핑한다. 기존 신청에는 필드가 없어도 조회할 수 있다. DB 마이그레이션 및 FastAPI 변경은 없다.

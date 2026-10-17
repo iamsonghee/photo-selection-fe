@@ -165,6 +165,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
   const submittingRef = useRef(false);
 
   const [name, setName] = useState("");
+  const [studioName, setStudioName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
 
@@ -188,6 +189,8 @@ function BetaApplyFormFields({ email }: { email: string }) {
 
   function validate(): string | null {
     if (!name.trim()) return "이름을 입력해 주세요.";
+    if (!studioName.trim()) return "스튜디오·업체명을 입력해 주세요.";
+    if (studioName.trim().length > 100) return "스튜디오·업체명은 100자 이내로 입력해 주세요.";
     if (!isValidKoreanPhone(phone)) return "휴대폰번호 형식이 올바르지 않습니다. (예: 010-1234-5678)";
     if (genres.length === 0) return "주 촬영 분야를 선택해 주세요.";
     if (genres.includes("other") && !genreOther.trim()) return "기타 촬영 분야를 입력해 주세요.";
@@ -221,6 +224,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
+          studio_name: studioName.trim(),
           phone: phone.trim(),
           genres,
           genre_other: genres.includes("other") ? genreOther.trim() || undefined : undefined,
@@ -259,7 +263,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
         <p className="beta-eyebrow">A-CUT CLOSED BETA</p>
         <h1 className="text-xl font-semibold text-foreground">클로즈드 베타 신청</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          약 1~2분이면 끝나요.<br />신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
+          작가·스튜디오를 위한 무료 베타입니다.<br />신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
         </p>
       </div>
 
@@ -269,6 +273,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
       </div>
 
       <Input label="이름 *" value={name} onChange={(e) => setName(e.target.value)} placeholder="홍길동" />
+      <Input label="스튜디오·업체명 *" value={studioName} onChange={(e) => setStudioName(e.target.value)} placeholder="고객에게 사용하는 스튜디오 또는 브랜드명" autoComplete="organization" maxLength={100} required />
       <PhoneInput
         label="휴대폰번호 *"
         value={phone}

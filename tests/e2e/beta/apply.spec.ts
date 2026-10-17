@@ -21,6 +21,9 @@ test.describe("클로즈드 베타 신청", () => {
     await expect(page.getByText("이름을 입력해 주세요.")).toBeVisible();
 
     await page.getByLabel("이름 *").fill("베타 테스트");
+    await page.getByRole("button", { name: "베타 신청하기" }).click();
+    await expect(page.getByText("스튜디오·업체명을 입력해 주세요.")).toBeVisible();
+    await page.getByLabel("스튜디오·업체명 *").fill("테스트 스튜디오");
     await page.getByLabel("휴대폰번호 *").fill("010-123-4567");
     await page.getByRole("button", { name: "베타 신청하기" }).click();
     await expect(page.getByText("휴대폰번호 형식이 올바르지 않습니다. (예: 010-1234-5678)")).toBeVisible();
@@ -48,6 +51,7 @@ test.describe("클로즈드 베타 신청", () => {
 
     await page.goto("/beta/apply");
     await page.getByLabel("이름 *").fill("베타 테스트");
+    await page.getByLabel("스튜디오·업체명 *").fill("테스트 스튜디오");
     await page.getByLabel("휴대폰번호 *").fill("010-9876-5432");
 
     const genreGroup = page.getByRole("group", { name: "주 촬영 분야 * (복수선택 가능)" });
@@ -70,6 +74,7 @@ test.describe("클로즈드 베타 신청", () => {
 
     await expect(page).toHaveURL(/\/beta\/apply\/complete$/);
     expect(submittedBody).not.toHaveProperty("genre_other");
+    expect(submittedBody).toHaveProperty("studio_name", "테스트 스튜디오");
   });
 
   test("모바일 화면에서 신청 폼이 가로로 넘치지 않는다", async ({ page }) => {
@@ -93,6 +98,7 @@ test.describe("클로즈드 베타 신청", () => {
 
     await page.goto("/beta/apply");
     await page.getByLabel("이름 *").fill("베타 테스트");
+    await page.getByLabel("스튜디오·업체명 *").fill("테스트 스튜디오");
     await page.getByLabel("휴대폰번호 *").fill("010-9876-5432");
     await page.getByRole("button", { name: "웨딩 본식" }).click();
     await page.getByLabel("월평균 촬영 수 *").selectOption("1_3");

@@ -28,7 +28,8 @@ export default async function AdminBetaApplicationsPage({
   const all = await getAllBetaApplicationsForAdmin();
   const filtered = all.filter((item) => {
     if (status !== "all" && item.status !== status) return false;
-    if (q && !item.name.includes(q) && !item.phone.includes(q.replace(/[^0-9]/g, ""))) return false;
+    const phoneQuery = q.replace(/[^0-9]/g, "");
+    if (q && !item.name.toLowerCase().includes(q.toLowerCase()) && !item.studioName?.toLowerCase().includes(q.toLowerCase()) && !(phoneQuery && item.phone.includes(phoneQuery))) return false;
     return true;
   });
 
@@ -56,7 +57,7 @@ export default async function AdminBetaApplicationsPage({
           type="text"
           name="q"
           defaultValue={q}
-          placeholder="이름 또는 번호 검색"
+          placeholder="업체명, 이름 또는 번호 검색"
           className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-placeholder-foreground"
         />
         <button
@@ -94,6 +95,7 @@ export default async function AdminBetaApplicationsPage({
                   >
                     {item.name}
                   </Link>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.studioName ?? "업체명 미입력(기존 신청)"}</p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{formatPhone(item.phone)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{item.genre}</td>

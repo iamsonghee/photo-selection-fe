@@ -104,6 +104,8 @@ export function avgPhotosRepValue(key: string): number {
 
 /** beta_applications.additional_answers jsonb 컬럼의 구조 — 신규(선택형) 신청서 전용, 구버전 신청은 null. */
 export interface BetaAdditionalAnswers {
+  /** 신규 신청은 필수. 기존 신청에는 값이 없을 수 있다. */
+  studio_name?: string;
   genres: string[];
   genre_other?: string;
   monthly_project_range: string;
