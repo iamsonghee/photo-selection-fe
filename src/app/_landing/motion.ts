@@ -170,15 +170,16 @@ export function startMainLanding(root: HTMLElement): () => void {
   }
   const setVeil = () => { const c = rel(copy); hero.style.setProperty("--vt", c.y + "px"); hero.style.setProperty("--vb", c.y + c.h + "px"); };
   // 휴대폰: 글 위에 사진 한 줄(통째로), 글, 글 아래 사진 줄 — 화면 높이와 상관없이 위·아래 모두 찜할 칸이 생기게 줄 경계에 맞춤
+  let viewportHeight = innerHeight;
   function layoutMobile() {
     const W = hero.clientWidth;
-    if (W >= 700) { mob = null; copy.style.top = copy.style.transform = hero.style.height = sheet.style.top = sheet.style.alignContent = ""; return; }
+    if (W >= 700) { mob = null; copy.style.top = copy.style.transform = sheet.style.top = sheet.style.alignContent = ""; hero.style.height = Math.max(640, viewportHeight) + "px"; return; }
     const cols = W < 600 ? 3 : 5, cw = (W - 28 - (cols - 1) * 10) / cols, cellH = (cw - 10) * 1.25 + 10, P = cellH + 10, ch = copy.offsetHeight;
     const A = 60, gap = 64, k = Math.ceil((cellH + 2 * gap + ch) / P), B = A + k * P; // A: 윗줄 윗변, B: 글 아래 첫 줄 윗변
     const top = (A + cellH + B) / 2 - ch / 2; // 두 줄 사이 가운데에 글
     copy.style.top = top + "px"; copy.style.transform = "translateX(-50%)";
     sheet.style.top = (A - P - 14) + "px"; sheet.style.alignContent = "start";
-    hero.style.height = Math.round(Math.max(innerHeight, B + cellH + 20)) + "px";
+    hero.style.height = Math.round(Math.max(viewportHeight, B + cellH + 20)) + "px";
     mob = { top, bottom: top + ch };
   }
   layoutMobile(); build(); setVeil(); makeCursors();
@@ -186,14 +187,16 @@ export function startMainLanding(root: HTMLElement): () => void {
   let inView = false;
   if (REDUCED) frame(finalState);
   else watch(hero, { threshold: .3 }, (e) => { inView = e.isIntersecting; if (inView) play(); else { run++; reset(); } });
-  // 열릴 때 창 높이가 조금 바뀌는 건 무시하고, 열 수가 바뀔 때만 다시 깔고 처음부터 재생
-  let rt = 0, lastCols = sheet.style.gridTemplateColumns, lastH = hero.clientHeight;
+  // 주소창·키보드 등 높이만 변하는 resize는 히어로와 다음 섹션을 밀지 않는다.
+  let rt = 0, lastWidth = hero.clientWidth;
   on(window, "resize", () => {
-    clearTimeout(rt); rt = later(() => {
-      layoutMobile(); setVeil();
-      const cols = innerWidth < 600 ? 3 : innerWidth < 1000 ? 5 : 8;
-      if (`repeat(${cols}, 1fr)` === lastCols && Math.abs(hero.clientHeight - lastH) < 120) return;
-      run++; layoutMobile(); build(); setVeil(); makeCursors(); lastCols = sheet.style.gridTemplateColumns; lastH = hero.clientHeight;
+    clearTimeout(rt);
+    if (hero.clientWidth === lastWidth) return;
+    rt = later(() => {
+      if (hero.clientWidth === lastWidth) return;
+      lastWidth = hero.clientWidth;
+      viewportHeight = innerHeight;
+      run++; layoutMobile(); build(); setVeil(); makeCursors();
       if (REDUCED) finalState(); else if (inView) play();
     }, 250);
   });
