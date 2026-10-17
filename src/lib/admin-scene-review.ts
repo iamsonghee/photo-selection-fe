@@ -3,6 +3,7 @@ import { getAdminClient } from "@/lib/supabase-admin";
 import { customerSceneCatalog } from "@/lib/customer-shoot-scenes";
 import { allRows } from "@/lib/supabase-all-rows";
 import type { LabeledScene } from "@/lib/scene-label-score";
+import { captureOrder } from "@/lib/customer-scenes";
 
 /** 장면 검수(/admin/scenes)용 서버 조회. 서비스 화면 데이터는 읽기만 하고, 정답은 customer_scene_labels에만 쓴다. */
 
@@ -13,17 +14,17 @@ export type SceneLabelRow = { project_id: string; shoot_type: string | null; sce
 export const LEGACY_AI_SETTINGS = { algorithm: "gap-v1", gapMinutes: 3, qualityPromptVersion: "v1-people" } as const;
 
 
-/** clip-service capture_order와 같은 순서: 촬영 시각(없으면 뒤로), 같으면 업로드 순 */
-function byCaptureOrder<T extends { taken_at: string | null; order_index: number }>(a: T, b: T) {
-  return (a.taken_at === null ? 1 : 0) - (b.taken_at === null ? 1 : 0) || (a.taken_at ?? "").localeCompare(b.taken_at ?? "") || a.order_index - b.order_index;
-}
 
 export async function loadSceneReview(projectId: string) {
   const admin = getAdminClient();
   const { data: project } = await admin.from("customer_projects").select("id, name, shoot_type, photo_count, created_at").eq("id", projectId).maybeSingle();
   if (!project) return null;
-  type PhotoRow = { id: string; thumb_url: string | null; preview_url: string | null; taken_at: string | null; order_index: number; filename: string; scene_id: string | null };
-  const photos = (await allRows<PhotoRow>((from, to) => admin.from("customer_photos").select("id, thumb_url, preview_url, taken_at, order_index, filename, scene_id").eq("project_id", projectId).order("order_index").range(from, to))).sort(byCaptureOrder);
+  type PhotoRow = { id: string; thumb_url: string | null; preview_url: string | null; taken_at: string | null; taken_at_source: "exif" | "file" | null; order_index: number; filename: string; scene_id: string | null };
+  // clip-service와 같은 촬영 순서(`captureOrder`) — 파일 수정 시각을 시각으로 쓰면 시각 없는 보정본이 섞여 보이고 채점 경계도 어긋났다(2026-10-15).
+  const photos = captureOrder(
+    await allRows<PhotoRow>((from, to) => admin.from("customer_photos").select("id, thumb_url, preview_url, taken_at, taken_at_source, order_index, filename, scene_id").eq("project_id", projectId).order("order_index").range(from, to)),
+    (photo) => ({ orderIndex: photo.order_index, takenAt: photo.taken_at, takenAtSource: photo.taken_at_source, filename: photo.filename }),
+  );
   const { data: sceneRows } = await admin.from("customer_scenes").select("id, scene_index, name").eq("project_id", projectId).order("scene_index");
   const { data: label, error: labelError } = await admin.from("customer_scene_labels").select("*").eq("project_id", projectId).maybeSingle();
 
@@ -36,7 +37,8 @@ export async function loadSceneReview(projectId: string) {
   }
   return {
     project: { id: project.id as string, name: project.name as string, shootType: (project.shoot_type as string | null) ?? null, createdAt: project.created_at as string },
-    photos: photos.map((photo): ReviewPhoto => ({ id: photo.id, thumbUrl: photo.thumb_url, previewUrl: photo.preview_url, takenAt: photo.taken_at, filename: photo.filename })),
+    // 파일 수정 시각은 촬영 시각이 아니라 검수 화면에도 보이지 않는다("시각 없음").
+    photos: photos.map((photo): ReviewPhoto => ({ id: photo.id, thumbUrl: photo.thumb_url, previewUrl: photo.preview_url, takenAt: photo.taken_at_source === "file" ? null : photo.taken_at, filename: photo.filename })),
     aiScenes,
     label: (label as SceneLabelRow | null) ?? null,
     labelTableMissing: Boolean(labelError),

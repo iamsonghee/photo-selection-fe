@@ -14,6 +14,7 @@ import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, filenameWithoutExtension, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { formatSceneRange } from "@/lib/customer-scenes";
+import { SCENE_PHASE_LABELS } from "@/lib/scene-phases";
 import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { useProjectShell } from "../../_lib/ProjectShell";
@@ -28,7 +29,10 @@ export default function CustomerSendPage() {
   return <Suspense fallback={<ProjectBodySkeleton variant="review" label="보낼 사진을 불러오고 있어요" />}><SendScreen /></Suspense>;
 }
 
-const sceneLabel = (scene: NamedScene) => scene.name ? `${scene.name}${scene.start ? ` (${formatSceneRange(scene)})` : ""}` : formatSceneRange(scene);
+// 웨딩 본식은 묶음 제목이 없는 이 화면에서 "식 후 · 신랑신부 연출촬영"처럼 묶음 이름을 앞에 붙인다.
+const sceneLabel = (scene: NamedScene) => scene.name
+  ? `${scene.phase ? `${SCENE_PHASE_LABELS[scene.phase]} · ` : ""}${scene.name}${scene.start ? ` (${formatSceneRange(scene)})` : ""}`
+  : formatSceneRange(scene);
 
 function SendScreen() {
   const projectId = useParams().projectId as string;

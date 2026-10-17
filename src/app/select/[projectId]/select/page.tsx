@@ -15,7 +15,7 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
-import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
+import { captureOrder, formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
 import type { PeopleKind, Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { useProjectShell } from "../../_lib/ProjectShell";
@@ -25,6 +25,7 @@ import { SceneGrid, type MobileColumns } from "./SceneGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { Sheet } from "./Sheets";
 import { taskProgressText, useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
+import { SCENE_PHASE_LABELS, type ScenePhase } from "@/lib/scene-phases";
 import { AiTidySheet, groupSimilarKey, rememberGroupSimilar, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
@@ -154,8 +155,8 @@ function SelectScreen() {
   const photos = analysis.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
   const scenes = analysis.scenes;
-  // 촬영 시간순 전체 목록 — 장면이 없을 때와 AI 정리 중(1차 훑어보기)에 쓴다.
-  const timeOrdered = useMemo(() => [...photos].sort((a, b) => (a.takenAt ?? "").localeCompare(b.takenAt ?? "") || a.orderIndex - b.orderIndex), [photos]);
+  // 촬영 시간순 전체 목록 — 장면이 없을 때와 AI 정리 중(1차 훑어보기)에 쓴다. clip-service와 같은 순서(`captureOrder`: 파일 수정 시각 제외, 시각 없는 보정본은 파일명 연번).
+  const timeOrdered = useMemo(() => captureOrder(photos, (photo) => ({ ...photo, filename: photo.originalFilename })), [photos]);
   // 정리 중에 들어온 사람은 끝나도 보던 전체 보기를 유지하고, 장면별 보기는 제안만 한다.
   const [holdAll, setHoldAll] = useState(false);
   const [promptDismissed, setPromptDismissed] = useState(false);
@@ -275,6 +276,8 @@ function SelectScreen() {
 
   // AI 장면은 이름이 제목, 시간대는 보조 정보. 이름이 없으면(시간 장면) 시간대가 제목이다.
   const sceneTitle = (item: NamedScene) => item.name ?? (scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진");
+  // 묶음 제목이 없는 한 줄 표시(현재 장면·다음 장면·전환 안내·점 메뉴)에서는 웨딩 본식 묶음을 앞에 붙인다 — 식 전·식 후에 같은 이름이 있다.
+  const sceneContextTitle = (item: NamedScene) => (item.phase ? `${SCENE_PHASE_LABELS[item.phase]} · ` : "") + sceneTitle(item);
 
   // 상세의 끝에서는 같은 보기 조건에 맞는 사진이 있는 다음/이전 장면으로 이어간다.
   const detailInScene = Boolean(openPhotoId && filtered.some((photo) => photo.id === openPhotoId));
@@ -283,7 +286,7 @@ function SelectScreen() {
     for (let index = sceneIndex + step; index >= 0 && index < scenes.length; index += step) {
       const matches = filterPhotos(scenes[index].photoIds.flatMap((id) => photoById.get(id) ?? []), peopleFilter);
       const photo = step === 1 ? matches[0] : matches.at(-1);
-      if (photo) return { index, photoId: photo.id, label: sceneTitle(scenes[index]) };
+      if (photo) return { index, photoId: photo.id, label: sceneContextTitle(scenes[index]) };
     }
     return null;
   };
@@ -351,19 +354,20 @@ function SelectScreen() {
   const sceneDone = (index: number) => isOwner && targets[index] > 0 && pickedInScene(scenes![index]) >= targets[index];
 
   // 장면 정리 진행 막대는 이름 붙인 장면 수 기준(유사컷·흔들림은 따로 줄로 보이고 장면을 기다리게 하지 않는다).
-  const sceneTask = analysis.tasks.find((task) => task.kind === "scene" && task.status === "processing");
-  const analysisPercent = sceneTask?.total ? Math.min(100, Math.round((sceneTask.done / sceneTask.total) * 100)) : 0;
+  // 웨딩 본식은 장면 정리가 흔들림 확인의 단계 판정을 기다리므로 흔들림 확인 진행을 따른다.
+  const progressTask = analysis.tasks.find((task) => task.kind === (analysis.byStage ? "quality" : "scene") && task.status === "processing");
+  const analysisPercent = progressTask?.total ? Math.min(100, Math.round((progressTask.done / progressTask.total) * 100)) : 0;
   // 장면이 먼저 끝나도 유사컷·흔들림은 뒤에서 계속 돈다 — 끝난 것처럼 보이지 않게 배너로 진행을 보여준다.
   const backgroundTasks = analysis.status === "analyzing" ? [] : analysis.tasks.filter((task) => task.status === "processing" && task.kind !== "scene");
   const backgroundTotal = backgroundTasks.reduce((sum, task) => sum + task.total, 0);
   const backgroundPercent = backgroundTotal ? Math.min(100, Math.round((backgroundTasks.reduce((sum, task) => sum + task.done, 0) / backgroundTotal) * 100)) : 0;
-  const backgroundLines = backgroundTasks.map((task) => <span key={task.kind}>{taskProgressText(task)}</span>);
+  const backgroundLines = backgroundTasks.map((task) => <span key={task.kind}>{taskProgressText(task, analysis.byStage)}</span>);
   const analysisBanner = analysis.status === "analyzing" ? (
     <div className={s.analysis} role="status">
       <Sparkles size={16} aria-hidden />
       <div>
         <strong>AI가 장면을 나누고 있어요</strong>
-        {analysis.tasks.filter((task) => task.status === "processing").map((task) => <span key={task.kind}>{taskProgressText(task)}</span>)}
+        {analysis.tasks.filter((task) => task.status === "processing").map((task) => <span key={task.kind}>{taskProgressText(task, analysis.byStage)}</span>)}
         <span>그동안 마음에 드는 사진에 ♡를 눌러 두세요. 정리가 끝나면 장면별로 모아서 보여드릴게요.</span>
         <i aria-hidden><b style={{ width: `${analysisPercent}%` }} /></i>
       </div>
@@ -415,14 +419,30 @@ function SelectScreen() {
       ? <button type="button" className={s.quickNotice} onClick={() => setSheet("ai")}>{analysis.notice.text}</button>
       : <span className={s.quickNotice} role="status">{analysis.notice.text}</span>
     : null;
-  const sceneItems = scenes?.map((item, index) => (
+  const sceneButton = (item: NamedScene, index: number) => (
     <button key={index} type="button" className={s.quickItem} aria-current={index === sceneIndex} onClick={() => goScene(index)}>
       <span>{sceneTitle(item)}</span>
       {isOwner
         ? <em className={s.sceneProgress}><b className={sceneDone(index) ? s.done : ""}>{sceneCount(index)}</b></em>
         : <em>{sceneCount(index)}</em>}
     </button>
-  ));
+  );
+  // 웨딩 본식은 장면을 식 전 / 본식 / 식 후 구획으로 묶는다(`scene-phases.ts`). 구획마다 제목·장면 수, 구획 사이 구분선,
+  // 지금 장면이 있는 구획 제목은 강조. 묶음 밖 장면(정리 뒤 새로 올린 사진)은 제목 없는 마지막 구획. 다른 촬영 유형은 그대로 한 목록.
+  const phaseStart = (index: number) => Boolean(scenes && (index === 0 ? scenes[0].phase : scenes[index].phase !== scenes[index - 1].phase));
+  const sceneGroups = (scenes ?? []).reduce<{ phase?: ScenePhase; items: number[] }[]>((groups, item, index) => {
+    const last = groups.at(-1);
+    if (last && last.phase === item.phase) last.items.push(index); else groups.push({ phase: item.phase, items: [index] });
+    return groups;
+  }, []);
+  const sceneItems = sceneGroups.some((group) => group.phase)
+    ? sceneGroups.map((group, groupIndex) => (
+      <section key={`phase-${groupIndex}`} className={s.phaseGroup} aria-label={group.phase ? SCENE_PHASE_LABELS[group.phase] : undefined}>
+        {group.phase && <p className={s.phaseHead}><span>{SCENE_PHASE_LABELS[group.phase]}</span><em>{group.items.length}개 장면</em></p>}
+        {group.items.map((index) => sceneButton(scenes![index], index))}
+      </section>
+    ))
+    : scenes?.map((item, index) => sceneButton(item, index));
 
   const card = (photo: Photo, columns: number) => {
     const groupId = photo.similarityGroupId ?? undefined;
@@ -491,7 +511,7 @@ function SelectScreen() {
 
   // 장면 끝의 얇은 안내: 다음 장면 이름(당기면 넘어간다는 신호), 마지막 장면이면 끝이라는 것만 — 진행·버튼은 하단 바에 이미 있다.
   const sceneFooter = scene ? (nextScene
-    ? <p className={s.sceneNext}><ArrowDown size={14} aria-hidden /><span>다음</span><strong>{sceneTitle(nextScene)}</strong></p>
+    ? <p className={s.sceneNext}><ArrowDown size={14} aria-hidden /><span>다음</span><strong>{sceneContextTitle(nextScene)}</strong></p>
     : <p className={s.sceneNext}><span>마지막 장면이에요</span></p>) : undefined;
 
   // 진행은 분수 대신 문장으로 — 이미 한 일(크게)과 앞으로 할 일(작게).
@@ -500,7 +520,7 @@ function SelectScreen() {
   // 모바일 하단 바 왼쪽: 지금 장면(누르면 장면 목록 시트)과 대화 — 떠 있던 장면 버튼을 하단 바 한 줄로 합쳤다. PC는 사이드바가 맡는다.
   const sceneDock = sceneMode && scenes ? <>
     <button type="button" className={s.barScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
-      <strong><i aria-hidden />{sceneTitle(scene!)}<ChevronUp size={14} aria-hidden /></strong>
+      <strong><i aria-hidden /><b>{sceneContextTitle(scene!)}</b><ChevronUp size={14} aria-hidden /></strong>
       <span>{isOwner ? (pickedInScene(scene!) ? `이 장면에서 ${pickedInScene(scene!)}장 골랐어요` : "") : <>이 장면 ♥{pickedInScene(scene!)} · 내 찜 {myLikes.size}장</>}</span>
     </button>
     {withChat && <button type="button" className={s.barChat} aria-label={chatOpen ? "대화 닫기" : "대화 열기"} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={18} /></button>}
@@ -517,7 +537,7 @@ function SelectScreen() {
     {sceneDock}
     <div className={`${s.barMeta} ${sceneDock ? s.barMetaWithDock : ""}`}>
       <strong>{doneText}</strong>
-      <span>{guideText}{scene && <span className={s.desktopOnlyInline}> · {sceneTitle(scene)}{pickedInScene(scene) ? `에서 ${pickedInScene(scene)}장 골랐어요` : ""}</span>}</span>
+      <span>{guideText}{scene && <span className={s.desktopOnlyInline}> · {sceneContextTitle(scene)}{pickedInScene(scene) ? `에서 ${pickedInScene(scene)}장 골랐어요` : ""}</span>}</span>
     </div>
     <div className={s.barActions}>
       <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal || completing || failedMemoCount > 0} onClick={() => void toReview()}>{completing ? "셀렉 결과 저장 중…" : "선택 결과 확인하기 →"}</PhotographerLightButton>
@@ -627,8 +647,8 @@ function SelectScreen() {
               bandOf={bandOf}
               empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>모두 보기</button></>}
               footer={sceneFooter}
-              next={nextScene ? { label: sceneTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, "next") } : null}
-              prev={prevScene ? { label: sceneTitle(prevScene), onPass: () => goScene(sceneIndex! - 1, "prev") } : null}
+              next={nextScene ? { label: sceneContextTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, "next") } : null}
+              prev={prevScene ? { label: sceneContextTitle(prevScene), onPass: () => goScene(sceneIndex! - 1, "prev") } : null}
               focus={focus}
               onScrollDirection={setChromeHidden}
             />
@@ -642,13 +662,15 @@ function SelectScreen() {
                     <button type="button" className={s.floatTool} onClick={() => toggleRail(false)} aria-label="장면 목록 펼치기" title="장면 목록 펼치기"><PanelLeftOpen size={16} /><span className={s.floatLabel}>장면 목록 펼치기</span></button>
                     {scenes.map((item, index) => {
                       const count = pickedInScene(item);
-                      return (
-                        <button key={index} type="button" className={s.floatItem} aria-current={index === sceneIndex} data-state={sceneDone(index) ? "done" : count ? "some" : undefined} onClick={() => goScene(index)} aria-label={`${sceneTitle(item)} ${sceneCount(index)}`}>
+                      return [
+                        // 웨딩 본식 구획 시작: 접혀 있으면 짧은 구분선, 펼치면 구획 이름.
+                        phaseStart(index) ? <span key={`phase-${index}`} className={s.floatPhase} aria-hidden><span className={s.floatLabel}>{item.phase ? SCENE_PHASE_LABELS[item.phase] : ""}</span></span> : null,
+                        <button key={index} type="button" className={s.floatItem} aria-current={index === sceneIndex} data-state={sceneDone(index) ? "done" : count ? "some" : undefined} onClick={() => goScene(index)} aria-label={`${sceneContextTitle(item)} ${sceneCount(index)}`}>
                           <i aria-hidden />
                           <span className={s.floatLabel}>{sceneTitle(item)}</span>
                           <em className={s.floatLabel}>{sceneCount(index)}</em>
-                        </button>
-                      );
+                        </button>,
+                      ];
                     })}
                     {withChat && <button type="button" className={s.floatTool} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)} aria-label={chatOpen ? "대화 닫기" : "대화 열기"}><MessageCircle size={16} /><span className={s.floatLabel}>대화</span></button>}
                   </nav>
@@ -661,7 +683,7 @@ function SelectScreen() {
       </div>
 
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneItems}</div>{failedNotice}</Sheet>}
-      {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} rerun={tidied} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
+      {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} shootType={project.shootType} rerun={tidied} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
 
       {withChat && <EphemeralChat
         channelKey={project.realtimeKey}

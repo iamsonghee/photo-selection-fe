@@ -23,7 +23,55 @@ const MIN_ISOLATED_PHOTOS = 3;
 
 const time = (value: string) => Date.parse(`${value}Z`);
 /** 장면 경계에 쓸 수 있는 촬영 시각. 파일 수정 시각("file")은 실제 촬영 시각이 아니라 뺀다(출처 기록 전 사진은 그대로 쓴다). */
-export const sceneTime = (photo: ScenePhoto) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
+export const sceneTime = (photo: Pick<ScenePhoto, "takenAt" | "takenAtSource">) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
+
+// 파일명 연번 — clip-service `scenes._filename_sequence`와 같은 규칙(값도 같게 유지).
+const FILENAME_MIN_DIGITS = 4;
+const FILENAME_LEADING_MAX_DIGITS = 6;
+const FILENAME_MAX_SPAN_FACTOR = 10;
+
+/**
+ * 파일명마다 순서 번호. 하나의 촘촘한 연번으로 읽히지 않으면 null.
+ * 1) 숫자가 한 묶음뿐인 이름(`IMG_0001.jpg`) — 앞뒤 글자까지 같은 체계. 2) 앞에 붙인 연번(`0001_SJ7_3213.jpg`) — 앞 4~6자리가 같은 자릿수
+ * (휴대폰 이름 `20261008_…`의 8자리 날짜는 제외). 번호가 겹치거나 범위가 사진 수의 10배를 넘으면 null.
+ */
+export function filenameSequence(names: readonly string[]): number[] | null {
+  if (!names.length) return null;
+  const single = names.map((name) => name.match(new RegExp(`^(\\D*)(\\d{${FILENAME_MIN_DIGITS},})(\\D*)$`)));
+  let signatures: Set<string>;
+  let numbers: number[];
+  if (single.every(Boolean)) {
+    signatures = new Set(single.map((m) => `${m![1].toLowerCase()}|${m![2].length}|${m![3].toLowerCase()}`));
+    numbers = single.map((m) => Number(m![2]));
+  } else {
+    const leading = names.map((name) => name.match(new RegExp(`^(\\d{${FILENAME_MIN_DIGITS},${FILENAME_LEADING_MAX_DIGITS}})\\D`)));
+    if (!leading.every(Boolean)) return null;
+    signatures = new Set(leading.map((m) => String(m![1].length)));
+    numbers = leading.map((m) => Number(m![1]));
+  }
+  if (signatures.size !== 1 || new Set(numbers).size !== numbers.length
+    || Math.max(...numbers) - Math.min(...numbers) > names.length * FILENAME_MAX_SPAN_FACTOR) return null;
+  return numbers;
+}
+
+export type OrderablePhoto = { orderIndex: number; takenAt?: string | null; takenAtSource?: "exif" | "file" | null; filename?: string | null };
+
+/**
+ * 촬영 순서 — clip-service `capture_order` + `content_order`와 같다. 촬영 시각(EXIF만, 파일 수정 시각 제외)이 있으면 시각순, 없는 사진은
+ * 뒤에 업로드 순. 모든 사진에 촬영 시각이 없고 파일명이 하나의 연번이면 그 번호순(보정본은 업로드 순서가 섞일 수 있다 — 2026-10-15
+ * 본식 보정본이 역순으로 올라가 장면 안 사진이 거꾸로 보였다). view: 항목 → 순서에 쓰는 값.
+ */
+export function captureOrder<T>(items: readonly T[], view: (item: T) => OrderablePhoto): T[] {
+  const rows = items.map((item) => ({ item, photo: view(item) }));
+  if (!rows.some(({ photo }) => sceneTime(photo))) {
+    const numbers = filenameSequence(rows.map(({ photo }) => photo.filename ?? ""));
+    if (numbers) return rows.map((row, i) => ({ ...row, n: numbers[i] })).sort((a, b) => a.n - b.n).map(({ item }) => item);
+  }
+  return rows.sort((a, b) => {
+    const ta = sceneTime(a.photo), tb = sceneTime(b.photo);
+    return (ta === null ? 1 : 0) - (tb === null ? 1 : 0) || (ta ?? "").localeCompare(tb ?? "") || a.photo.orderIndex - b.photo.orderIndex;
+  }).map(({ item }) => item);
+}
 
 const gapBetween = (before: ScenePhoto[], after: ScenePhoto[]) => time(sceneTime(after[0])!) - time(sceneTime(before[before.length - 1])!);
 

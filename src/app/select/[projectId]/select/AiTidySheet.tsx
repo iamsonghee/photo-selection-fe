@@ -1,6 +1,6 @@
 "use client";
 
-import { customerPlaceNames, customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
+import { customerSceneCatalog, customerSceneGapSeconds, customerSceneLabelBasis, customerSceneLabelOptions } from "@/lib/customer-shoot-scenes";
 import { MIN_PHOTOS_FOR_SCENES } from "@/lib/customer-scenes";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Sheet } from "./Sheets";
@@ -12,6 +12,8 @@ const TIDY_LABELS: Record<AiTidyKind, string> = { scene: "장면 나누기", sim
 
 /**
  * AI 정리 시작. 장면 정리에는 촬영 종류의 장면 이름 목록을 함께 보낸다. 각 작업은 따로 돌고 따로 끝난다.
+ * 사진마다 라벨로 나누는 종류(홈스냅 장소·웨딩 본식 단계)는 장면·흔들림 확인 모두에 같은 라벨 옵션을 보낸다 —
+ * 흔들림 확인이 라벨을 판정하고, 장면 정리가 같은 판정 버전을 찾아 나눈다(본식은 판정이 끝날 때까지 기다린다).
  * 반환: 시작한(또는 이미 진행 중인 — 409) 작업, 시작하지 못한 작업에 대한 안내(모두 시작했으면 null).
  * 일부만 실패해도 안내한다 — 다시 누르면 진행 중인 작업은 409로 넘어가고 실패한 작업만 다시 시작된다.
  */
@@ -19,8 +21,8 @@ export async function startAiTidy(projectId: string, kinds: AiTidyKind[], shootT
   const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType), sceneGapSeconds: customerSceneGapSeconds(shootType) }
-      : kind === "quality" ? { placeNames: customerPlaceNames(shootType) } : {}),
+    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType), sceneGapSeconds: customerSceneGapSeconds(shootType), ...customerSceneLabelOptions(shootType) }
+      : kind === "quality" ? customerSceneLabelOptions(shootType) : {}),
   }).catch(() => null)));
   const started = kinds.filter((_, index) => responses[index]?.ok || responses[index]?.status === 409);
   const failed = kinds.filter((kind) => !started.includes(kind));
@@ -49,9 +51,11 @@ export const AI_TIDY_KINDS: AiTidyKind[] = ["scene", "similarity", "quality"];
  * 다시 정리할 때 clip-service가 이미 판정·계산한 사진은 건너뛴다(새 사진만).
  * 처음 정리할 때만 보기 설정(묶어 보기·흔들림 빼기)을 켠다 — 다시 정리할 때는 사용자가 보기 옵션에서 바꾼 값을 둔다.
  */
-export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onStart, onClose }: {
+export function AiTidySheet({ projectId, photoCount, shootType, rerun, pending, error, onStart, onClose }: {
   projectId: string;
   photoCount: number;
+  /** 웨딩 본식이면 단계별로 나눈다고 한 줄 더 알린다. */
+  shootType?: string | null;
   /** 이미 정리한 프로젝트를 다시 정리 — 고른 결과가 초기화될까 걱정하지 않게 유지된다고 밝힌다. */
   rerun?: boolean;
   pending: boolean;
@@ -66,6 +70,7 @@ export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onSt
   return (
     <Sheet title={rerun ? "AI로 다시 정리" : "AI로 사진 정리"} onClose={onClose}>
       <p>{photoCount.toLocaleString()}장을 {rerun ? "다시 " : ""}정리해요. {fewPhotos ? "" : "장면별로 나누고, "}비슷한 사진은 묶고, 흔들린 사진은 따로 모아요. 지우는 사진은 없어요.</p>
+      {!fewPhotos && customerSceneLabelBasis(shootType) === "stage" && <p>본식은 신부대기실·입장·예식처럼 단계별로 나눠요.</p>}
       <p>사진 수에 따라 몇 분 걸릴 수 있고, 그동안에도 사진을 고를 수 있어요.{fewPhotos ? ` 장면은 사진이 ${MIN_PHOTOS_FOR_SCENES}장 이상일 때 나눠요.` : ""}</p>
       {rerun && <p><strong>고른 사진·찜·메모는 그대로예요.</strong> 장면과 유사컷 묶음만 새로 나눠요.</p>}
       {error && <p className={s.tidyError} role="alert">{error}</p>}

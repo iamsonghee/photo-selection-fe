@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { customerPlaceNames, customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
+import { customerSceneCatalog, customerSceneGapSeconds, customerSceneLabelOptions } from "@/lib/customer-shoot-scenes";
 
 const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
@@ -11,9 +11,16 @@ const KINDS = ["scene", "similarity", "quality"] as const;
 const names = (list: readonly string[] | undefined) => (list?.length ? list : undefined);
 
 /** 고객 버튼(startAiTidy → /api/customer-select/projects/[id]/ai/[kind])이 보내는 옵션과 같게 만든다. */
+function labelOptionsFor(shootType: string | null) {
+  const { placeNames, placeBasis, placeHints } = customerSceneLabelOptions(shootType);
+  return { place_names: names(placeNames), place_basis: placeBasis, place_hints: placeHints };
+}
+
 function optionsFor(kind: (typeof KINDS)[number], shootType: string | null) {
-  if (kind === "scene") return { scene_names: names(customerSceneCatalog(shootType)), scene_gap_seconds: customerSceneGapSeconds(shootType) };
-  if (kind === "quality") return { place_names: names(customerPlaceNames(shootType)) };
+  // 본식 단계(웨딩 본식)는 장면 정리만 쓴다 — 고객 라우트도 scene 요청에만 넘긴다.
+  if (kind === "scene") return { scene_names: names(customerSceneCatalog(shootType)), scene_gap_seconds: customerSceneGapSeconds(shootType), ...labelOptionsFor(shootType),
+    place_main_stages: names(customerSceneLabelOptions(shootType).placeMainStages) };
+  if (kind === "quality") return labelOptionsFor(shootType);
   return {};
 }
 
