@@ -30,12 +30,12 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("프로젝트 정보에서 요청된 셀렉 기한을 PC와 모바일 모두 확인", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}`);
+    await page.goto(`/studio/projects/${project.projectId}`);
     await expect(page.locator("[data-project-selection-deadline]")).toHaveCount(0);
 
     const selecting = await createFullProject(page, 2);
     try {
-      await page.goto(`/photographer/projects/${selecting.projectId}`);
+      await page.goto(`/studio/projects/${selecting.projectId}`);
       await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText(/\d{4}-\d{2}-\d{2}/);
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText(/\d{4}-\d{2}-\d{2}/);
@@ -51,12 +51,12 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P1: 프로젝트 목록 페이지 로드", async ({ page }) => {
-    await page.goto("/photographer/projects");
-    await expect(page).toHaveURL(/\/photographer\/projects/);
+    await page.goto("/studio/projects");
+    await expect(page).toHaveURL(/\/studio\/projects/);
     const sidebar = page.locator("[data-photographer-sidebar]");
     // 새 프로젝트는 페이지 머리에서만 만든다 — 사이드바에는 이동 메뉴만 둔다.
     await expect(sidebar.getByRole("button", { name: "새 프로젝트" })).toHaveCount(0);
-    await expect(sidebar.locator("a[href='/photographer/projects']")).toHaveAttribute("aria-current", "page");
+    await expect(sidebar.locator("a[href='/studio/projects']")).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: "프로젝트", level: 1 })).toBeVisible();
 
     const profileTrigger = sidebar.locator("[data-sidebar-profile-trigger]");
@@ -77,7 +77,7 @@ test.describe("작가 — 프로젝트 관리", () => {
 
   test("P1-M: 프로젝트 목록 모바일은 공통 page header와 축소 헤더를 사용", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/photographer/projects");
+    await page.goto("/studio/projects");
 
     const pageHeader = page.locator("[data-photographer-mobile-page-header]");
     await expect(pageHeader.getByRole("heading", { name: "프로젝트" })).toBeVisible();
@@ -97,14 +97,14 @@ test.describe("작가 — 프로젝트 관리", () => {
     await expect(globalHeader).toHaveAttribute("data-compact", "false");
 
     // 공통 모바일 작가 헤더를 쓰는 하위 화면에도 같은 규칙을 적용한다.
-    await page.goto("/photographer/projects/new");
+    await page.goto("/studio/projects/new");
     await expect(globalHeader).toHaveAttribute("data-compact", "false");
     await page.evaluate(() => window.scrollTo({ top: 160 }));
     await expect(globalHeader).toHaveAttribute("data-compact", "true");
   });
 
   test("P1-0: 접힌 사이드바 상태를 메뉴 이동 후에도 유지", async ({ page }) => {
-    await page.goto("/photographer/projects");
+    await page.goto("/studio/projects");
     await page.getByRole("button", { name: "사이드바 접기" }).click();
 
     const sidebar = page.locator("[data-photographer-sidebar]");
@@ -123,7 +123,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     )).toBeLessThanOrEqual(2);
     expect(collapsedBrandBox!.x + collapsedBrandBox!.width).toBeLessThan(expandButtonBox!.x);
     await sidebar.getByRole("link", { name: "대시보드" }).click();
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
+    await expect(page).toHaveURL(/\/studio\/dashboard/);
     await page.waitForLoadState("networkidle");
     await expect(sidebar).toHaveCSS("width", "102.5px");
     await expect(page.locator("main[data-app-theme='light']")).toHaveCSS("margin-left", "102.5px");
@@ -135,12 +135,12 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P1-1: 프로젝트 목록은 관리 메뉴 없이 상세 진입과 다음 작업만 제공", async ({ page }) => {
-    await page.goto("/photographer/projects");
+    await page.goto("/studio/projects");
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator("button[aria-label$='프로젝트 더보기']")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "프로젝트 삭제", exact: true })).toHaveCount(0);
-    await expect(page).toHaveURL(/\/photographer\/projects/);
+    await expect(page).toHaveURL(/\/studio\/projects/);
   });
 
   test("P1-2: 지정한 고객 진입 대표 사진을 프로젝트 목록 썸네일로 사용한다", async ({ page }) => {
@@ -152,7 +152,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(response.ok()).toBe(true);
 
       await page.setViewportSize({ width: 1440, height: 1000 });
-      await page.goto("/photographer/projects");
+      await page.goto("/studio/projects");
       const projectName = page.getByText(coveredProject.projectName!, { exact: true }).filter({ visible: true });
       await expect(projectName).toBeVisible({ timeout: 8000 });
       const projectRow = page.locator("[data-desktop-project-row]").filter({ has: projectName });
@@ -176,7 +176,7 @@ test.describe("작가 — 프로젝트 관리", () => {
         betaApplicationStatus: null,
       }),
     }));
-    await page.goto("/photographer/projects/new");
+    await page.goto("/studio/projects/new");
     await expect(page).toHaveURL(/\/projects\/new/);
     const nameInput = page.locator("input[placeholder*='촬영']").or(page.locator("input[placeholder*='프로젝트']")).first();
     await expect(nameInput).toBeVisible({ timeout: 10000 });
@@ -214,7 +214,7 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P3: 프로젝트 검색 → 결과 필터링", async ({ page }) => {
-    await page.goto("/photographer/projects");
+    await page.goto("/studio/projects");
     const searchInput = page.locator("input[placeholder*='검색']");
     if (!(await searchInput.isVisible({ timeout: 3000 }).catch(() => false))) {
       test.skip(true, "검색 입력창 없음");
@@ -223,18 +223,18 @@ test.describe("작가 — 프로젝트 관리", () => {
     await searchInput.fill("없는프로젝트xyz");
     await page.waitForTimeout(500);
     // 결과 없음 또는 빈 목록
-    const hasResults = await page.locator("a[href*='/photographer/projects/']").count();
+    const hasResults = await page.locator("a[href*='/studio/projects/']").count();
     expect(hasResults).toBe(0);
   });
 
   test("P4: 프로젝트 빠른 필터와 모바일 상세 필터", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto("/photographer/projects");
+    await page.goto("/studio/projects");
     const desktopFilters = page.getByRole("group", { name: "PC 프로젝트 빠른 필터" });
     const desktopDone = desktopFilters.getByRole("button", { name: /^완료/ });
     await desktopDone.click();
     await expect(desktopDone).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/\/photographer\/projects/);
+    await expect(page).toHaveURL(/\/studio\/projects/);
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileFilters = page.getByRole("group", { name: "프로젝트 빠른 필터" });
@@ -251,7 +251,7 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P5: 프로젝트 상세 페이지 로드", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}`);
+    await page.goto(`/studio/projects/${project.projectId}`);
     await expect(page.locator("main[data-app-theme='light']")).toBeVisible();
     const sidebar = page.locator("[data-photographer-sidebar]");
     await expect(sidebar).toHaveAttribute("data-sidebar-theme", "light");
@@ -349,7 +349,7 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P6: 정보 수정 전체 화면 열기/닫기/저장", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}`);
+    await page.goto(`/studio/projects/${project.projectId}`);
     const openEditView = async () => {
       await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
       await page.getByRole("menuitem", { name: "수정하기" }).click();
@@ -420,7 +420,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       });
       expect(response.ok(), await response.text()).toBeTruthy();
 
-      await page.goto(`/photographer/projects/${activeProject.projectId}`);
+      await page.goto(`/studio/projects/${activeProject.projectId}`);
       await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
       await page.getByRole("menuitem", { name: "수정하기" }).click();
       await expect(page.getByLabel("고객 비밀번호", { exact: true })).toBeEnabled();
@@ -433,7 +433,7 @@ test.describe("작가 — 프로젝트 관리", () => {
   test("P7-1: 셀렉 중 기한 변경은 재접속 후에도 유지되고 종료 후에는 거부", async ({ page }) => {
     const activeProject = await createFullProject(page, 3);
     try {
-      await page.goto(`/photographer/projects/${activeProject.projectId}`);
+      await page.goto(`/studio/projects/${activeProject.projectId}`);
       await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
       await page.getByRole("menuitem", { name: "수정하기" }).click();
 
@@ -470,7 +470,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     const activeProject = await createEditingProject(page, 1);
     try {
       await setProjectStatus(page, activeProject.projectId, "reviewing_v1");
-      await page.goto(`/photographer/projects/${activeProject.projectId}`);
+      await page.goto(`/studio/projects/${activeProject.projectId}`);
       await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
       await page.getByRole("menuitem", { name: "수정하기" }).click();
       await expect(page.locator("#edit-field-deadline")).toHaveCount(0);
@@ -513,7 +513,7 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P9: 프로젝트 상세 Light 반응형 — Desktop/Narrow/Mobile", async ({ page }) => {
-    const projectUrl = `/photographer/projects/${project.projectId}`;
+    const projectUrl = `/studio/projects/${project.projectId}`;
 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(projectUrl);
@@ -647,7 +647,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     const selectingProject = await createFullProject(page, 5);
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto(`/photographer/projects/${selectingProject.projectId}`);
+      await page.goto(`/studio/projects/${selectingProject.projectId}`);
       await expect(page.getByRole("heading", { name: "고객이 사진을 선택하고 있습니다" })).toBeVisible({ timeout: 8000 });
       await expect(
         page.getByText("고객이 셀렉을 확정하면 선택한 사진과 작가 전달 메모를 확인할 수 있습니다.", { exact: true }),
@@ -663,11 +663,11 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(page.getByRole("tab", { name: /셀렉/ })).toHaveCount(0);
       await page.getByRole("button", { name: "원본 사진 보기" }).click();
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
+        new RegExp(`/studio/projects/${selectingProject.projectId}/assets/original`),
       );
-      await page.goto(`/photographer/projects/${selectingProject.projectId}/assets/selected`);
+      await page.goto(`/studio/projects/${selectingProject.projectId}/assets/selected`);
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
+        new RegExp(`/studio/projects/${selectingProject.projectId}/assets/original`),
       );
     } finally {
       await deleteTestProject(page, selectingProject.projectId);
@@ -737,9 +737,9 @@ test.describe("작가 — 프로젝트 관리", () => {
         });
       });
       await page.setViewportSize({ width: 1792, height: 1000 });
-      await page.goto(`/photographer/projects/${selectingProject.projectId}/upload`);
+      await page.goto(`/studio/projects/${selectingProject.projectId}/upload`);
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
+        new RegExp(`/studio/projects/${selectingProject.projectId}/assets/original`),
         { timeout: 8000 },
       );
       await expect(page.getByRole("tab", { name: /원본/ })).toHaveAttribute("aria-selected", "true");
@@ -804,9 +804,9 @@ test.describe("작가 — 프로젝트 관리", () => {
         });
       });
       await page.setViewportSize({ width: 1792, height: 1000 });
-      await page.goto(`/photographer/projects/${selectingProject.projectId}/upload`);
+      await page.goto(`/studio/projects/${selectingProject.projectId}/upload`);
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
+        new RegExp(`/studio/projects/${selectingProject.projectId}/assets/original`),
         { timeout: 8000 },
       );
       await expect(page.getByRole("tab", { name: /원본/ })).toHaveAttribute("aria-selected", "true");
@@ -1004,7 +1004,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.reload();
       await page.getByRole("tab", { name: /셀렉/ }).click();
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/selected`),
+        new RegExp(`/studio/projects/${selectingProject.projectId}/assets/selected`),
       );
       await expect(page.getByRole("tab", { name: /셀렉/ })).toHaveAttribute("aria-selected", "true");
       await expect(page.getByRole("heading", { name: "셀렉 결과" })).toBeVisible();
@@ -1061,7 +1061,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(statusResponse.ok()).toBe(true);
 
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto(`/photographer/projects/${preparingProject.projectId}/upload`);
+      await page.goto(`/studio/projects/${preparingProject.projectId}/upload`);
       await expect(page.getByRole("heading", { name: "원본 업로드" })).toBeVisible({ timeout: 8000 });
 
       const uploadRows = page.locator("[data-original-photo-row]");
@@ -1232,7 +1232,7 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(statusResponse.ok()).toBe(true);
 
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto(`/photographer/projects/${preparingProject.projectId}/upload`);
+      await page.goto(`/studio/projects/${preparingProject.projectId}/upload`);
       const photoButton = page.locator("[data-original-photo-media] > button").first();
       await expect(photoButton).toBeVisible({ timeout: 8000 });
       await photoButton.click();
@@ -1256,7 +1256,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     // 생성 폼이 노출되지 않는지(무제한으로 잘못 간주하지 않는지) 검증한다.
     await page.route("**/api/photographer/quota", (route) => route.abort("failed"));
 
-    await page.goto("/photographer/projects/new");
+    await page.goto("/studio/projects/new");
 
     // 에러 상태(다시 시도)가 노출되어야 하고, 생성 폼(이름 입력)은 보이면 안 된다.
     await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible({ timeout: 8000 });

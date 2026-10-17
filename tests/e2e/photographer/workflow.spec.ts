@@ -38,7 +38,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
 
     const page = await browser.newPage({ viewport: { width: 375, height: 667 } });
     await loginAsPhotographer(page);
-    await page.goto(`/photographer/projects/${editingProject.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${editingProject.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
 
     // 첫 보정본이 없으면 일괄 업로드 패널이 자동으로 한 번 열린다.
@@ -167,7 +167,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
       });
     });
     await setProjectStatus(page, editingProject.projectId, "delivered");
-    await page.goto(`/photographer/projects/${editingProject.projectId}/assets/final`);
+    await page.goto(`/studio/projects/${editingProject.projectId}/assets/final`);
     const finalToolbar = page.getByRole("region", { name: "최종 보정본 작업 도구" });
     await expect(finalToolbar).toHaveCSS("height", "44px");
     await expect(finalToolbar.locator("[data-mobile-asset-toolbar-actions]")).toBeVisible();
@@ -222,7 +222,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
       const { versionId } = await seedResponse.json() as { versionId: string };
       await setProjectStatus(page, reviewingProject.projectId, "reviewing_v1");
 
-      await page.goto(`/photographer/projects/${reviewingProject.projectId}/assets/retouched?round=v1`);
+      await page.goto(`/studio/projects/${reviewingProject.projectId}/assets/retouched?round=v1`);
       await expect(page.getByRole("region", { name: "보정본 작업 도구" })).toBeVisible();
       await expect(page.getByRole("checkbox", { name: /보정본/ })).toHaveCount(0);
       await expect(page.getByRole("button", { name: /선택 삭제/ })).toHaveCount(0);
@@ -240,14 +240,14 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
   });
 
   test("W1: 워크플로우 페이지 로드 → 원본 탭 표시", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
     // 원본 탭은 모든 상태에서 보임
     await expect(page.getByRole("tab", { name: /^원본/ })).toBeVisible({ timeout: 8000 });
   });
 
   test("W2: 셀렉 탭 → 내보내기 버튼 존재", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
     await page.getByRole("tab", { name: /^셀렉/ }).click();
     await page.waitForTimeout(500);
@@ -256,14 +256,14 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
   });
 
   test("W3: 갤러리/파일명 뷰 토글", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "목록으로 보기", exact: true }).click();
     await expect(page).toHaveURL(/\/assets\/retouched/);
   });
 
   test("W4: 셀렉 탭 → CSV 내보내기 다운로드", async ({ page }) => {
-    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
     await page.getByRole("tab", { name: /^셀렉/ }).click();
     await page.waitForTimeout(500);
@@ -324,7 +324,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="1200" height="900" fill="#536b78"/></svg>',
       }));
       await setProjectStatus(page, detailProject.projectId, "editing_v2");
-      await page.goto(`/photographer/projects/${detailProject.projectId}/assets/retouched?round=v2`);
+      await page.goto(`/studio/projects/${detailProject.projectId}/assets/retouched?round=v2`);
       await page.getByRole("img", { name: "V2", exact: true }).first().click();
 
       const viewer = page.locator("[data-original-photo-viewer]");
@@ -382,7 +382,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
       }));
       await setProjectStatus(page, stageProject.projectId, "editing_v2");
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto(`/photographer/projects/${stageProject.projectId}/assets/retouched?round=v2`);
+      await page.goto(`/studio/projects/${stageProject.projectId}/assets/retouched?round=v2`);
 
       const retouchedTab = page.getByRole("tab", { name: "보정본", exact: true });
       const stepper = page.locator("[data-retouch-stage-stepper]");

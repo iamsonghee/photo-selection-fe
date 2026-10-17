@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceMemory } from "@/components/WorkspaceMemory";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/lib/photographer-sidebar-routes";
 
 /**
- * 작가 영역(/photographer/*) 공통 셸.
+ * 작가 영역(/studio/*) 공통 셸.
  * 사이드바 너비(narrow)는 여기서만 관리 — 페이지 컴포넌트마다 별도 사이드바 없음.
  */
 export function PhotographerDesktopShell({
@@ -50,9 +51,9 @@ export function PhotographerDesktopShell({
     const redirectMobileUtilityRoute = () => {
       if (
         mobileViewport.matches &&
-        pathname === "/photographer/dashboard"
+        pathname === "/studio/dashboard"
       ) {
-        router.replace("/photographer/projects");
+        router.replace("/studio/projects");
       }
     };
 
@@ -66,6 +67,7 @@ export function PhotographerDesktopShell({
 
   return (
     <>
+      <WorkspaceMemory workspace="studio" />
       {/* z-20: main(z-10)보다 위에 두어 사이드바 밖으로 나온 토글이 가려지지 않게 함 */}
       <div className="relative z-20 hidden md:block">
         <Sidebar collapsed={collapsed} sidebarToggle={{ onToggle: toggleSidebar }} />

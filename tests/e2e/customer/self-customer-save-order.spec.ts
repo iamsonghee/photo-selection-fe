@@ -26,7 +26,7 @@ for (const field of ['selection', 'like', 'comment'] as const) {
       if (url.endsWith(`/${id}`)) return route.fulfill({ json: { isOwner: true, project: state() } });
       return route.fulfill({ json: { ok: true } });
     });
-    await page.goto(`/customer-select/${id}/select`);
+    await page.goto(`/select/${id}/select`);
     const card = page.locator('[data-photo-id="p1"]');
     await expect(card).toBeVisible();
     if (field === 'selection') {

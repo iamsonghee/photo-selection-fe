@@ -16,7 +16,7 @@ export type ProjectLimitInfo = {
 /**
  * "새 프로젝트" 진입점(Dashboard FAB / Project List FAB / Sidebar) 3곳이 공유하는 게이트 —
  * 클릭 시점에 quota를 먼저 확인해 한도 도달이면 페이지 이동 없이 모달만 띄우고, 아니면 그대로
- * /photographer/projects/new로 이동한다(Figma #56046). quota 확인 자체가 실패하면(네트워크 등)
+ * /studio/projects/new로 이동한다(Figma #56046). quota 확인 자체가 실패하면(네트워크 등)
  * 기존처럼 이동시킨다 — 실제 차단은 /new 페이지 자체의 서버측 검증(POST 403)이 이미 담당하므로
  * 이 사전 확인은 UX 단축일 뿐 보안 경계가 아니다.
  */
@@ -37,7 +37,7 @@ export function useNewProjectGate() {
       });
       return;
     }
-    router.push(customerId ? `/photographer/projects/new?customerId=${encodeURIComponent(customerId)}` : "/photographer/projects/new");
+    router.push(customerId ? `/studio/projects/new?customerId=${encodeURIComponent(customerId)}` : "/studio/projects/new");
   }, [refetch, router]);
 
   return { handleNewProject: () => openProjectForm(), handleNewProjectForCustomer: (id: string) => openProjectForm(id), limitInfo, closeLimitModal: () => setLimitInfo(null) };

@@ -111,7 +111,7 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await installMocks(page);
 
   const started = Date.now();
-  await page.goto(`/customer-select/${PROJECT_ID}/select`);
+  await page.goto(`/select/${PROJECT_ID}/select`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
   // 프로젝트 화면은 ProjectShell 공통 헤더(2026-10-06)를 쓴다 — 목록 셸 전용 속성 대신 헤더 자체가 보이는지만 본다.
   await expect(page.locator("header").first()).toBeVisible();

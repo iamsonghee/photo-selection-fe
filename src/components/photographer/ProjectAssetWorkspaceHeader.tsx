@@ -92,7 +92,7 @@ export function ProjectAssetWorkspaceHeader({
         >
           <button
             type="button"
-            onClick={() => navigate("/photographer/projects")}
+            onClick={() => navigate("/studio/projects")}
             className="shrink-0 transition-colors hover:text-foreground"
           >
             프로젝트
@@ -101,7 +101,7 @@ export function ProjectAssetWorkspaceHeader({
           <button
             type="button"
             data-project-asset-context-name
-            onClick={() => navigate(`/photographer/projects/${projectId}`)}
+            onClick={() => navigate(`/studio/projects/${projectId}`)}
             className="truncate font-semibold text-foreground transition-colors hover:text-accent"
           >
             {project.name}

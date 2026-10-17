@@ -1,5 +1,5 @@
 import { BrandLogoBar } from "@/components/BrandLogo";
-import { ProjectBodySkeleton } from "../_lib/ProjectBodySkeleton";
+import { ProjectBodySkeleton } from "@/app/select/_lib/ProjectBodySkeleton";
 import theme from "@/styles/AcutLightTheme.module.css";
 
 export default function CustomerResultLoading() {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { migrateWorkspacePath } from "@/lib/workspaces";
 import { isAdminEmail } from "@/lib/admin-emails";
 import {
   CUSTOMER_SHARE_COOKIE_MAX_AGE,
@@ -8,6 +9,29 @@ import {
 } from "@/lib/customer-select-share-auth";
 
 const COOKIE_TTL_SECONDS = 86400;
+
+async function handleWorkspaceGate(req: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({ request: req });
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (cookies) => {
+        cookies.forEach(({ name, value }) => req.cookies.set(name, value));
+        response = NextResponse.next({ request: req });
+        cookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    } },
+  );
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) return response;
+  const login = new URL("/login", req.url);
+  login.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+  const redirect = NextResponse.redirect(login);
+  response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
+}
 
 type CustomerPinLookup =
   | { found: true; accessPin: string | null }
@@ -55,7 +79,7 @@ async function handleAdminGate(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL("/", req.url));
   }
   if (!isAdminEmail(user.email)) {
-    return NextResponse.redirect(new URL("/photographer/dashboard", req.url));
+    return NextResponse.redirect(new URL("/studio/dashboard", req.url));
   }
 
   return response;
@@ -215,6 +239,14 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(url, 308);
   }
 
+  const migratedPath = migrateWorkspacePath(pathname);
+  if (migratedPath !== pathname) {
+    const destination = req.nextUrl.clone();
+    destination.pathname = migratedPath;
+    // 307은 메서드·쿼리를 보존하고 브라우저에 영구 캐시되지 않는다.
+    return NextResponse.redirect(destination, 307);
+  }
+
   const customerProjectId = customerProjectIdFromPath(pathname);
   const customerShareToken = req.nextUrl.searchParams.get("share_token");
   if (customerProjectId && customerShareToken) {
@@ -228,6 +260,13 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return handleAdminGate(req);
+  }
+
+  // 소유자 전용 화면만 보호한다. 공유 셀렉·작가 초대·하객 링크의 인증은 기존대로 유지한다.
+  if (pathname.startsWith("/studio/") ||
+      pathname === "/select/projects" || /^\/select\/(?:new|guest)(?:\/|$)/.test(pathname) ||
+      /^\/select\/[^/]+\/settings$/.test(pathname)) {
+    return handleWorkspaceGate(req);
   }
 
   // Extract token from /c/[token] and all nested customer routes.

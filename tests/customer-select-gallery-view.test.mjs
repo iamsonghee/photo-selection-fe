@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { collapseSimilarityGroups, galleryAnchorPhotoId } from "../src/app/customer-select/_lib/gallery-view.ts";
+import { collapseSimilarityGroups, galleryAnchorPhotoId } from "../src/app/select/_lib/gallery-view.ts";
 
 const photos = [
   { id: "a", similarityGroupId: "group-1" },

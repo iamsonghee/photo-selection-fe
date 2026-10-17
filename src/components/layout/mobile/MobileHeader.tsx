@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ArrowLeftRight, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useProfile } from "@/contexts/ProfileContext";
 import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
@@ -15,7 +16,25 @@ import lightThemeStyles from "@/styles/PhotographerLightTheme.module.css";
 export function MobileHeader({ light = false }: { light?: boolean }) {
   const pathname = usePathname();
   const { profile } = useProfile();
-  const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "작가";
+  const accountMenu = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      if (accountMenu.current && !accountMenu.current.contains(event.target as Node)) accountMenu.current.open = false;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && accountMenu.current?.open) {
+        accountMenu.current.open = false;
+        accountMenu.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
   const [compact, setCompact] = useState(false);
   const [assetImmersive, setAssetImmersive] = useState(false);
   const [projectContext, setProjectContext] = useState<PhotographerMobileProjectContext | null>(null);
@@ -69,7 +88,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
     return () => window.removeEventListener(PHOTOGRAPHER_MOBILE_PROJECT_CONTEXT_EVENT, sync);
   }, [pathname]);
 
-  const assetProjectBase = pathname.match(/^(\/photographer\/projects\/[^/]+)\/(?:assets|upload|workflow|results)(?:\/|$)/)?.[1];
+  const assetProjectBase = pathname.match(/^(\/studio\/projects\/[^/]+)\/(?:assets|upload|workflow|results)(?:\/|$)/)?.[1];
   const compactProjectHeader = Boolean(projectContext) && (Boolean(assetProjectBase) || compact || assetImmersive);
   const visuallyCompact = compact || assetImmersive;
 
@@ -82,7 +101,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
       data-project-context-visible={compactProjectHeader ? "true" : "false"}
       className={`${light ? lightThemeStyles.lightTheme : ""} photographer-mobile-header ${visuallyCompact ? "is-compact" : ""} ${assetImmersive ? "is-asset-immersive" : ""} fixed left-0 right-0 top-0 z-50 box-border flex items-center justify-between ${assetProjectBase ? "gap-1 px-2" : "gap-3 px-5"} border-b-0 bg-background/95 backdrop-blur-md md:hidden`}
     >
-      <Link href="/photographer/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
+      <Link href="/studio/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
         <div className={`flex items-center justify-center bg-[#ff4d00] font-extrabold text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 rounded-[6px] text-xs" : "h-[26px] w-[26px] rounded-[7px] text-[13px]"}`}>
           A
         </div>
@@ -102,7 +121,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
 
       {projectContext ? (
         <Link
-          href={assetProjectBase ?? "/photographer/projects"}
+          href={assetProjectBase ?? "/studio/projects"}
           data-mobile-project-header-context
           aria-label={`${projectContext.projectName} 프로젝트 상세로 이동`}
           aria-hidden={!compactProjectHeader}
@@ -115,28 +134,32 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
         </Link>
       ) : null}
 
-      <Link
-        href="/photographer/settings"
-        aria-label="설정"
-        aria-hidden={compactProjectHeader}
-        tabIndex={compactProjectHeader ? -1 : undefined}
-        className={`flex h-11 shrink-0 items-center justify-center overflow-hidden rounded-full transition-[width,opacity,background-color] duration-200 active:bg-surface-raised motion-reduce:transition-none ${
-          compactProjectHeader ? "pointer-events-none w-0 opacity-0" : "w-11 opacity-100"
-        }`}
-      >
-        <span className={`flex items-center justify-center overflow-hidden rounded-full border border-border-strong bg-surface-raised font-bold text-foreground transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-7 w-7 text-xs" : "h-[30px] w-[30px] text-[13px]"}`}>
-          {profile?.profileImageUrl ? (
-            <img
-              src={getProfileImageUrl(profile.profileImageUrl)}
-              alt=""
-              className="h-full w-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
-            />
-          ) : (
-            <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
-          )}
-        </span>
-      </Link>
+      {!compactProjectHeader && <details key={pathname} ref={accountMenu} className="relative ml-auto shrink-0">
+        <summary aria-label="계정 메뉴" className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full active:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+          <span className={`flex items-center justify-center overflow-hidden rounded-full border border-border-strong bg-surface-raised font-bold text-foreground transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-7 w-7 text-xs" : "h-[30px] w-[30px] text-[13px]"}`}>
+            {profile?.profileImageUrl ? (
+              <img
+                src={getProfileImageUrl(profile.profileImageUrl)}
+                alt=""
+                className="h-full w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
+              />
+            ) : (
+              <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
+            )}
+          </span>
+        </summary>
+        <div className="absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-xl border border-border-subtle bg-surface text-foreground">
+          <Link href="/studio/settings" onClick={() => { if (accountMenu.current) accountMenu.current.open = false; }} className="flex min-h-11 items-center gap-2 px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
+            <Settings size={18} /> 설정
+          </Link>
+          {/* 전체 페이지 이동으로 업로드 중 beforeunload 보호를 유지한다. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/select/projects" className="flex min-h-11 items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent">
+            <ArrowLeftRight size={18} /> 내 사진 셀렉으로 이동
+          </a>
+        </div>
+      </details>}
     </header>
   );
 }

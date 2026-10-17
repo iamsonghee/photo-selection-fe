@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import LandingPage from "./landing/page";
-import { LANDING_FAQ } from "./landing/faq";
+import { createClient } from "@/lib/supabase/server";
+import { MainLanding } from "./_landing/MainLanding";
 import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
 import { OG_MAIN_IMAGE, SITE_NAME, SITE_URL } from "@/lib/site-metadata";
-import "./landing/landing.css";
 
-const title = "A-CUT | 고객의 사진 셀렉부터 보정본 확정까지";
-const description = "사진작가를 위한 고객 셀렉·보정 피드백 관리. 함께 찜하고 AI 유사컷을 비교하며, 선택 결과부터 보정본 확정까지 한곳에서 관리하세요.";
+const title = "A-CUT | 작가·스튜디오 · 내 사진 셀렉";
+const description = "받은 사진을 직접 셀렉하거나, 고객과 사진·보정 요청을 주고받으세요.";
 
 export const metadata: Metadata = {
   title,
@@ -43,23 +42,17 @@ const jsonLd = {
       inLanguage: "ko-KR",
       publisher: { "@id": `${SITE_URL}/#organization` },
     },
-    {
-      "@type": "FAQPage",
-      "@id": `${SITE_URL}/#faq`,
-      mainEntity: LANDING_FAQ.map(({ question, answer }) => ({
-        "@type": "Question",
-        name: question,
-        acceptedAnswer: { "@type": "Answer", text: answer },
-      })),
-    },
+
   ],
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <LandingPage />
+      <MainLanding loggedIn={!!user} />
     </>
   );
 }

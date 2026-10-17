@@ -145,7 +145,7 @@ for (const viewport of scenarios) {
         (window as unknown as { uploadReports: unknown[] }).uploadReports = [];
         window.addEventListener("acut:upload-performance", event => (window as unknown as { uploadReports: unknown[] }).uploadReports.push((event as CustomEvent).detail));
       }, { retry: !!viewport.retry });
-      const url = `/photographer/projects/${projectId}/upload`;
+      const url = `/studio/projects/${projectId}/upload`;
       await page.goto(url, { waitUntil: "domcontentloaded" }).catch(async error => {
         if (!String(error).includes("ERR_ABORTED")) throw error;
         await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -299,7 +299,7 @@ test("activated project can reopen the upload page only to recover unfinished or
       id: "unfinished-job", original_filename: "sample.jpg", original_file_size: 1234,
       original_last_modified: 0, created_at: "2026-09-17T00:00:00Z",
     }] } }));
-    await page.goto(`/photographer/projects/${projectId}/upload?recover=1`);
+    await page.goto(`/studio/projects/${projectId}/upload?recover=1`);
     await expect(page).toHaveURL(/\/upload\?recover=1$/);
     await expect(page.getByText("원본 1장 확인 필요 · 완료된 사진은 다시 보내지 않습니다", { exact: true })).toBeVisible();
     await expect(page.locator("[data-original-photo-card]").filter({ hasText: "원본 누락" })).toHaveCount(1);
@@ -389,7 +389,7 @@ test(`mobile ${strategy} upload ordering`, async ({ browser }, testInfo) => {
       }) } });
     });
 
-    await page.goto(`/photographer/projects/${projectId}/upload`);
+    await page.goto(`/studio/projects/${projectId}/upload`);
     const sample = fs.readFileSync(path.join(__dirname, "../../fixtures/sample.jpg"));
     await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 9 }, (_, index) => ({
       name: `sample-${index + 1}.jpg`, mimeType: "image/jpeg", buffer: sample,
@@ -559,7 +559,7 @@ test("upload completion shows the refreshed photo count, not the pre-upload coun
       return route.fulfill({ json: { uploaded: files, rejected: [], original_presigned: [] } });
     });
 
-    await page.goto(`/photographer/projects/${projectId}/upload`);
+    await page.goto(`/studio/projects/${projectId}/upload`);
     const sample = fs.readFileSync(path.join(__dirname, "../../fixtures/sample.jpg"));
     await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 3 }, (_, index) => ({
       name: `count-${index + 1}.jpg`, mimeType: "image/jpeg", buffer: sample,

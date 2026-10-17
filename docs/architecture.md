@@ -1,5 +1,22 @@
 # 시스템 아키텍처
 
+## 작업 주소 이전 (2026-10-11 구현)
+
+작가·스튜디오 작업 화면은 `/studio/**`, 내 사진 셀렉 작업 화면은 `/select/**`를 사용한다. 이전 `/photographer/**`, `/customer-select/**` 요청은 middleware에서 307로 연결하며 하위 경로·쿼리·HTTP 메서드를 보존한다. 로그인 복귀 경로도 동일 규칙으로 변환한다. 공개 결과 공유 `/customer-select/result/**`는 기존 경로에 묶인 인증 쿠키를 유지하기 위해 이전하지 않는다. `/c/**`, `/g/**`, `/api/**`, OAuth `/auth/callback`도 유지한다. 새 작업 화면은 noindex 대상이며 권한·PIN·공유 토큰 검증은 기존 정책대로 적용한다.
+
+## 공통 진입 구조 (2026-10-11, feat/landing-entry-flow)
+
+- 소개 랜딩: `/`, `/studio`, `/select`(2026-10-16 확정 시안으로 교체, `src/app/_landing`·`src/app/<select|studio>/_landing`) → 공통 `/login` → 기존 작업 공간(`/studio/dashboard`, `/select/projects`). 일반 복귀 `/workspaces`는 검증된 현재 사용자의 `user_metadata.acut_last_workspace`만 읽어 공간을 결정한다. 기억 값이 없거나 잘못됐으면 선택 화면을 표시한다.
+- 세 랜딩은 서버 HTML에 압축된 PC·모바일 WebP 시연 이미지를 먼저 포함한다(`LandingPoster`, `public/landing/posters`). `useLandingAnimation`이 브라우저 힌트를 확인해 데이터 절약, slow-2g/2g/3g, 0 초과 1.5Mbps 이하 downlink, 0 초과 4GiB 이하 deviceMemory, 0 초과 논리 CPU 4개 이하 중 하나면 정적 이미지를 유지하고 연출 모듈을 import하지 않는다. 지원하지 않는 힌트는 저사양으로 간주하지 않는다. 일반 환경은 연출 모듈 로딩이 끝난 뒤 기존 DOM 시연으로 전환하며, 모듈 로딩 실패 시 이미지를 유지한다. 아래 시연 이미지는 지연 로딩한다. 통합 홈의 찜 숫자 강조는 강제 `offsetWidth` 읽기 없이 Web Animations로 재생한다(2026-10-17).
+- `/select`·`/studio`의 스크롤 시연은 상시 RAF 루프를 사용하지 않고 passive scroll 이벤트를 프레임당 한 번으로 합쳐 갱신한다. 같은 장면 이름·장수는 DOM을 다시 만들지 않으며, 화면 밖·숨겨진 탭에서는 갱신하지 않는다. 셀렉 히어로의 계속 떠다니는 동작은 제거하고 스크롤에 따른 정리·선택은 유지한다. 폰트 로딩과 같은 화면 구간의 resize에서는 사진 DOM을 재사용하고, 움직임 축소 설정은 완료 장면을 정적으로 표시한다(2026-10-17).
+- `src/lib/workspaces.ts`는 두 공간의 명칭·착지 경로와 기억 키를 정의한다. `WorkspaceMemory`는 인증된 공간 진입 시 기존 Supabase `auth.updateUser`로 해당 설정만 갱신한다. 새 DB 테이블·Next API·결제 의존성은 추가하지 않는다. 사용자 메타데이터는 사용자 수정 가능하므로 프로젝트 권한·과금에 절대로 사용하지 않는다.
+- OAuth 목적지는 기존 `acut_post_login_redirect` 쿠키(10분)를 재사용한다. 기본값은 `/workspaces`이며 쿠키가 없을 때 쿼리 `next`를 보조로 사용한다. 외부 주소·제어 문자·로그인/API/콜백 복귀 경로를 거절한다. 인증 실패/취소도 쿠키를 지우고 원래 목적지를 지정한 `/login?error=oauth`로 재시도한다.
+- 기존 공통 `photographers` 행 생성·베타 초대 처리·신청 매칭은 유지한다. 작가 이용 지표는 명시적인 `/studio/**`·`/beta/apply` 로그인에만 기록하고 일반 로그인·개인 셀렉·공유 링크를 작가 지표에 섞지 않는다. 일반 로그인 후 스튜디오를 선택하는 동작 자체는 OAuth 지표 이벤트를 새로 만들지 않는다.
+- middleware는 작가 영역과 기존 개인 소유자 전용 진입점에서 `auth.getUser()`로 확인하며 세션 갱신 쿠키를 전달한다. 미인증이면 원래 경로와 쿼리를 `/login?next=...`에 보존한다. 프로젝트 소유권·PIN·공유 토큰 검사는 각 기존 서버 경계에 남는다.
+- 저장 실패는 계정별 `acut_workspace_save_failed_<auth user id>` 쿠키(30일, SameSite=Lax, HTTPS에서 Secure)로 같은 브라우저에 기억한다. `/workspaces`는 이 경우 서비스 선택을 보여준다. 실패 쿠키도 이동 힌트일 뿐 권한이 아니다.
+- 기존 스튜디오 `getPolicyForPhotographer` 기반 프로젝트·사진 한도와 개인 `customerPhotoLimit`/BE `customer_upload`의 계정별 한도는 변경하지 않았다. 정식 공간별 상품·결제·차감 모델은 아직 구현하지 않았다.
+- `/login`, `/workspaces`는 X-Robots-Tag 및 metadata로 noindex 처리한다. `/studio`, `/select` 랜딩도 metadata noindex이며 sitemap에 추가하지 않는다. 홈의 기존 인증 메타 태그는 보존하고 표시하지 않는 FAQ 구조화 데이터는 홈에서 제외했다.
+
 ## 작가 업로드 성능 기록 (2026-10-16)
 
 작가 업로드 화면은 세션 종료 시 집계 report 한 건을 `POST /api/photographer/upload-performance`로 전송한다. 로그인 세션에서 확인한 작가 ID와 배포 커밋 SHA를 붙여 service role로 `upload_performance_logs`에 저장한다. 테이블은 RLS를 켜고 일반 사용자 정책을 두지 않으며 `created_at` 인덱스 하나만 사용한다. 브라우저 report에는 파일명·파일 객체·프로젝트 ID·R2 key·URL·토큰이 없다. FastAPI `/photos`와 `/originals/confirm`은 추가 조회 없이 `time.perf_counter()`로 단계별 시간을 Railway 로그에 남긴다. 저장·로그 실패는 업로드 결과를 바꾸지 않는다. 상세 필드와 분석 쿼리는 `upload-flow.md` 및 `photographer-upload-performance-analysis.md`를 따른다.
@@ -35,7 +52,7 @@
 
 ## 셀프 고객 셀렉 서비스 (2026-09-19)
 
-2026-09-22: 소유자 전용 프로젝트 현황(`/customer-select/[projectId]`)을 추가했다.
+2026-09-22: 소유자 전용 프로젝트 현황(`/select/[projectId]`)을 추가했다.
 서버에서 소유권을 확인하고 프로젝트 메타데이터와 최종 선택 수를 조회한다. 기존 사진 작업
 바로가기와 별개로 제공하며 새로운 DB 상태/스키마는 추가하지 않는다.
 업로드 사전 한도 검사는 소유자의 모든 `customer_projects.photo_count` 합계를 조회해 사용하고,
@@ -61,7 +78,7 @@ BE는 초과 배치를 통째로 거절한다. DB도 소유자별 advisory lock�
 
 소유자 UI의 로그인·프로젝트 목록·생성 화면은 작가 Light UI의 토큰을
 `src/styles/AcutLightTheme.module.css`를 통해 공유한다. 로그인 후 기본 착지점은
-`/customer-select`이며, 서버 세션으로 소유자를 확인한 뒤 `customer_projects.owner_id`로
+`/select/projects`이며, 서버 세션으로 소유자를 확인한 뒤 `customer_projects.owner_id`로
 목록을 조회한다. 전역 `:root` 토큰은 운영과 같은 Dark Photo Workspace 그대로이고(2026-10-02 되돌림 — 셀프 고객을 위해 전역을 라이트로 바꾸면 테마로 감싸지 않은 화면까지 바뀜),
 셀프 고객 화면은 라이트 테마로 감싸며 루트에 `data-acut-light-canvas`를 달아 html/body도 `--acut-canvas`(#f5f8f8)로 맞춘다. 작가 전용 사이드바·이용량·베타 컨텍스트는
 재사용하지 않는다.
@@ -127,7 +144,7 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 
 - 대표 주소는 `https://www.acut.kr`(`SITE_URL`, `src/lib/site-metadata.ts`)이다. apex `acut.kr`은 Vercel이 www로 308 리다이렉트하고, `acut.vercel.app`은 `src/middleware.ts`가 www로 바로 308 리다이렉트한다.
 - 색인 대상은 `src/app/sitemap.ts`의 `/`, `/beta/apply`, `/terms`, `/privacy`다. 네 페이지 모두 `alternates.canonical`과 Open Graph(제목·설명·url, 공유 미리보기 이미지 `OG_MAIN_IMAGE` = `/og/main.jpg?v=2`)를 갖는다(`/terms`·`/privacy` OG는 2026-10-08 추가). 로그인하지 않은 `/beta/apply`는 로그인 창(`AuthModal`)이 처음부터 열려 창 제목 h1("3초면 시작할 수 있어요")이 페이지 h1과 함께 있다 — 화면 크기(`beta.css`의 `.beta-signin h1` 28px)를 유지하려고 그대로 둔다(2026-10-08 결정). 정확한 수정일을 알 수 없어 `lastModified`는 넣지 않는다.
-- 고객·작가·관리자 화면과 API(`/c`, `/g`, `/photographer`, `/customer-select`, `/admin`, `/auth`, `/api` 하위, `/beta/apply/complete`)는 `next.config.ts`의 `NOINDEX_SOURCES`로 `X-Robots-Tag: noindex, nofollow` 헤더를 받는다. `src/app/robots.ts`는 크롤러가 이 헤더를 읽을 수 있도록 해당 경로를 막지 않고 `/api/`, `/auth/`만 `Disallow`하며 sitemap 주소를 알린다.
+- 고객·작가·관리자 화면과 API(`/c`, `/g`, `/studio`, `/select/projects`, `/admin`, `/auth`, `/api` 하위, `/beta/apply/complete`)는 `next.config.ts`의 `NOINDEX_SOURCES`로 `X-Robots-Tag: noindex, nofollow` 헤더를 받는다. `src/app/robots.ts`는 크롤러가 이 헤더를 읽을 수 있도록 해당 경로를 막지 않고 `/api/`, `/auth/`만 `Disallow`하며 sitemap 주소를 알린다.
 - `/landing`은 `/`와 같은 화면을 그리던 중복 주소라 `next.config.ts` `redirects()`에서 `/`로 308 리다이렉트한다. 개발 전용 `/landing/demo-capture`·`/landing/support-capture`는 영향이 없다.
 - `/`는 JSON-LD(Organization·WebSite·FAQPage)를 렌더링한다. FAQ 문장은 `src/app/landing/faq.ts`의 `LANDING_FAQ`를 화면(`LandingStory`)과 함께 쓴다. 실제 후기·평점이 없으므로 리뷰·평점 스키마는 넣지 않는다(`PRODUCT.md` Evidence on Hand).
 - 아이콘: 파비콘은 SVG 마크(`BRAND_MARK_SVG`), apple-touch-icon은 180px PNG(`BRAND_APPLE_TOUCH_ICON_PNG`), 구조화 데이터 로고는 512px PNG(`BRAND_LOGO_PNG`)다(`src/lib/brand-assets.ts`, `public/brand/`).
@@ -166,7 +183,7 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 ```mermaid
 flowchart LR
     subgraph Client["브라우저"]
-        Photographer["작가 UI\n/photographer/**"]
+        Photographer["작가 UI\n/studio/**"]
         Customer["고객 UI\n/c/[token]/**"]
     end
 
@@ -292,7 +309,7 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **가상 스크롤**: `@tanstack/react-virtual` (대량 사진 갤러리 렌더링용, 정확한 사용처는 갤러리 페이지로 추정 — 상세 코드 라인은 `확인 필요`).
 - **로컬 실행**: `npm run dev` → `next dev -p 3001` (포트 3001 고정). `dev:no-turbopack` 대안 스크립트 존재.
 - **인증 클라이언트**: `@supabase/ssr` — 서버(`src/lib/supabase/server.ts`, 쿠키 기반 `createServerClient`)와 브라우저(`src/lib/supabase/client.ts`, `createBrowserClient`) 두 종류의 클라이언트를 분리해 사용. 별도로 서비스 롤 키를 쓰는 관리자 클라이언트(`src/lib/supabase-admin.ts`)가 API 라우트 내부에서 사용됨.
-- **미들웨어**: `src/middleware.ts` — matcher는 정적 파일(`_next/static`, `_next/image`, `favicon.ico`)을 뺀 모든 경로지만, 실제로 처리하는 것은 레거시 도메인 리다이렉트, 셀프 고객 공유 토큰 교환(`/customer-select/[projectId]/**?share_token=`), 관리자 차단(`/admin/**`), 작가 고객 PIN 확인(`/c/[token]/**`)뿐이다. **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). Next.js 16부터 `middleware` 파일 이름은 폐기 예고(`proxy` 권장) 경고가 나오지만 16.3.8에서도 그대로 동작한다 — `proxy.ts` 전환은 별도 작업. (2026-10-06 matcher 서술을 코드 기준으로 정정, 16.3.8에서 비로그인·쿠키 없는 요청과 세그먼트 프리페치 요청 모두 PIN 화면·홈으로 보내는 것을 확인) PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다. PIN 인증 쿠키의 HMAC 범위에는 프로젝트 토큰과 현재 `access_pin` 상태가 함께 포함되며, 미들웨어와 고객 API의 `checkPinAuth`가 DB의 현재 PIN을 기준으로 검증하므로 PIN 설정·변경·삭제 시 기존 쿠키는 즉시 무효화된다.
+- **미들웨어**: `src/middleware.ts` — matcher는 정적 파일(`_next/static`, `_next/image`, `favicon.ico`)을 뺀 모든 경로지만, 실제로 처리하는 것은 레거시 도메인 리다이렉트, 셀프 고객 공유 토큰 교환(`/select/[projectId]/**?share_token=`), 관리자 차단(`/admin/**`), 작가 고객 PIN 확인(`/c/[token]/**`)뿐이다. **`/studio/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). Next.js 16부터 `middleware` 파일 이름은 폐기 예고(`proxy` 권장) 경고가 나오지만 16.3.8에서도 그대로 동작한다 — `proxy.ts` 전환은 별도 작업. (2026-10-06 matcher 서술을 코드 기준으로 정정, 16.3.8에서 비로그인·쿠키 없는 요청과 세그먼트 프리페치 요청 모두 PIN 화면·홈으로 보내는 것을 확인) PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다. PIN 인증 쿠키의 HMAC 범위에는 프로젝트 토큰과 현재 `access_pin` 상태가 함께 포함되며, 미들웨어와 고객 API의 `checkPinAuth`가 DB의 현재 PIN을 기준으로 검증하므로 PIN 설정·변경·삭제 시 기존 쿠키는 즉시 무효화된다.
 
 ---
 
@@ -373,21 +390,21 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 ## 6. 주요 페이지와 라우트
 
-### 6.1 작가(`/photographer/**`)
+### 6.1 작가(`/studio/**`)
 
 | 라우트 | 파일 | 설명 |
 |---|---|---|
-| `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | 대시보드 요약. 프로젝트가 1개 이상 있고 5개 설문 트리거 중 하나라도 충족되면 베타 설문 모달(`BetaSurveyModal`, §7.1 목록의 `api/photographer/beta-survey/*`) 조건부 노출(§6.1b 베타 설문 참고) |
-| `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 프로젝트 목록/검색/필터 |
-| `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | PIN·재보정 횟수를 포함한 840px 프로젝트 생성 폼. 상세 수정 view와 `ProjectFormFields.tsx`의 Page Heading·Section·Field·Input·촬영유형·재보정·Switch·PIN primitive 및 `PhotographerFormActionBar`를 공유하고, 생성 화면은 `나중에 올리기`/`원본 올리기` 액션을 주입한다. |
-| `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | Light 프로젝트 상세 작업 허브. 공통 Light Page Header 아래에 `ProjectProgressCard`가 Project List와 같은 상태 매핑을 재사용한 6단계 Expanded Stepper를 표시한다. 본문은 `ProjectInformationCard`(기본 정보·고객 갤러리 설정·고객 링크/PIN 조회)와 470px `ProjectWorkPanel`(상태별 업로드·셀렉·보정·검토·결과 CTA)의 2열이며, 최근 활동 패널은 Figma 상세 구조에 맞춰 표시하지 않는다. `정보 수정`은 중앙 모달이 아니라 840px 전체 수정 view로 전환되며 프로젝트 생성 화면과 동일한 `ProjectFormFields.tsx` primitive와 폼 geometry를 사용한다. 촬영장소와 4자리 숫자 PIN(`access_pin`, 빈 값은 제거)을 저장하고, 진행 상태에 따른 셀렉 수·원본 설정 잠금은 유지한다. 상세 조회 view의 PIN은 읽기 전용이며 변경은 이 수정 view에서만 한다. 수정 view의 하단은 생성 폼과 공용 `PhotographerFormActionBar`를 사용한다. 초대 링크 복사·PIN 표시·삭제 기능은 유지한다. `알림톡 보내기`는 Figma 위치에 표시하는 비활성 준비 중 버튼이며 아직 이벤트/API가 없다. |
-| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 초대 전(`preparing`) 사진 업로드/편집 화면. 셀렉용 프리뷰가 모두 등록되면 전달용 원본 전송이 남아 있어도 `셀렉 요청하기`로 `preparing→selecting` 전환과 공유가 가능하다. 활성화 뒤 사진 추가·삭제는 잠기지만 현재 원본 큐는 계속 전송된다. 실패 원본이 있으면 프로젝트 작업 카드의 복구 CTA가 `?recover=1`로 이 화면을 제한적으로 다시 열며, 신규 사진 편집 없이 기존 job만 복구한다. 그 외 활성 프로젝트 재진입은 `/assets/original`로 이동한다. |
-| `/photographer/projects/[id]/assets/original` · `/assets/selected` | `assets/ProjectAssetsPageClient.tsx` | 확정 이후의 원본/셀렉 통합 조회 workspace. 경로는 분리하지만 공용 `ProjectAssetTabs`와 동일한 클라이언트 화면을 사용한다. 두 탭 모두 업로드 화면과 같은 가상화 `PhotographerPhotoGallery`와 공용 `OriginalPhotoViewer`를 재사용한다. 원본은 읽기 전용 메타데이터와 유사컷 상태를, 셀렉은 순번·고객 코멘트를 variant slot으로 표시한다. 셀렉 탭은 목록 내보내기와 셀렉 원본/프리뷰 폴더 저장을 제공한다. |
-| `/photographer/projects/[id]/assets/retouched` | `workflow/WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 화면.** 실제 업로드 UI는 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며 `src/lib/version-mapping.ts`와 `src/lib/retouch-clip-match.ts`를 사용한다. 원본·셀렉과 같은 `ProjectAssetTabs` 자산 탐색 체계에 속하며, grid 최소 카드 폭·간격·반응형 여백·사진 비율도 `OriginalPhotoGallery`가 내보내는 공용 규격을 사용한다. 기존 `/workflow`와 `/results`는 저장된 링크 호환을 위해 새 자산 경로로 redirect한다. |
-| `/photographer/settings` | `settings/page.tsx` | 프로필 설정, 프로필 이미지 업로드, 계정 삭제 |
+| `/studio/dashboard` | `src/app/studio/(workspace)/dashboard/page.tsx` | 대시보드 요약. 프로젝트가 1개 이상 있고 5개 설문 트리거 중 하나라도 충족되면 베타 설문 모달(`BetaSurveyModal`, §7.1 목록의 `api/photographer/beta-survey/*`) 조건부 노출(§6.1b 베타 설문 참고) |
+| `/studio/projects` | `src/app/studio/(workspace)/projects/page.tsx` | 프로젝트 목록/검색/필터 |
+| `/studio/projects/new` | `src/app/studio/(workspace)/projects/new/page.tsx` | PIN·재보정 횟수를 포함한 840px 프로젝트 생성 폼. 상세 수정 view와 `ProjectFormFields.tsx`의 Page Heading·Section·Field·Input·촬영유형·재보정·Switch·PIN primitive 및 `PhotographerFormActionBar`를 공유하고, 생성 화면은 `나중에 올리기`/`원본 올리기` 액션을 주입한다. |
+| `/studio/projects/[id]` | `ProjectNexusPageClient.tsx` | Light 프로젝트 상세 작업 허브. 공통 Light Page Header 아래에 `ProjectProgressCard`가 Project List와 같은 상태 매핑을 재사용한 6단계 Expanded Stepper를 표시한다. 본문은 `ProjectInformationCard`(기본 정보·고객 갤러리 설정·고객 링크/PIN 조회)와 470px `ProjectWorkPanel`(상태별 업로드·셀렉·보정·검토·결과 CTA)의 2열이며, 최근 활동 패널은 Figma 상세 구조에 맞춰 표시하지 않는다. `정보 수정`은 중앙 모달이 아니라 840px 전체 수정 view로 전환되며 프로젝트 생성 화면과 동일한 `ProjectFormFields.tsx` primitive와 폼 geometry를 사용한다. 촬영장소와 4자리 숫자 PIN(`access_pin`, 빈 값은 제거)을 저장하고, 진행 상태에 따른 셀렉 수·원본 설정 잠금은 유지한다. 상세 조회 view의 PIN은 읽기 전용이며 변경은 이 수정 view에서만 한다. 수정 view의 하단은 생성 폼과 공용 `PhotographerFormActionBar`를 사용한다. 초대 링크 복사·PIN 표시·삭제 기능은 유지한다. `알림톡 보내기`는 Figma 위치에 표시하는 비활성 준비 중 버튼이며 아직 이벤트/API가 없다. |
+| `/studio/projects/[id]/upload` | `upload/page.tsx` | 초대 전(`preparing`) 사진 업로드/편집 화면. 셀렉용 프리뷰가 모두 등록되면 전달용 원본 전송이 남아 있어도 `셀렉 요청하기`로 `preparing→selecting` 전환과 공유가 가능하다. 활성화 뒤 사진 추가·삭제는 잠기지만 현재 원본 큐는 계속 전송된다. 실패 원본이 있으면 프로젝트 작업 카드의 복구 CTA가 `?recover=1`로 이 화면을 제한적으로 다시 열며, 신규 사진 편집 없이 기존 job만 복구한다. 그 외 활성 프로젝트 재진입은 `/assets/original`로 이동한다. |
+| `/studio/projects/[id]/assets/original` · `/assets/selected` | `assets/ProjectAssetsPageClient.tsx` | 확정 이후의 원본/셀렉 통합 조회 workspace. 경로는 분리하지만 공용 `ProjectAssetTabs`와 동일한 클라이언트 화면을 사용한다. 두 탭 모두 업로드 화면과 같은 가상화 `PhotographerPhotoGallery`와 공용 `OriginalPhotoViewer`를 재사용한다. 원본은 읽기 전용 메타데이터와 유사컷 상태를, 셀렉은 순번·고객 코멘트를 variant slot으로 표시한다. 셀렉 탭은 목록 내보내기와 셀렉 원본/프리뷰 폴더 저장을 제공한다. |
+| `/studio/projects/[id]/assets/retouched` | `workflow/WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 화면.** 실제 업로드 UI는 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며 `src/lib/version-mapping.ts`와 `src/lib/retouch-clip-match.ts`를 사용한다. 원본·셀렉과 같은 `ProjectAssetTabs` 자산 탐색 체계에 속하며, grid 최소 카드 폭·간격·반응형 여백·사진 비율도 `OriginalPhotoGallery`가 내보내는 공용 규격을 사용한다. 기존 `/workflow`와 `/results`는 저장된 링크 호환을 위해 새 자산 경로로 redirect한다. |
+| `/studio/settings` | `settings/page.tsx` | 프로필 설정, 프로필 이미지 업로드, 계정 삭제 |
 | `/auth/callback` | `src/app/auth/callback/route.ts` | OAuth 콜백, `photographers` 행 자동 생성, 로그인 시작 화면이 쿠키로 남긴 복귀 경로로 바로 리다이렉트(셀프 고객 로그인은 작가 지표 기록 생략 — 아래 "OAuth 로그인 후 원래 페이지로 복귀시키는 방법") |
 
-**삭제된 레거시 라우트(2026-07-13)**: `/auth`(no-op 리다이렉트), `/photographer/projects/[id]/upload_backup`, `/photographer/projects/[id]/edit/start`, `/photographer/projects/[id]/edit/progress`, `/photographer/projects/[id]/upload-versions`, `/photographer/projects/[id]/upload-versions/v2`, `api/photographer/upload-versions`(프록시). 전부 코드베이스 전체 grep으로 들어오는 링크가 0건임을 확인 후 삭제했다. 현재 보정 진입점은 `/assets/retouched`이며, 과거 `/workflow` 주소는 호환 redirect만 유지한다.
+**삭제된 레거시 라우트(2026-07-13)**: `/auth`(no-op 리다이렉트), `/studio/projects/[id]/upload_backup`, `/studio/projects/[id]/edit/start`, `/studio/projects/[id]/edit/progress`, `/studio/projects/[id]/upload-versions`, `/studio/projects/[id]/upload-versions/v2`, `api/photographer/upload-versions`(프록시). 전부 코드베이스 전체 grep으로 들어오는 링크가 0건임을 확인 후 삭제했다. 현재 보정 진입점은 `/assets/retouched`이며, 과거 `/workflow` 주소는 호환 redirect만 유지한다.
 
 ### 6.1a 베타 신청(`/beta/**`, 라우트는 공개지만 제출은 로그인 필수)
 
@@ -396,11 +413,11 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/beta/apply` | `src/app/beta/apply/page.tsx` + `src/components/beta/BetaApplyForm.tsx` | 클로즈드 베타 신청 폼(신규, 2026-07-26). **URL 자체는 로그인 여부와 무관하게 공개**이지만, 세션이 없으면 폼 대신 "구글/카카오로 로그인하고 신청하기" 안내 카드를 렌더링한다(2026-07-27부터 — 페이지 접근을 막는 게 아니라 화면 내용만 조건부). 로그인돼 있으면 세션 이메일을 읽기 전용 텍스트로 표시(입력 불가, 더 이상 `<input>`이 아님) |
 | `/beta/apply/complete` | `src/app/beta/apply/complete/page.tsx` | 신청 완료 안내(정적) |
 
-가입(`/photographer/dashboard` 등 기존 서비스 이용)과는 별개의 개념이다 — 신청 화면에 진입하는 것 자체는 가입의 필수 관문이 아니며, 승인/거절과 무관하게 누구나 기존처럼 즉시 가입해 "일반(Trial)" 등급으로 서비스를 쓸 수 있다(§6.3의 베타 등급 시스템과는 목적이 다른 별도 테이블, 상세는 아래 §6.3 안 "베타 신청서" 항목 참고). 다만 **"베타 신청서 제출" 그 자체는 2026-07-27부터 로그인이 선행 조건**이다 — 이메일을 신청자가 직접 입력하거나 관리자가 나중에 수동으로 매칭해야 하는 번거로움·오류 위험을 없애기 위해서다.
+가입(`/studio/dashboard` 등 기존 서비스 이용)과는 별개의 개념이다 — 신청 화면에 진입하는 것 자체는 가입의 필수 관문이 아니며, 승인/거절과 무관하게 누구나 기존처럼 즉시 가입해 "일반(Trial)" 등급으로 서비스를 쓸 수 있다(§6.3의 베타 등급 시스템과는 목적이 다른 별도 테이블, 상세는 아래 §6.3 안 "베타 신청서" 항목 참고). 다만 **"베타 신청서 제출" 그 자체는 2026-07-27부터 로그인이 선행 조건**이다 — 이메일을 신청자가 직접 입력하거나 관리자가 나중에 수동으로 매칭해야 하는 번거로움·오류 위험을 없애기 위해서다.
 
-**OAuth 로그인 후 원래 페이지로 복귀시키는 방법(2026-07-27 추가, 2026-10-06 쿠키 방식으로 교체, `src/lib/post-login-redirect.ts`)**: `/beta/apply`나 `/customer-select/login`에서 로그인하면 완료 후 그 화면으로 돌아와야 하는데, Supabase의 `redirectTo` URL에 `?next=...` 쿼리스트링을 붙이는 방식은 **Supabase 프로젝트의 Redirect URLs 허용 목록과 정확히 일치해야 하므로 위험하다**(로컬 테스트에서 실제로 OAuth 콜백이 거부되고 에러 쿼리와 함께 `/`로 리다이렉트되는 문제가 발생함). 대신 로그인 시작 직전에 돌아갈 경로를 쿠키 `acut_post_login_redirect`(Path=/, Max-Age 10분, SameSite=Lax, https에서만 Secure)에 적어 두고(`setPostLoginRedirect()`), `redirectTo` URL 자체는 항상 기존과 동일하게 유지한다. `/auth/callback`이 그 쿠키를 읽어(`resolvePostLoginPath()` — 같은 출처의 절대 경로만 통과, `//host`·제어 문자·512자 초과는 기본 목적지 `/photographer/dashboard`로. 쿼리 `next`는 쿠키가 없을 때의 보조 경로이며 같은 검증을 거친다) 세션 교환 뒤 바로 그 경로로 리다이렉트하고 쿠키를 지운다. 쿠키는 Supabase의 PKCE code verifier 쿠키와 같은 경로(최상위 이동)로 콜백에 도착하므로 로그인이 되는 환경이면 늘 함께 온다. `AuthModal`은 `redirectPath?: string` prop을 받으며, 생략 시 기본 목적지로 간다(이전 시도의 쿠키는 비운다). **셀프 고객 로그인 분기**: 복귀 경로가 `/customer-select`(하위 포함)이면 콜백은 `photographers` 행은 그대로 만들되(한 계정으로 작가·셀프 고객 화면을 모두 쓸 수 있고 작가 화면이 행을 기대한다) `signup_completed`/`first_login` 지표는 기록하지 않는다(`isCustomerSelectLogin()`). 이력: 2026-07-27~10-06에는 sessionStorage에 남겨 두고 로그인을 항상 `/photographer/dashboard`로 완료한 뒤 그 페이지의 `useEffect`가 `consumePostLoginRedirect()`로 한 번 더 이동시켰다(대시보드 깜빡임 방지용 `peekPostLoginRedirect()` 포함). 셀프 고객이 로그인마다 작가 대시보드를 거치고 sessionStorage가 막힌 환경에서는 거기 남는 문제, 콜백이 로그인 출처를 몰라 셀프 고객에게도 작가 지표가 쌓이는 문제로 교체했다.
+**OAuth 로그인 후 복귀(2026-10-11)**: `redirectTo`는 쿼리 없는 `/auth/callback`을 유지하고 목적지는 `acut_post_login_redirect` 쿠키(10분, Path=/, SameSite=Lax, HTTPS에서 Secure)에 저장한다. `AuthModal`은 명시적 `redirectPath` 또는 기본 `/workspaces`를 매 로그인 시 덮어쓴다. 콜백은 쿠키 우선, 없으면 쿼리 `next`를 검사한다. 외부 주소·제어 문자·512자 초과·로그인/API/콜백 목적지는 `/workspaces`로 보낸다. 성공과 실패 모두 목적지 쿠키를 지우며 실패는 같은 목적지의 공통 로그인에서 재시도한다. `photographers` 계정 행은 기존대로 생성하되 `isStudioLogin()`으로 명시적 스튜디오/베타 로그인의 지표만 기록한다. 일반 로그인·개인 셀렉·초대는 작가 가입/첫 로그인 지표에서 제외한다. `/workspaces`는 계정의 마지막 공간을 확인하거나 공간 선택을 제공한다. Supabase 허용 URL 설정은 이번 변경에서 수정하지 않았다. 과거 sessionStorage → 작가 대시보드 경유 방식은 현재 사용하지 않는다.
 
-### 6.1b 베타 설문(별도 라우트 아님, `/photographer/dashboard`에 조건부 임베드)
+### 6.1b 베타 설문(별도 라우트 아님, `/studio/dashboard`에 조건부 임베드)
 
 `plan/beta-system.md` §7·§12(5·6단계). `BetaSurveyModal`(`src/components/photographer/BetaSurveyModal.tsx`)이 `PhotographerModal` 위에 올라가는 형태로, 대시보드에서 조건 충족 시에만 렌더된다. `src/lib/beta-survey.ts`의 `IMPLEMENTED_SURVEY_TYPES`가 생애주기 순서로 5개 타입을 등록하며(여러 개 동시 충족 시 가장 이른 것부터 노출), 현재 구현된 설문은:
 - **마이크로 3종**(2026-07-27 추가, 각 1~2문항, "10초 안에" 답할 수 있는 것이 목표): `project_created`(첫 프로젝트 존재 시점, 1문항: 생성 과정 난이도 1~5점), `original_uploaded`(첫 프로젝트에 `project_logs.action='uploaded'` 존재, 2문항: 업로드 수월함 1~5점 + 불편한 점 자유서술), `selection_received`(첫 프로젝트에 `project_logs.action='confirmed'` 존재, 2문항: 확인 과정 편리함 1~5점 + 고객 피드백 자유서술). 뒤의 두 개는 ②③와 달리 `projects.status`가 아니라 **project_logs 존재 여부**로 트리거를 판단한다 — 고객이 `cancel-confirm`으로 확정을 취소해도 status만 되돌아갈 뿐 "이벤트가 있었다"는 사실은 남기 때문. 이 특성(되돌릴 수 없는 트리거) 때문에 한 번 트리거되면 사용자가 응답/건너뛰기 전까지 대시보드 방문마다 계속 노출된다(설계상 의도).
@@ -445,8 +462,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/admin/logs` | `src/app/admin/logs/page.tsx` | Activity Logs — 전체 작가 대상 `project_logs` 조회 |
 | `/admin/settings` | `src/app/admin/settings/page.tsx` + `AdminSettingsForm.tsx` | Settings — 등급별(일반/베타) 이용 한도를 편집 가능한 폼으로 제공(신규, 2026-07-26). `PATCH /api/admin/settings`로 `app_settings` 테이블을 갱신하며, 재배포 없이 즉시 반영된다(§6.3). 관리자 계정(`ADMIN_EMAILS`)은 여전히 읽기 전용 표시(하드코딩 유지). |
 
-- `src/middleware.ts`가 `/admin/**` 렌더링 전에 세션 이메일을 `ADMIN_EMAILS`와 대조한다. 비로그인은 `/`로, 허용되지 않은 이메일은 `/photographer/dashboard`로 리다이렉트한다. `src/app/admin/layout.tsx`의 `getAdminUser()`도 확인하며, 별도의 관리자 회원/역할·권한 테이블은 없다.
-- 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/photographer/**`의 접기형 사이드바와 달리 `lg`(1024px) 이상은 240px 고정폭 사이드바이고, 페이지 전체가 스크롤되는 동안 `lg:sticky lg:top-0`(화면 높이)로 제자리에 붙어 있다(2026-10-10 — 전에는 콘텐츠와 함께 밀려 올라갔음, 메뉴가 넘치면 메뉴 목록만 스크롤). `lg` 미만은 상단 바 + 슬라이드 드로어. `metadata.robots.index = false`로 검색엔진 노출 차단.
+- `src/middleware.ts`가 `/admin/**` 렌더링 전에 세션 이메일을 `ADMIN_EMAILS`와 대조한다. 비로그인은 `/`로, 허용되지 않은 이메일은 `/studio/dashboard`로 리다이렉트한다. `src/app/admin/layout.tsx`의 `getAdminUser()`도 확인하며, 별도의 관리자 회원/역할·권한 테이블은 없다.
+- 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/studio/**`의 접기형 사이드바와 달리 `lg`(1024px) 이상은 240px 고정폭 사이드바이고, 페이지 전체가 스크롤되는 동안 `lg:sticky lg:top-0`(화면 높이)로 제자리에 붙어 있다(2026-10-10 — 전에는 콘텐츠와 함께 밀려 올라갔음, 메뉴가 넘치면 메뉴 목록만 스크롤). `lg` 미만은 상단 바 + 슬라이드 드로어. `metadata.robots.index = false`로 검색엔진 노출 차단.
 - **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
 - **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
 - **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx`의 Profile Popover 안(설정/로그아웃과 함께, 2026-08-20부터 — 이전에는 사이드바 하단 상시 노출 버튼)에 "문의하기"로 노출된다.
@@ -454,13 +471,13 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
   - **가입 시점 매칭(2026-07-26 추가, `src/app/auth/callback/route.ts`)**: 신청은 이제 항상 로그인 후에 일어나 정상 흐름에서는 실행될 일이 거의 없지만, 레거시 데이터 등 예외 상황을 위한 방어 코드로 그대로 남겨뒀다. 같은 이메일로 신규 가입하면 `photographers` 행 생성 직후 `matched_photographer_id IS NULL`인 신청 레코드를 찾아 새 계정과 연결한다. 기존 `photographer` 행 생성과 같은 try/catch로 감싸여 있어 실패해도 로그인 자체는 막히지 않는다.
   - **관리자 승인→가입 연결 UI(2026-07-26 추가, 2026-07-27 재작성, `AdminBetaApplicationControl.tsx`)**: 상태가 `approved`이고 매칭된 계정이 아직 베타가 아닐 때만 노출. **"베타 초대 등록"(가입 전 이메일 사전등록) 버튼은 폐기** — 신청자가 이미 가입돼 있는 지금 구조에서는 호출할 때마다 "이미 가입된 사용자입니다" 오류만 반환하기 때문. 대신 **"베타 부여" 버튼**이 기존 `PATCH /api/admin/users/[id]/beta`를 그대로 호출해 `{beta_status:'active'}`만 전송한다(날짜 없이 무기한 부여 — `beta-policy.ts`의 `isBetaActive()`가 `betaEndDate` null을 "무기한 유효"로 처리). **"계정 매칭"(이메일로 수동 검색) 입력창은 완전히 제거**됐다 — 신청 시점에 항상 자동 매칭되므로 더 이상 필요 없다고 판단(사용자 확인, 예외 상황용 폴백도 남기지 않기로 함). `matched_photographer_id`가 비어 있는 예외 상황(정상 흐름에서는 발생 안 함)은 경고 문구만 표시.
 - **핵심 사용 행동 집계(`beta_usage_events` 테이블, 신규, 2026-07-27, `supabase/migrations/20260727_beta_usage_events.sql`)**: `project_logs`가 커버 못하는 프로젝트 비종속 이벤트(`signup_completed`/`first_login`) + 조회성 이벤트(`customer_link_visited`) 3종만 기록한다 — 프로젝트 생성/사진업로드/셀렉완료/납품완료 등은 이미 `project_logs`/`projects`로 확인 가능해 여기 다시 담지 않는다. `photographer_id`/`project_id` 둘 다 nullable, 어느 한쪽만 채워짐. 기록은 `src/lib/beta-usage-events.ts`의 `recordBetaUsageEvent()`(never-throw, best-effort) 하나로 통일:
-  - `signup_completed`: `auth/callback/route.ts`의 신규 가입(`!existing`) 분기에서만 기록. 셀프 고객 서비스에서 시작한 로그인(복귀 경로 `/customer-select`)은 기록하지 않는다(2026-10-06).
+  - `signup_completed`: `auth/callback/route.ts`의 신규 가입(`!existing`) 분기에서만 기록. 셀프 고객 서비스에서 시작한 로그인(복귀 경로 `/select/projects`)은 기록하지 않는다(2026-10-06).
   - `first_login`: 같은 라우트에서 신규/기존 가입 여부와 무관하게 매 로그인마다 insert를 시도 — 작가당 1건만 허용하는 부분 유니크 인덱스(`photographer_id, event_type WHERE project_id IS NULL`)가 있어 이미 기록됐으면 23505로 걸러지고 조용히 무시된다(매번 별도 SELECT 없이 insert-and-ignore 방식). 셀프 고객 서비스에서 시작한 로그인은 기록하지 않는다 — 그 계정이 나중에 작가 화면에서 로그인하면 그때 기록된다(2026-10-06).
   - `customer_link_visited`: **`src/app/c/[token]/page.tsx`(인덱스)가 아니라 `src/app/c/[token]/layout.tsx`에서 기록한다.** 처음에는 인덱스 페이지에 뒀으나, PIN 인증 후 딥링크(예: 북마크된 `/c/[token]/gallery`로 직접 진입)는 인덱스를 거치지 않아 놓친다는 걸 실제 링크로 검증하다 발견해 모든 하위 경로를 감싸는 layout으로 옮겼다. App Router는 같은 동적 세그먼트 하위의 클라이언트 내비게이션에서 layout을 재실행하지 않으므로(사진 클릭 등 내부 이동마다 다시 도는 게 아니라 최초 진입 시 1회) 고객 트래픽 부하 우려도 크지 않다. 프로젝트당 1건만 허용하는 유니크 인덱스(`project_id, event_type WHERE project_id IS NOT NULL`)로 멱등 처리 — 고객이 여러 번 재접속해도 "최초 접속" 1건만 남는다(실제 링크로 재방문시켜 중복 없이 1건만 유지됨을 확인). 서버리스 환경에서는 응답 종료 후 백그라운드 실행이 보장되지 않아 `await`한다(인덱스 조회 1회 수준의 지연).
   - 관리자 화면 반영: `/admin/beta-applications/[id]`에 "사용 현황" 섹션(매칭된 계정이 있을 때만 노출) — 첫 로그인 시각(`beta_usage_events`), 생성한 프로젝트 수(`projects` 테이블 카운트, 기존 데이터 재사용), 고객이 접속한 프로젝트 수(`beta_usage_events` 카운트).
 - **`feedback` 테이블**(신규, `supabase/migrations/20260726_feedback.sql`): `reporter_type`(photographer/customer, 현재는 photographer만 사용) · `photographer_id` · `project_id`(nullable) · `category`(bug/suggestion) · `message` · `page_url` · `status`(new/reviewing/resolved). RLS는 활성화되어 있으나 정책이 없어 anon/authenticated 롤의 직접 접근은 차단되고, 모든 접근은 서버(service role 또는 세션 검증된 API 라우트)를 통해서만 이뤄진다.
 - **`project_logs` 액션 커버리지 확장**(`supabase/migrations/20260726_project_logs_expand_actions.sql`): 기존 5개(`created/uploaded/selecting/confirmed/editing`)에 `reviewing_v1/editing_v2/reviewing_v2/delivered` 4개를 추가해 CHECK 제약을 8개 상태 전이 전부로 확장했다. 기록 지점: `reviewing_v1`/`reviewing_v2`는 작가가 `WorkflowPageClient.tsx`에서 고객 검토를 시작할 때(`POST /api/photographer/project-logs`), `editing_v2`/`delivered`는 고객이 `POST /api/c/review-submit`으로 검토 결과를 제출할 때 서버에서 직접 기록한다(둘 다 실패해도 상태 전환 자체는 막지 않음).
-- **베타 등급/이용량 제한 시스템**(2026-07-26, `supabase/migrations/20260726_beta_tier_system.sql`): 등급은 관리자(`ADMIN_EMAILS` 이메일 일치, 무제한) / 베타(`photographers.beta_status='active'` AND 기간 유효) / 일반(그 외 전부) 3단계이며, 사용자별 override 없이 전원 동일한 정책이 적용된다. 프로젝트 10개·사진 2000장(베타), 프로젝트 1개·사진 500장(일반) 등 구체적인 한도 값은 **더 이상 코드 상수가 아니라 `app_settings` DB 테이블(id=1 싱글턴)에서 읽는다** — `/admin/settings`에서 관리자가 값을 바꾸면 재배포 없이 즉시 반영된다(2026-07-26, `20260726_app_settings.sql`). 판정 로직은 FE `src/lib/beta-policy.ts`(순수 함수, DB에서 읽은 `AppSettings`를 인자로 받음) + `src/lib/app-settings.ts`(`getAppSettings()`, DB 조회 실패 시 `src/lib/beta-limits.ts`의 `DEFAULT_*` 상수로 폴백), BE `app/beta_policy.py`(`_get_settings()`가 동일한 `app_settings` 테이블 조회, 실패 시 `DEFAULT_*` 상수 폴백)에 각각 단일 소스로 모아뒀다(런타임이 둘이라 코드 공유 불가 — `ADMIN_EMAILS`는 이번 실시간화 범위에서 제외해 계속 두 언어에 하드코딩 중복). 표시용 화면(대시보드 진행바, 재보정 패널, 업로드 사전 경고)도 신규 공개 `GET /api/limits`로 같은 값을 실시간 조회한다. **"베타 이용중" 배지(2026-07-27 추가)**: 대시보드 우측 사용량 패널이 `GET /api/photographer/quota`의 `tier` 필드를 조회해 `tier === "beta"`일 때만 "사용량" 라벨 옆에 배지를 표시한다(`src/app/photographer/dashboard/page.tsx`) — 그 전까지는 작가 본인이 자신의 등급(관리자/베타/일반)을 화면 어디서도 확인할 방법이 없었다.
+- **베타 등급/이용량 제한 시스템**(2026-07-26, `supabase/migrations/20260726_beta_tier_system.sql`): 등급은 관리자(`ADMIN_EMAILS` 이메일 일치, 무제한) / 베타(`photographers.beta_status='active'` AND 기간 유효) / 일반(그 외 전부) 3단계이며, 사용자별 override 없이 전원 동일한 정책이 적용된다. 프로젝트 10개·사진 2000장(베타), 프로젝트 1개·사진 500장(일반) 등 구체적인 한도 값은 **더 이상 코드 상수가 아니라 `app_settings` DB 테이블(id=1 싱글턴)에서 읽는다** — `/admin/settings`에서 관리자가 값을 바꾸면 재배포 없이 즉시 반영된다(2026-07-26, `20260726_app_settings.sql`). 판정 로직은 FE `src/lib/beta-policy.ts`(순수 함수, DB에서 읽은 `AppSettings`를 인자로 받음) + `src/lib/app-settings.ts`(`getAppSettings()`, DB 조회 실패 시 `src/lib/beta-limits.ts`의 `DEFAULT_*` 상수로 폴백), BE `app/beta_policy.py`(`_get_settings()`가 동일한 `app_settings` 테이블 조회, 실패 시 `DEFAULT_*` 상수 폴백)에 각각 단일 소스로 모아뒀다(런타임이 둘이라 코드 공유 불가 — `ADMIN_EMAILS`는 이번 실시간화 범위에서 제외해 계속 두 언어에 하드코딩 중복). 표시용 화면(대시보드 진행바, 재보정 패널, 업로드 사전 경고)도 신규 공개 `GET /api/limits`로 같은 값을 실시간 조회한다. **"베타 이용중" 배지(2026-07-27 추가)**: 대시보드 우측 사용량 패널이 `GET /api/photographer/quota`의 `tier` 필드를 조회해 `tier === "beta"`일 때만 "사용량" 라벨 옆에 배지를 표시한다(`src/app/studio/(workspace)/dashboard/page.tsx`) — 그 전까지는 작가 본인이 자신의 등급(관리자/베타/일반)을 화면 어디서도 확인할 방법이 없었다.
   - **프로젝트 생성**: 기존엔 `src/lib/db.ts`의 `createProject()`가 브라우저에서 Supabase에 직접 INSERT해 서버 검증이 전혀 없었다. 신규 `POST /api/photographer/projects`로 옮기고 여기서 등급별 한도를 검증한 뒤 생성한다(`new/page.tsx`가 이 API를 호출하도록 변경). **모든 등급이 `COUNT(*) FROM projects`(현재 보유 수) 기준으로 판정한다** — 일반 사용자도 프로젝트를 삭제하면 즉시 슬롯이 다시 확보된다(2026-07-26 커밋 `2b2e241`/`818affc`에서 결정됨). 처음 설계 단계에서는 "삭제 후 재생성 우회 방지"를 위해 일반 사용자만 `photographers.total_projects_created`(누적, 삭제해도 감소 안 함)로 판정하도록 만들었으나, 이후 정책이 단순화되어 두 등급 모두 동일하게 현재 보유 수 기준을 쓴다 — `total_projects_created` 컬럼은 남아있지만 더 이상 읽히지 않는다.
   - **사진 업로드**: `FastAPI POST /api/upload/photos`가 기존 전역 상수 대신 `app/beta_policy.get_max_photos_per_project()`로 요청자의 등급별 한도를 조회해 검증한다.
   - **가입 전 사전 초대**: `beta_invitations` 테이블에 이메일을 등록해두면, 그 이메일로 가입하는 순간(`src/app/auth/callback/route.ts`) 자동으로 `beta_status='active'`가 부여되고 초대가 소진 처리된다. 이미 가입된 이메일은 초대 등록 자체가 거부된다(관리자가 상세 화면에서 직접 부여해야 함).
@@ -636,7 +653,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/upload/photos` | POST | 클라이언트 Bearer 전달(자체 검증 없음) | FastAPI 업로드 프록시(CORS 우회용). 보정본용 프록시(`api/photographer/upload-versions`)는 호출하는 곳이 없어 2026-07-13 삭제됨 — 실제 보정본 업로드는 `UploadVersionsPanel.tsx`가 FastAPI를 직접 호출 |
 | `api/photographer/upload/originals/finalize` | POST | 클라이언트 Bearer 전달(FastAPI에서 세션+소유권 검증) | 원본 포함 업로드 세션 종료 시 FastAPI `/api/upload/originals/finalize` 프록시. R2 HEAD/ZIP/worker를 기다리지 않고 DB의 전체 사진 수와 `pending/processing/completed` 수를 집계해 원본 누락을 완료 토스트 전에 검출 |
 | `api/projects/[id]` | PATCH | **없음** | 레거시 엔드포인트, §12 위험 항목 참고 |
-| `api/photographer/quota` | GET | 세션 | 로그인한 작가 본인의 등급/사용량/한도 조회(사용자 안내용, `/photographer/projects`·`/projects/new`에서 사용) |
+| `api/photographer/quota` | GET | 세션 | 로그인한 작가 본인의 등급/사용량/한도 조회(사용자 안내용, `/studio/projects`·`/projects/new`에서 사용) |
 | `api/limits` | GET | 없음(민감 정보 아님) | 현재 유효한 이용 한도 값(`app_settings` 조회) — 대시보드/재보정 패널/업로드 페이지 등 표시용 화면이 실시간 값 반영에 사용 |
 | `api/feedback` | POST | 세션 | 작가 피드백(버그/제안) 제출 → `feedback` 테이블 insert |
 | `api/beta/applications` | POST | 세션(2026-07-27부터 필수, 없으면 401) | 클로즈드 베타 신청서 제출. 이메일/`photographer_id`는 항상 세션에서 조회(클라이언트 입력 없음). 휴대폰번호 중복 시 409 |
@@ -877,7 +894,7 @@ sequenceDiagram
 ## 13. 권한 및 데이터 격리 구조
 
 - **작가 데이터 격리**: 거의 모든 작가용 API 라우트가 "세션에서 `auth_id` 추출 → `photographers.id` 조회 → 대상 리소스의 `photographer_id`와 일치 확인" 패턴을 반복 구현합니다(공용 미들웨어/헬퍼로 통합되어 있지 않고 각 라우트 파일에 개별 구현).
-- **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher는 고객 경로(`/c/:token`, `/c/:token/:path+`)와 관리자 경로만 포함하므로, 인증되지 않은 사용자도 작가 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
+- **`/studio/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher는 고객 경로(`/c/:token`, `/c/:token/:path+`)와 관리자 경로만 포함하므로, 인증되지 않은 사용자도 작가 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
 - **`/admin/**`는 미들웨어에서 렌더링 전에 접근 제어됩니다.** `src/middleware.ts`가 세션 이메일을 허용 목록(`ADMIN_EMAILS`)과 대조해 HTTP 리다이렉트하고, `src/app/admin/layout.tsx`도 `getAdminUser()`로 확인합니다. 역할/권한 테이블 없이 이메일 허용 목록으로 판별합니다. **페이지 가드는 `/api/admin/**`에 자동 적용되지 않으므로**, 각 Route Handler가 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
 - **레거시 미인증 라우트**: `src/app/api/projects/[id]/route.ts`(PATCH)는 세션/소유권 확인이 전혀 없이 `src/lib/db.ts`의 `updateProject()`를 직접 호출합니다. 같은 기능을 하는 `src/app/api/photographer/projects/[id]/route.ts`는 세션+소유권 검증을 하므로, 이 레거시 경로는 사용되지 않는 것으로 보이나 **엔드포인트 자체는 살아있어 확인 필요**합니다.
 - **FastAPI `/api/storage/delete`는 서버 간 Bearer 인증이 필수다.** Next API에서 사용자 소유권을 확인한 후 `INTERNAL_PRESIGN_SECRET`을 보낸다. secret 미설정은 503, 불일치는 403이며 R2를 호출하지 않는다.
@@ -942,7 +959,7 @@ sequenceDiagram
 10. **대량 `print()`/`console.log` 디버그 로그가 프로덕션 경로에 남아있음** — BE의 업로드 경로 메모리 진단 로그, FE의 프로필/업로드 프록시 라우트 로그(토큰 앞 20자 등 일부 민감할 수 있는 정보 포함).
 11. **백엔드/CLIP 서비스 모두 자동화 테스트가 전혀 없음** — 회귀는 FE의 Playwright E2E(주로 Supabase 직접 경로)로만 일부 커버됩니다. 업로드/삭제/presign 등 FastAPI 로직 자체를 검증하는 테스트는 없습니다.
 12. **`GalleryPageClient`/뷰어 등 고객 UI 상세 코드는 이번 조사에서 표면적으로만 확인**했습니다 — 가상 스크롤 구현 세부사항, 무한 스크롤 여부 등은 §16 참고.
-13. ~~레거시 페이지 `/photographer/projects/[id]/upload-versions`, `.../upload-versions/v2`~~ — 2026-07-13 삭제됨(§6.1 삭제 이력 참고). 해당 페이지 고유의 매칭 렌더링 버그도 코드와 함께 제거되어 더 이상 해당 없음.
+13. ~~레거시 페이지 `/studio/projects/[id]/upload-versions`, `.../upload-versions/v2`~~ — 2026-07-13 삭제됨(§6.1 삭제 이력 참고). 해당 페이지 고유의 매칭 렌더링 버그도 코드와 함께 제거되어 더 이상 해당 없음.
 14. ~~같은 고객 링크(token)를 두 세션이 동시에 열어 서로 다른 필드(별점/색상/코멘트)를 편집하면, 나중 요청이 로컬 캐시 전체를 재전송해 먼저 저장된 값을 지우는 데이터 유실~~ — 2026-07-28 수정됨(§11 참고). `updatePhotoState()`/`toggle()`이 바뀐 필드만 전송하도록, `upsertSelectionAdmin`이 생략된 필드는 건드리지 않도록 파이프라인 전 구간을 수정. 동시 세션 간 실시간 미반영(새로고침 전까지 안 보임) 문제도 5초 폴링으로 함께 개선(완전한 실시간은 아님 — 최대 폴링 주기만큼 지연 가능).
 15. **베타 AI 전환(2026-07-28) 이후 OpenCLIP/OpenCV/mediapipe 코드·패키지가 미사용 상태로 남아있음(의도적 보류)** — `clip_model.py`/`analyzer.py`/`quality.py`/`eyes.py`와 `torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless`/`mediapipe` 패키지, Dockerfile의 `libgl1`/`libglib2.0-0`. `clip_model.py`는 `matcher.py`(보정본 매칭)가 계속 의존해 삭제 불가하지만, `quality.py`/`eyes.py`(그리고 관련 OpenCV/mediapipe 패키지)는 다른 사용처가 없어 삭제 가능한 상태 — 다만 영향 범위·롤백 가능성 검토 후 별도 승인을 받기로 하고 이번 라운드에서는 삭제하지 않았다(§6.5).
 
@@ -1007,3 +1024,7 @@ sequenceDiagram
 - `POST/GET /api/customer-select/guest-albums/[id]/archives`: 소유자 ZIP 스냅샷 요청/파트 상태와 다운로드 서명 주소 조회.
 - FastAPI 내부 `POST /api/guest-upload/archive-urls`: 내부 비밀값과 ZIP 전용 키 패턴 검증, 15분 GET URL.
 - 공개 업로드 세 API는 DB의 기기·IP 분당 한도를 공유한다. pending+ready 예약량으로 동시 업로드 총량을 제한한다.
+
+2026-10-17: 세 공개 랜딩은 `LandingAuth`에서 비로그인 사용자의 `/login`·`/beta/apply` 일반 클릭을 처리해 기존 `AuthModal`을 현재 랜딩 위에 표시한다. 로그인 후 목적지는 기존 redirect 유틸을 사용하고, 닫을 때 대기 목적지를 정리한다. 직접 URL 진입·새 탭은 기존 로그인/신청 경로를 유지한다.
+
+`LandingAuth`는 일반 클릭으로 `/`·`/studio`·`/select` 사이를 이동할 때 스크롤을 즉시 맨 위로 초기화한다. 해시 링크와 수정 키를 사용한 새 탭 열기는 기존 브라우저 동작을 유지한다(2026-10-17).

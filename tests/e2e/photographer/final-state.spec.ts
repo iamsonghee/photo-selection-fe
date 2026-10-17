@@ -56,7 +56,7 @@ test("납품 완료 최종본은 과거 재보정 요청 상태를 노출하지 
     await setProjectStatus(page, project.projectId, "delivered");
 
     await page.setViewportSize({ width: 402, height: 874 });
-    await page.goto(`/photographer/projects/${project.projectId}/assets/final`);
+    await page.goto(`/studio/projects/${project.projectId}/assets/final`);
 
     await expect(page.getByRole("tab", { name: "최종 보정본", exact: true })).toHaveAttribute(
       "aria-selected",

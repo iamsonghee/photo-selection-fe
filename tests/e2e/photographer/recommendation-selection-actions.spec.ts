@@ -194,7 +194,7 @@ test("원본 탭에서 저장된 작가 추천을 표시하고 필터링한다",
   );
   expect(recommendationResponse.ok(), await recommendationResponse.text()).toBe(true);
 
-  await page.goto(`/photographer/projects/${project.projectId}/assets/original`);
+  await page.goto(`/studio/projects/${project.projectId}/assets/original`);
   await expect(page.locator("[data-photo-sort-select]:visible")).toHaveCount(1);
   const scopeSelect = page.getByRole("button", { name: "보기 범위: 전체 사진" });
   await expect(scopeSelect).toBeVisible();
@@ -216,7 +216,7 @@ test("PC 셀렉 결과는 파일명 복사를 내보내기 메뉴 안에 표시�
   });
   expect(statusResponse.ok(), await statusResponse.text()).toBe(true);
 
-  await page.goto(`/photographer/projects/${project.projectId}/assets/selected`);
+  await page.goto(`/studio/projects/${project.projectId}/assets/selected`);
   const copyButton = page.getByRole("button", { name: "파일명 복사" });
   await expect(copyButton).toBeHidden();
 

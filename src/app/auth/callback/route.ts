@@ -3,7 +3,7 @@ import { getAdminClient } from "@/lib/supabase-admin";
 import { NextRequest, NextResponse } from "next/server";
 import { getAppSettings } from "@/lib/app-settings";
 import { recordBetaUsageEvent } from "@/lib/beta-usage-events";
-import { isCustomerSelectLogin, POST_LOGIN_REDIRECT_COOKIE, resolvePostLoginPath } from "@/lib/post-login-redirect";
+import { isStudioLogin, POST_LOGIN_REDIRECT_COOKIE, resolvePostLoginPath } from "@/lib/post-login-redirect";
 
 /**
  * OAuth 콜백 Route Handler
@@ -14,13 +14,12 @@ import { isCustomerSelectLogin, POST_LOGIN_REDIRECT_COOKIE, resolvePostLoginPath
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  // 같은 출처의 절대 경로만 믿는다 — 아니면 작가 대시보드. 쿼리 `next`는 쿠키가 없을 때의 보조 경로.
+  // 같은 출처의 절대 경로만 믿는다 — 아니면 마지막 공간/공간 선택. 쿼리 `next`는 쿠키가 없을 때의 보조 경로.
   const next = resolvePostLoginPath(
     request.cookies.get(POST_LOGIN_REDIRECT_COOKIE)?.value ?? requestUrl.searchParams.get("next"),
   );
-  // 셀프 고객 서비스에서 시작한 로그인. 계정은 작가와 같아(한 계정으로 작가·셀프 고객 화면 모두 가능)
-  // photographers 행은 그대로 만들되, 작가 가입·첫 로그인 지표에는 섞지 않는다.
-  const customerSelectLogin = isCustomerSelectLogin(next);
+  // 공통 로그인·개인 셀렉은 작가 가입 지표에 포함하지 않는다. 공통 계정 행 생성은 유지한다.
+  const studioLogin = isStudioLogin(next);
 
   // request.url의 origin은 next dev가 리버스 프록시(ngrok/cloudflared 등) 뒤에서 실제 요청
   // Host를 무시하고 항상 localhost:PORT로 되돌려주는 문제가 있어(dev 서버 특유의 동작),
@@ -29,15 +28,21 @@ export async function GET(request: NextRequest) {
   const forwardedProto = request.headers.get("x-forwarded-proto") ?? requestUrl.protocol.replace(":", "");
   const origin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin;
 
-  if (!code) {
-    return NextResponse.redirect(new URL("/", origin));
+  function failedLogin() {
+    const retry = new URL("/login", origin);
+    retry.searchParams.set("next", next);
+    retry.searchParams.set("error", "oauth");
+    const response = NextResponse.redirect(retry);
+    response.cookies.set(POST_LOGIN_REDIRECT_COOKIE, "", { path: "/", maxAge: 0 });
+    return response;
   }
+  if (!code) return failedLogin();
 
   const supabase = await createClient();
   const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("[Auth Callback] exchangeCodeForSession error:", error);
-    return NextResponse.redirect(new URL("/?error=" + encodeURIComponent(error.message), origin));
+    return failedLogin();
   }
 
   const user = sessionData?.user;
@@ -113,7 +118,7 @@ export async function GET(request: NextRequest) {
             .is("matched_photographer_id", null);
         }
 
-        if (!customerSelectLogin) {
+        if (studioLogin) {
           await recordBetaUsageEvent(admin, { eventType: "signup_completed", photographerId: newId });
         }
       }
@@ -122,7 +127,7 @@ export async function GET(request: NextRequest) {
       // 이미 기록됐으면 조용히 무시되므로(recordBetaUsageEvent 참고) 매 로그인마다 별도 조회 없이
       // 그냥 insert를 시도해도 안전하다. 셀프 고객 로그인은 건너뛰어, 그 계정이 나중에 작가 화면에서
       // 로그인하면 그때 "첫 로그인"이 된다.
-      if (!customerSelectLogin) {
+      if (studioLogin) {
         await recordBetaUsageEvent(admin, { eventType: "first_login", photographerId });
       }
     } catch (e) {

@@ -34,8 +34,8 @@ export function CustomerProjectHistory({ projects }: { projects: CustomerHistory
           </div>
         </div>
         <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <PhotographerLightLinkButton href={`/photographer/projects/${project.id}`} variant="outline">프로젝트 보기</PhotographerLightLinkButton>
-          {project.status === "delivered" && <PhotographerLightLinkButton href={`/photographer/projects/${project.id}/assets/final`} variant="secondary">최종 보정본 보기</PhotographerLightLinkButton>}
+          <PhotographerLightLinkButton href={`/studio/projects/${project.id}`} variant="outline">프로젝트 보기</PhotographerLightLinkButton>
+          {project.status === "delivered" && <PhotographerLightLinkButton href={`/studio/projects/${project.id}/assets/final`} variant="secondary">최종 보정본 보기</PhotographerLightLinkButton>}
         </div>
       </li>)}
     </ul>}

@@ -1,3 +1,0 @@
-.lightTheme {
-  composes: lightTheme from "../../../styles/PhotographerLightTheme.module.css";
-}

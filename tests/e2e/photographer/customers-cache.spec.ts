@@ -14,13 +14,13 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
     if (hold) { pending.push(route); return; }
     await route.fulfill({json:list});
   });
-  await page.route(/\/api\/photographer\/customers\/[0-9a-f-]+$/, async route => {
+  await page.route(/\/api\/studio\/customers\/[0-9a-f-]+$/, async route => {
     const id = route.request().url().split("/").at(-1)!;
     detailCalls.set(id,(detailCalls.get(id)??0)+1);
     if (hold) { pending.push(route); return; }
     await route.fulfill({json:{customer:{...(customers.find(customer=>customer.id===id) ?? {id,name:"기존 고객"}),note:"저장된 메모",updatedAt:"2026-10-01T00:00:00Z",projects:[]}}});
   });
-  await page.goto("/photographer/customers");
+  await page.goto("/studio/customers");
   await page.getByRole("searchbox").fill("캐시검증");
   const detail = page.getByRole("article", { name:"고객 상세" });
   await expect(detail.getByRole("heading",{name:"김지민",exact:true})).toBeVisible();
@@ -45,7 +45,7 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
 
   // Layout cache survives a real route change and return via browser history.
   await page.getByRole("link", { name: "프로젝트", exact: true }).first().click();
-  await expect(page).toHaveURL(/photographer\/projects$/);
+  await expect(page).toHaveURL(/app\/studio\/projects$/);
   await page.goBack();
   await page.getByRole("searchbox").fill("캐시검증");
   await expect(detail.getByRole("heading",{name:"김지민",exact:true})).toBeVisible();
@@ -65,8 +65,8 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
   await page.getByRole("menuitem", { name: "로그아웃" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("article", { name: "고객 상세" })).toHaveCount(0);
-  const unauthorized = await page.request.get("/photographer/customers");
+  const unauthorized = await page.request.get("/studio/customers");
   expect(await unauthorized.text()).not.toContain('aria-label="고객 목록"');
-  await page.goto("/photographer/customers");
+  await page.goto("/studio/customers");
   await expect(page).toHaveURL(/\/$/);
 });

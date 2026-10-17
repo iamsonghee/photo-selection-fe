@@ -36,7 +36,7 @@ test.describe("관리자 — 접근 제어(raw HTTP, 데이터 유출 방지)", 
     }
   });
 
-  test("관리자가 아닌 로그인 사용자가 /admin/** raw 요청 시 /photographer/dashboard로 리다이렉트되고 데이터가 없다", async ({ page }) => {
+  test("관리자가 아닌 로그인 사용자가 /admin/** raw 요청 시 /studio/dashboard로 리다이렉트되고 데이터가 없다", async ({ page }) => {
     await loginAsPhotographer(page);
 
     for (const route of ADMIN_ROUTES) {
@@ -44,7 +44,7 @@ test.describe("관리자 — 접근 제어(raw HTTP, 데이터 유출 방지)", 
       expect(res.status(), `${route} 는 리다이렉트(3xx)여야 함`).toBeGreaterThanOrEqual(300);
       expect(res.status()).toBeLessThan(400);
       const location = res.headers()["location"];
-      expect(location, `${route} 의 Location 헤더`).toBe("/photographer/dashboard");
+      expect(location, `${route} 의 Location 헤더`).toBe("/studio/dashboard");
 
       // 리다이렉트 응답 본문에 리다이렉트 대상 경로 외의 실제 데이터(이메일, 프로젝트/작가 정보 등)가
       // 없어야 한다 — 정확히 0바이트일 필요는 없다(Next.js가 리다이렉트 경로 자체를 폴백 본문으로

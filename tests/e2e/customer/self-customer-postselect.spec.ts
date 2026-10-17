@@ -25,7 +25,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       if (path.endsWith(id)) return route.fulfill({ json: { project, isOwner: true } });
       return route.fulfill({ json: { ok: true } });
     });
-    await page.goto(`/customer-select/${id}/select`);
+    await page.goto(`/select/${id}/select`);
     const finish = page.getByRole("button", { name: "선택 결과 확인하기 →" });
     await expect(finish).toBeVisible();
     await finish.click();

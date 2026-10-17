@@ -21,7 +21,7 @@ test("photos added while uploading are queued and uploaded right after", async (
     participantDone: {}, participantNicknames: { red: "테스트" }, shareToken: "", shareEnabled: true, exported: false,
   } } }));
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/customer-select/queue-check/upload");
+  await page.goto("/select/queue-check/upload");
   await expect(page.getByRole("heading", { name: "업로드 대기열" })).toBeVisible();
 
   const file = (name: string) => ({ name, mimeType: "image/jpeg", buffer: Buffer.from("unused") });

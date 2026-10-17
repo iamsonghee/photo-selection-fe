@@ -59,7 +59,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   page.on("request", (request) => { if (request.method() === "PATCH" && new URL(request.url()).pathname.endsWith("/projects/core-flow")) projectStatePatches.push(request.url()); });
   await loginAsPhotographer(page);
   await mock(page, selectedCount);
-  await page.goto("/customer-select/core-flow/select");
+  await page.goto("/select/core-flow/select");
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   // 셀프 고르기 카드는 모바일 기본 2열에서도 1:1(공용 카드의 2열 4:3을 덮어쓴다).
   const cardBox = await page.locator("[data-photo-id]").first().boundingBox();
@@ -97,7 +97,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const viewerReviewBox = await confirm.boundingBox();
   const viewerReviewText = await confirm.innerText();
   await confirm.click();
-  await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
+  await expect(page).toHaveURL(/\/select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: `${selectedCount}장을 골랐어요` })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
   expect(reviewTexts).toContain(`약속한 10장보다 ${Math.abs(selectedCount - 10)}장 ${selectedCount > 10 ? "많아요" : "적어요"}`);
@@ -135,8 +135,10 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
   expect([...csvBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   expect(csvText).toContain("파일명,작가 전달 메모");
-  expect(csvText).toContain("유사컷02.jpg");
-  expect(csvText).not.toContain("유사컷02.jpg".normalize("NFD"));
+  // 파일명 목록은 확장자를 뺀다(a8baece2, filenameWithoutExtension) — 한글은 NFC 그대로
+  expect(csvText).toContain("유사컷02");
+  expect(csvText).not.toContain("유사컷02.jpg");
+  expect(csvText).not.toContain("유사컷02".normalize("NFD"));
   expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
@@ -163,8 +165,8 @@ test("legacy exported project can continue selecting", async ({ page }) => {
     return route.fulfill({ json: { ok: true } });
   });
 
-  await page.goto("/customer-select/delivered/select");
-  await expect(page).toHaveURL(/\/customer-select\/delivered\/select$/);
+  await page.goto("/select/delivered/select");
+  await expect(page).toHaveURL(/\/select\/delivered\/select$/);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(true);
 });

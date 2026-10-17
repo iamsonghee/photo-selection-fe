@@ -8,7 +8,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     // /new는 유형 선택(촬영본 고르기·하객 사진 모으기), 촬영본 생성 폼은 /new/photos다(2026-10-06).
-    await page.goto("/customer-select/new/photos");
+    await page.goto("/select/new/photos");
     await expect(page.getByRole("heading", { name: "어떤 사진을 골라볼까요?" })).toBeVisible();
     // 셀프 고객은 장면 구성이 다른 촬영 종류를 나눠 고른다(웨딩 본식/웨딩 촬영 등).
     await expect(page.getByRole("button", { name: "웨딩 본식" })).toBeVisible();
@@ -25,9 +25,9 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.screenshot({ path: testInfo.outputPath(`create-${width}.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  await page.goto("/customer-select");
+  await page.goto("/select/projects");
   await expect(page.getByText(/미입력/)).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "전체 사진 이용량" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "내 사진 셀렉 사진 이용량" })).toBeVisible();
   const accountMenu = page.locator('summary[aria-label="계정 메뉴"]');
   await expect(accountMenu).toBeVisible();
   await accountMenu.click();
@@ -138,7 +138,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   });
   await page.route("**/api/customer-select/projects/*/participants", async (route) => { await route.fulfill({ json: { ok: true } }); });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/customer-select/limit-check/upload");
+  await page.goto("/select/limit-check/upload");
   await expect(page.getByRole("heading", { name: "업로드 한도 확인" })).toBeVisible();
   // 업로드 화면에는 AI 버튼이 없다(29132aa) — AI 정리는 업로드를 마친 뒤 안내와 고르기 화면에서 시작한다(고르기 쪽은 scene-timeline 테스트가 확인).
   await expect(page.getByRole("button", { name: "AI 분석 시작" })).toHaveCount(0);
